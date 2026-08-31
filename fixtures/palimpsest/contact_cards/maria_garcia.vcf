@@ -1,0 +1,7 @@
+BEGIN:VCARD
+VERSION:3.0
+N:Garcia;Maria;;;
+FN:Maria Garcia
+EMAIL;TYPE=INTERNET:maria@example.com
+TEL;TYPE=CELL:+1-555-0104
+END:VCARD

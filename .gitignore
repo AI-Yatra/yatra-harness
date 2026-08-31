@@ -1,0 +1,21 @@
+.venv/
+.runs/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.env
+.DS_Store
+.ruff_cache/
+
+# REPL-generated per-message task files. Generated on the fly; not part of
+# the workshop material. Delete the whole folder to start fresh.
+tasks/chat/
+
+# Local scratch: probe configs, adversarial scenarios, API check scripts.
+.probe/
+
+# Session findings kept alongside the code but deliberately untracked.
+docs/FINDINGS.md
+docs/FINDINGS-CAPABILITY-AUDIT.md

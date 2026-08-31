@@ -1,0 +1,62 @@
+version: 1
+runs_dir: ../.runs
+
+budgets:
+  max_turns: 16
+  max_tool_calls: 30
+  max_seconds: 600
+  max_context_chars: 48000
+  max_output_chars: 16000
+  max_verification_attempts: 3
+
+model_router:
+  primary: remote-api
+  fallbacks: [local-ollama]
+  retries_per_route: 2
+  backoff_seconds: 0.5
+  circuit_breaker_failures: 2
+  routes:
+    remote-api:
+      kind: openai_compatible
+      model: configure-me
+      base_url: https://api.openai.com/v1
+      api_key_env: HARNESS_REMOTE_API_KEY
+      timeout_seconds: 90
+      local: false
+      cost_per_1m_input: 0.15
+      cost_per_1m_output: 0.60
+      latency: low
+      quality: 3.5
+      context_window: 128000
+    local-ollama:
+      kind: ollama
+      model: qwen2.5-coder:3b
+      base_url: http://127.0.0.1:11434/v1
+      timeout_seconds: 90
+      local: true
+      latency: medium
+      quality: 2.5
+      context_window: 32768
+
+policy:
+  approval_mode: mutations
+  allowed_commands:
+    - [python, -m, unittest]
+    - [git, diff]
+    - [git, status]
+  network_enabled: false
+  allowed_domains: []
+  command_timeout_seconds: 45
+  browser_timeout_seconds: 10
+
+mcp:
+  - name: repo-stats
+    command: ["{python}", -m, harness.mcp_demo.server]
+    protocol_version: "2025-11-25"
+    timeout_seconds: 10
+    enabled: true
+
+context:
+  recent_observations: 6
+  repo_entries: 120
+

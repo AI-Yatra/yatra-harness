@@ -1,0 +1,7 @@
+BEGIN:VCARD
+VERSION:3.0
+N:Brown;Charlie;;;
+FN:Charlie Brown
+EMAIL;TYPE=INTERNET:charlie@example.com
+TEL;TYPE=CELL:+1-555-0103
+END:VCARD

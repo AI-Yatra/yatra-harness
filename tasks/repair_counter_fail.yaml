@@ -1,0 +1,27 @@
+version: 1
+id: repair-counter-boundary-fail
+objective: >-
+  Repair the clamp function so values below the configured lower bound are
+  clamped to that bound while preserving the existing upper-bound and
+  validation behavior.
+workspace_seed: ../fixtures/buggy_counter
+constraints:
+  - Inspect the repository before modifying it.
+  - Modify implementation code only; do not modify tests.
+  - Use the configured acceptance command as the completion criterion.
+  - Keep the public function signature unchanged.
+protected_paths:
+  - tests/**
+acceptance:
+  # Deliberately-broken acceptance command for failure-mode testing.
+  commands:
+    - [python, -c, "import sys; sys.exit(2)"]
+  require_non_empty_diff: true
+  timeout_seconds: 30
+metadata:
+  workshop_module: feature-test-failmode
+  difficulty: introductory
+  notes: |
+    Acceptance command always exits non-zero, so the verifier gate is
+    guaranteed to fail. Used to exercise the verification-and-retry loop
+    and the BUDGET_EXHAUSTED / ProviderExhausted terminal states.

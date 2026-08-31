@@ -1,0 +1,65 @@
+version: 1
+runs_dir: ../.runs
+
+# Round 3 — Qwen Cloud (Alibaba DashScope) live-model test.
+# Endpoint: https://dashscope-intl.aliyuncs.com/compatible-mode/v1 (international)
+# Key must be provided via $env:DASHSCOPE_API_KEY — never paste in chat.
+budgets:
+  max_turns: 8
+  max_tool_calls: 16
+  max_seconds: 1200
+  max_context_chars: 32000
+  max_output_chars: 12000
+  max_verification_attempts: 2
+
+model_router:
+  primary: remote-qwen
+  fallbacks: [teaching]
+  retries_per_route: 2
+  backoff_seconds: 1.0
+  circuit_breaker_failures: 3
+  routes:
+    remote-qwen:
+      kind: openai_compatible
+      # Default model: qwen3-coder-plus (coding, tool-calling, 128K context).
+      # qwen-plus/qwen-turbo 403 on a free-tier-only account once spent.
+      # Edit to qwen-coder-plus / qwen3-coder-plus / qwen-max as needed.
+      model: qwen3-coder-plus
+      base_url: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+      api_key_env: DASHSCOPE_API_KEY
+      timeout_seconds: 120
+      local: false
+      cost_per_1m_input: 0.0
+      cost_per_1m_output: 0.0
+      latency: medium
+      quality: 3.5
+      context_window: 131072
+    teaching:
+      kind: replay
+      script: ../scenarios/repair_demo.yaml
+      local: true
+      latency: low
+      quality: 3.0
+      context_window: 32768
+
+policy:
+  approval_mode: mutations
+  allowed_commands:
+    - [python, -m, unittest]
+    - [git, diff]
+    - [git, status]
+  network_enabled: false
+  allowed_domains: []
+  command_timeout_seconds: 45
+  browser_timeout_seconds: 10
+
+mcp:
+  - name: repo-stats
+    command: ["{python}", -m, harness.mcp_demo.server]
+    protocol_version: "2025-11-25"
+    timeout_seconds: 10
+    enabled: true
+
+context:
+  recent_observations: 6
+  repo_entries: 120

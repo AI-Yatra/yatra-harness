@@ -1,0 +1,19 @@
+version: 1
+id: bounded-bugfix
+instructions: >-
+  Explore before editing. Prefer the smallest implementation-only patch. Use
+  repository evidence rather than assumptions. Run or rely on the independent
+  verifier before claiming completion. If verification fails, diagnose the
+  exact failure and repair the existing patch instead of starting over.
+allowed_tools:
+  - repo_stats
+  - repo_tree
+  - search_repo
+  - read_file
+  - apply_patch
+  - run_command
+  - python_run
+  - git_diff
+  - browser_fetch
+  - finish
+

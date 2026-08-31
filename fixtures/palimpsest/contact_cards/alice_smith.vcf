@@ -1,0 +1,7 @@
+BEGIN:VCARD
+VERSION:3.0
+N:Smith;Alice;;;
+FN:Alice Smith
+EMAIL;TYPE=INTERNET:alice@example.com
+TEL;TYPE=CELL:+1-555-0101
+END:VCARD

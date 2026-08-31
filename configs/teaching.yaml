@@ -1,0 +1,89 @@
+version: 1
+runs_dir: ../.runs
+
+budgets:
+  max_turns: 14
+  max_tool_calls: 24
+  max_seconds: 300
+  max_context_chars: 24000
+  max_output_chars: 12000
+  max_verification_attempts: 3
+
+model_router:
+  primary: teaching
+  fallbacks: []
+  retries_per_route: 1
+  backoff_seconds: 0.05
+  circuit_breaker_failures: 2
+  routes:
+    teaching:
+      kind: replay
+      model: deterministic-repair-demo
+      script: ../scenarios/repair_demo.yaml
+      timeout_seconds: 5
+      local: true
+      latency: low
+      quality: 0.0
+      context_window: 32768
+    broken:
+      kind: replay
+      model: deterministic-failure
+      script: ../scenarios/provider_failure.yaml
+      timeout_seconds: 5
+      local: true
+      latency: low
+      quality: 0.0
+      context_window: 32768
+    local-ollama:
+      kind: ollama
+      model: qwen2.5-coder:3b
+      base_url: http://127.0.0.1:11434/v1
+      timeout_seconds: 60
+      local: true
+      latency: medium
+      quality: 2.5
+      context_window: 32768
+    local-vllm:
+      kind: vllm
+      model: local-coder
+      base_url: http://127.0.0.1:8000/v1
+      timeout_seconds: 60
+      local: true
+      latency: low
+      quality: 3.0
+      context_window: 16384
+    remote-api:
+      kind: openai_compatible
+      model: configure-me
+      base_url: https://api.openai.com/v1
+      api_key_env: HARNESS_REMOTE_API_KEY
+      timeout_seconds: 60
+      local: false
+      cost_per_1m_input: 0.15
+      cost_per_1m_output: 0.60
+      latency: low
+      quality: 3.5
+      context_window: 128000
+
+policy:
+  approval_mode: never
+  allowed_commands:
+    - [python, -m, unittest]
+    - [git, diff]
+    - [git, status]
+  network_enabled: false
+  allowed_domains: []
+  command_timeout_seconds: 30
+  browser_timeout_seconds: 10
+
+mcp:
+  - name: repo-stats
+    command: ["{python}", -m, harness.mcp_demo.server]
+    protocol_version: "2025-11-25"
+    timeout_seconds: 10
+    enabled: true
+
+context:
+  recent_observations: 5
+  repo_entries: 100
+

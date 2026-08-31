@@ -1,0 +1,813 @@
+"""Typed tool registry and policy-governed native/MCP tool implementations."""
+
+from __future__ import annotations
+
+import ipaddress
+import json
+import os
+import socket
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
+
+from .artifacts import ArtifactStore
+from .config import HarnessConfig, MCPServerConfig
+from .contracts import RiskLevel, SkillContract, ToolResult, ToolSpec
+from .errors import MCPError, ToolError, WorkspaceError
+from .mcp import MCPStdioClient
+from .policy import PolicyEngine
+from .process import run_process
+from .util import truncate
+from .workspace import Workspace
+
+ToolHandler = Callable[[dict[str, Any]], tuple[str, dict[str, Any]]]
+EventCallback = Callable[[str, dict[str, Any]], None]
+
+
+@dataclass(frozen=True, slots=True)
+class RegisteredTool:
+    spec: ToolSpec
+    handler: ToolHandler
+
+
+class ToolRegistry:
+    def __init__(
+        self,
+        policy: PolicyEngine,
+        *,
+        max_output_chars: int,
+        artifacts: ArtifactStore,
+        event_callback: EventCallback | None = None,
+    ) -> None:
+        self.policy = policy
+        self.max_output_chars = max_output_chars
+        self.artifacts = artifacts
+        self.event_callback = event_callback or (lambda _event, _payload: None)
+        self._tools: dict[str, RegisteredTool] = {}
+
+    def register(self, spec: ToolSpec, handler: ToolHandler) -> None:
+        if spec.name in self._tools:
+            raise ToolError(f"duplicate tool registration: {spec.name}")
+        self._tools[spec.name] = RegisteredTool(spec, handler)
+
+    def specs(self) -> tuple[ToolSpec, ...]:
+        return tuple(item.spec for item in sorted(self._tools.values(), key=lambda item: item.spec.name))
+
+    def execute(self, call_id: str, name: str, arguments: dict[str, Any]) -> ToolResult:
+        started = time.monotonic()
+        registered = self._tools.get(name)
+        if registered is None:
+            return ToolResult(call_id, name, False, "", error=f"unknown tool: {name}")
+        try:
+            validate_json_schema(arguments, registered.spec.input_schema, f"tool.{name}.arguments")
+        except ToolError as exc:
+            return ToolResult(call_id, name, False, "", error=str(exc))
+        decision = self.policy.evaluate(registered.spec, arguments)
+        self.event_callback(
+            "POLICY_DECISION",
+            {
+                "call_id": call_id,
+                "tool": name,
+                "allowed": decision.allowed,
+                "requires_approval": decision.requires_approval,
+                "reason": decision.reason,
+            },
+        )
+        if not decision.allowed:
+            return ToolResult(call_id, name, False, "", error=decision.reason)
+        try:
+            content, metadata = registered.handler(arguments)
+            bounded, was_truncated = truncate(content, self.max_output_chars)
+            if was_truncated:
+                reference = self.artifacts.write_payload(f"tool-{name}", content)
+                metadata = {**metadata, "truncated": True, "artifact_ref": reference}
+            return ToolResult(
+                call_id=call_id,
+                name=name,
+                ok=True,
+                content=bounded,
+                metadata=metadata,
+                duration_ms=int((time.monotonic() - started) * 1000),
+            )
+        except (ToolError, WorkspaceError, MCPError) as exc:
+            return ToolResult(
+                call_id=call_id,
+                name=name,
+                ok=False,
+                content="",
+                error=str(exc),
+                duration_ms=int((time.monotonic() - started) * 1000),
+            )
+        except Exception as exc:  # isolate unexpected tool failures from the loop
+            return ToolResult(
+                call_id=call_id,
+                name=name,
+                ok=False,
+                content="",
+                error=f"unexpected tool failure: {type(exc).__name__}: {exc}",
+                duration_ms=int((time.monotonic() - started) * 1000),
+            )
+
+
+def validate_json_schema(value: Any, spec: dict[str, Any], path: str) -> None:
+    expected = spec.get("type")
+    if expected == "object":
+        if not isinstance(value, dict):
+            raise ToolError(f"{path} must be an object")
+        required = spec.get("required", [])
+        for key in required:
+            if key not in value:
+                raise ToolError(f"{path}.{key} is required")
+        properties = spec.get("properties", {})
+        if spec.get("additionalProperties") is False:
+            unknown = sorted(set(value) - set(properties))
+            if unknown:
+                raise ToolError(f"{path} contains unknown fields: {', '.join(unknown)}")
+        for key, item in value.items():
+            if key in properties:
+                validate_json_schema(item, properties[key], f"{path}.{key}")
+        return
+    if expected == "array":
+        if not isinstance(value, list):
+            raise ToolError(f"{path} must be an array")
+        item_spec = spec.get("items", {})
+        for index, item in enumerate(value):
+            validate_json_schema(item, item_spec, f"{path}[{index}]")
+        return
+    if expected == "string" and not isinstance(value, str):
+        raise ToolError(f"{path} must be a string")
+    if expected == "integer" and (isinstance(value, bool) or not isinstance(value, int)):
+        raise ToolError(f"{path} must be an integer")
+    if expected == "number" and (isinstance(value, bool) or not isinstance(value, int | float)):
+        raise ToolError(f"{path} must be a number")
+    if expected == "boolean" and not isinstance(value, bool):
+        raise ToolError(f"{path} must be a boolean")
+    if "enum" in spec and value not in spec["enum"]:
+        raise ToolError(f"{path} must be one of {spec['enum']!r}")
+
+
+def build_registry(
+    config: HarnessConfig,
+    skill: SkillContract,
+    workspace: Workspace,
+    artifacts: ArtifactStore,
+    policy: PolicyEngine,
+    event_callback: EventCallback | None = None,
+) -> ToolRegistry:
+    registry = ToolRegistry(
+        policy,
+        max_output_chars=config.budgets.max_output_chars,
+        artifacts=artifacts,
+        event_callback=event_callback,
+    )
+    _register_native(registry, config, workspace)
+    for server in config.mcp_servers:
+        if server.enabled:
+            _register_mcp(registry, server, workspace)
+    missing = sorted(set(skill.allowed_tools) - {spec.name for spec in registry.specs()})
+    if missing:
+        raise ToolError(f"skill enables tools that are not registered: {', '.join(missing)}")
+    return registry
+
+
+def _object_schema(properties: dict[str, Any], required: tuple[str, ...] = ()) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": list(required),
+        "additionalProperties": False,
+    }
+
+
+def _register_native(registry: ToolRegistry, config: HarnessConfig, workspace: Workspace) -> None:
+    object_schema = _object_schema
+    registry.register(
+        ToolSpec(
+            "repo_tree",
+            "List a bounded tree of files in the run workspace.",
+            object_schema({"max_entries": {"type": "integer"}}),
+            RiskLevel.READ,
+        ),
+        lambda args: _repo_tree(workspace, args, config.context_repo_entries),
+    )
+    registry.register(
+        ToolSpec(
+            "search_repo",
+            "Search UTF-8 text files in the workspace for a literal string.",
+            object_schema(
+                {"query": {"type": "string"}, "max_matches": {"type": "integer"}},
+                ("query",),
+            ),
+            RiskLevel.READ,
+        ),
+        lambda args: _search_repo(workspace, args),
+    )
+    registry.register(
+        ToolSpec(
+            "read_file",
+            "Read a UTF-8 file inside the run workspace.",
+            object_schema(
+                {
+                    "path": {"type": "string"},
+                    "start_line": {"type": "integer"},
+                    "end_line": {"type": "integer"},
+                },
+                ("path",),
+            ),
+            RiskLevel.READ,
+        ),
+        lambda args: _read_file(workspace, args),
+    )
+    registry.register(
+        ToolSpec(
+            "apply_patch",
+            "Apply a unified git patch inside the run workspace.",
+            object_schema({"patch": {"type": "string"}}, ("patch",)),
+            RiskLevel.WRITE,
+        ),
+        lambda args: _apply_patch(workspace, args, config.budgets.max_output_chars),
+    )
+    registry.register(
+        ToolSpec(
+            "run_command",
+            "Run an allowlisted command without a shell in the workspace.",
+            object_schema(
+                {"command": {"type": "array", "items": {"type": "string"}}}, ("command",)
+            ),
+            RiskLevel.EXECUTE,
+        ),
+        lambda args: _run_command(workspace, args, config),
+    )
+    registry.register(
+        ToolSpec(
+            "python_run",
+            "Run a workspace-relative Python script in isolated interpreter mode.",
+            object_schema(
+                {
+                    "path": {"type": "string"},
+                    "arguments": {"type": "array", "items": {"type": "string"}},
+                },
+                ("path",),
+            ),
+            RiskLevel.EXECUTE,
+        ),
+        lambda args: _python_run(workspace, args, config),
+    )
+    registry.register(
+        ToolSpec(
+            "git_diff",
+            "Return the current workspace diff and changed paths.",
+            object_schema({}),
+            RiskLevel.READ,
+        ),
+        lambda args: _git_diff(workspace, config),
+    )
+    registry.register(
+        ToolSpec(
+            "browser_fetch",
+            "Fetch one allowlisted public HTTP(S) URL without following redirects.",
+            object_schema({"url": {"type": "string"}}, ("url",)),
+            RiskLevel.NETWORK,
+        ),
+        lambda args: _browser_fetch(args, config),
+    )
+    registry.register(
+        ToolSpec(
+            "finish",
+            "Submit a completion claim. The harness will independently verify it.",
+            object_schema({"summary": {"type": "string"}}, ("summary",)),
+            RiskLevel.CONTROL,
+        ),
+        lambda args: (args["summary"], {"control": "finish"}),
+    )
+
+
+def _repo_tree(
+    workspace: Workspace, arguments: dict[str, Any], default_entries: int
+) -> tuple[str, dict[str, Any]]:
+    maximum = min(max(arguments.get("max_entries", default_entries), 1), 500)
+    entries = []
+    for path in sorted(workspace.root.rglob("*")):
+        if ".git" in path.parts or "__pycache__" in path.parts:
+            continue
+        relative = path.relative_to(workspace.root).as_posix()
+        if path.is_symlink():
+            entries.append(relative + " -> <symlink>")
+        elif path.is_dir():
+            entries.append(relative + "/")
+        elif path.is_file():
+            entries.append(relative)
+        if len(entries) >= maximum:
+            break
+    return "\n".join(entries), {"entries": len(entries), "capped": len(entries) == maximum}
+
+
+def _search_repo(workspace: Workspace, arguments: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    query = arguments["query"]
+    if not query:
+        raise ToolError("search query cannot be empty")
+    maximum = min(max(arguments.get("max_matches", 50), 1), 200)
+    matches = []
+    scanned = 0
+    for path in sorted(workspace.root.rglob("*")):
+        if not path.is_file() or path.is_symlink() or ".git" in path.parts:
+            continue
+        scanned += 1
+        try:
+            with path.open(encoding="utf-8") as handle:
+                for line_number, line in enumerate(handle, start=1):
+                    if query in line:
+                        matches.append(
+                            f"{path.relative_to(workspace.root).as_posix()}:{line_number}:{line.rstrip()}"
+                        )
+                        if len(matches) >= maximum:
+                            return "\n".join(matches), {
+                                "matches": len(matches),
+                                "files_scanned": scanned,
+                                "capped": True,
+                            }
+        except (OSError, UnicodeDecodeError):
+            continue
+    return "\n".join(matches), {"matches": len(matches), "files_scanned": scanned, "capped": False}
+
+
+def _read_file(workspace: Workspace, arguments: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    path = workspace.resolve(arguments["path"], must_exist=True)
+    if path.is_symlink() or not path.is_file():
+        raise ToolError("read_file requires a regular non-symlink file")
+    start = max(arguments.get("start_line", 1), 1)
+    end = arguments.get("end_line", start + 399)
+    if end < start or end - start > 2_000:
+        raise ToolError("invalid or excessive line range")
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ToolError(f"could not read UTF-8 file: {exc}") from exc
+    selected = [f"{index:5d} | {lines[index - 1]}" for index in range(start, min(end, len(lines)) + 1)]
+    return "\n".join(selected), {
+        "path": workspace.relative(path),
+        "start_line": start,
+        "end_line": min(end, len(lines)),
+        "total_lines": len(lines),
+    }
+
+
+def _patch_header_paths(patch: str) -> tuple[str, ...]:
+    paths = []
+    for line in patch.splitlines():
+        if not line.startswith(("--- ", "+++ ")):
+            continue
+        value = line[4:].split("\t", 1)[0].strip()
+        if value == "/dev/null":
+            continue
+        if value.startswith(("a/", "b/")):
+            value = value[2:]
+        if not value:
+            raise ToolError("patch contains an empty file path")
+        paths.append(value)
+    if not paths:
+        raise ToolError("patch does not contain unified diff file headers")
+    return tuple(dict.fromkeys(paths))
+
+
+def _recount_patch_hunk_headers(patch: str) -> str:
+    """Recount old/new line counts in unified diff hunk headers.
+
+    LLMs frequently emit patches with off-by-one errors in the hunk header
+    counts (e.g. ``@@ -5,7 +5,8 @@`` when the hunk actually contains 6 old
+    lines), and they sometimes omit the leading ``+`` on every line of a
+    new-file patch (writing bare file content after ``@@ -0,0 +1,N @@``).
+    Git's ``apply`` is strict and rejects both cases with ``error: corrupt
+    patch at <stdin>:N``. This function rewrites the header so the declared
+    counts match the body, preserving the optional function-section label
+    (the trailing text after the second ``@@`` in ``@@ -X,Y +A,B @@ label``),
+    and it adds the missing ``+`` prefix to bare lines inside new-file hunks.
+    """
+    import re
+
+    hunk_header = re.compile(
+        r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$"
+    )
+
+    lines = patch.splitlines(keepends=True)
+    out: list[str] = []
+    in_hunk = False
+    is_new_file = False  # True when the previous file header was `--- /dev/null`
+    old_count = 0
+    new_count = 0
+    header_idx = -1  # index in `out` of the most recent hunk header line
+    label = ""
+
+    for line in lines:
+        match = hunk_header.match(line.rstrip("\n").rstrip("\r"))
+        if match is not None:
+            old_start = int(match.group(1))
+            new_start = int(match.group(3))
+            label = match.group(5) or ""
+            old_count = 0
+            new_count = 0
+            in_hunk = True
+            header_idx = len(out)
+            out.append(f"@@ -{old_start} +{new_start} @@{label}\n")
+            continue
+        if not in_hunk:
+            # Track whether the previous file header was a new-file patch.
+            if line.startswith("--- /dev/null"):
+                is_new_file = True
+            elif line.startswith("--- "):
+                is_new_file = False
+            out.append(line)
+            continue
+        # A diff/--- /+++ line terminates the current hunk.
+        if line.startswith("diff --git ") or line.startswith("--- ") or line.startswith("+++ "):
+            if header_idx >= 0:
+                old_start_re = re.match(r"^@@ -(\d+)", out[header_idx])
+                new_start_re = re.match(r"^@@ -\d+ \+(\d+)", out[header_idx])
+                if old_start_re and new_start_re:
+                    out[header_idx] = (
+                        f"@@ -{old_start_re.group(1)},{old_count} "
+                        f"+{new_start_re.group(1)},{new_count} @@{label}\n"
+                    )
+            old_count = 0
+            new_count = 0
+            in_hunk = False
+            header_idx = -1
+            out.append(line)
+            continue
+        if line.startswith("+"):
+            new_count += 1
+            out.append(line)
+        elif line.startswith("-"):
+            old_count += 1
+            out.append(line)
+        elif line.startswith("\\"):
+            # "\ No newline at end of file" — does not change line counts.
+            out.append(line)
+        elif is_new_file:
+            # New-file hunk: every bare line is an addition; prefix with `+`.
+            new_count += 1
+            out.append("+" + line)
+        else:
+            # Context line (or blank, which is also a context line).
+            old_count += 1
+            new_count += 1
+            out.append(line)
+
+    if in_hunk and header_idx >= 0:
+        old_start_re = re.match(r"^@@ -(\d+)", out[header_idx])
+        new_start_re = re.match(r"^@@ -\d+ \+(\d+)", out[header_idx])
+        if old_start_re and new_start_re:
+            out[header_idx] = (
+                f"@@ -{old_start_re.group(1)},{old_count} "
+                f"+{new_start_re.group(1)},{new_count} @@{label}\n"
+            )
+    return "".join(out)
+
+
+def _apply_patch(
+    workspace: Workspace, arguments: dict[str, Any], max_output: int
+) -> tuple[str, dict[str, Any]]:
+    raw_patch = arguments["patch"]
+    patch = _recount_patch_hunk_headers(raw_patch)
+    # Some models emit unified diffs whose last line lacks a terminating
+    # newline. `git apply` then reads the trailing line together with the
+    # hunk header and refuses with "corrupt patch at <stdin>:N". Append a
+    # newline if missing so the patch is always well-formed.
+    if not patch.endswith("\n"):
+        patch = patch + "\n"
+    paths = _patch_header_paths(patch)
+    for relative in paths:
+        workspace.ensure_writable(relative)
+    # Write the patch to a temp file rather than passing it on stdin.
+    # subprocess.Popen with text=True on Windows translates \n to \r\n
+    # on the way to the child, which `git apply` treats as a context
+    # mismatch against the LF file on disk. Using a file path preserves
+    # the bytes the model produced.
+    patch_file = tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        newline="",
+        suffix=".diff",
+        delete=False,
+    )
+    try:
+        patch_file.write(patch)
+        patch_file.close()
+        patch_path = patch_file.name
+        check = run_process(
+            ["git", "apply", "--check", "--whitespace=nowarn", patch_path],
+            cwd=workspace.root,
+            timeout=20,
+            max_output_chars=max_output,
+        )
+    finally:
+        try:
+            os.unlink(patch_path)
+        except OSError:
+            pass
+    if check.returncode != 0:
+        # Re-open the file (it's already deleted) — re-create for the reverse check.
+        patch_file = tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            suffix=".diff",
+            delete=False,
+        )
+        patch_file.write(patch)
+        patch_file.close()
+        patch_path = patch_file.name
+        try:
+            reverse = run_process(
+                ["git", "apply", "--reverse", "--check", "--whitespace=nowarn", patch_path],
+                cwd=workspace.root,
+                timeout=20,
+                max_output_chars=max_output,
+            )
+        finally:
+            try:
+                os.unlink(patch_path)
+            except OSError:
+                pass
+        if reverse.returncode == 0:
+            return "patch was already applied; treated as an idempotent success", {
+                "paths": list(paths),
+                "already_applied": True,
+            }
+        # First fallback: 3-way merge. Tolerant of whitespace and small
+        # context mismatches, and uses the git index to resolve changes.
+        patch_file = tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            newline="",
+            suffix=".diff",
+            delete=False,
+        )
+        patch_file.write(patch)
+        patch_file.close()
+        patch_path = patch_file.name
+        try:
+            three_way = run_process(
+                ["git", "apply", "--check", "--3way", "--whitespace=nowarn", patch_path],
+                cwd=workspace.root,
+                timeout=20,
+                max_output_chars=max_output,
+            )
+            applied_3way = None
+            if three_way.returncode == 0:
+                applied_3way = run_process(
+                    ["git", "apply", "--3way", "--whitespace=nowarn", patch_path],
+                    cwd=workspace.root,
+                    timeout=20,
+                    max_output_chars=max_output,
+                )
+        finally:
+            try:
+                os.unlink(patch_path)
+            except OSError:
+                pass
+        if three_way.returncode == 0 and applied_3way is not None and applied_3way.returncode == 0:
+            return (
+                f"applied patch to {len(paths)} path(s) via 3-way merge: "
+                f"{', '.join(paths)}"
+            ), {
+                "paths": list(paths),
+                "already_applied": False,
+                "applied_via": "three_way_merge",
+            }
+        raise ToolError(
+            f"patch failed validation: {check.output.strip()}"
+        )
+    # The first apply succeeds — write the patch file again to apply it
+    # (the previous temp file was deleted after the check).
+    patch_file = tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        newline="",
+        suffix=".diff",
+        delete=False,
+    )
+    patch_file.write(patch)
+    patch_file.close()
+    patch_path = patch_file.name
+    try:
+        applied = run_process(
+            ["git", "apply", "--whitespace=nowarn", patch_path],
+            cwd=workspace.root,
+            timeout=20,
+            max_output_chars=max_output,
+        )
+    finally:
+        try:
+            os.unlink(patch_path)
+        except OSError:
+            pass
+    if applied.returncode != 0:
+        raise ToolError(f"patch could not be applied: {applied.output.strip()}")
+    return f"applied patch to {len(paths)} path(s): {', '.join(paths)}", {
+        "paths": list(paths),
+        "already_applied": False,
+    }
+
+
+def _normalize_command(command: list[str]) -> list[str]:
+    if command and command[0] in {"python", "python3"}:
+        return [sys.executable, *command[1:]]
+    return command
+
+
+def _run_command(
+    workspace: Workspace, arguments: dict[str, Any], config: HarnessConfig
+) -> tuple[str, dict[str, Any]]:
+    command = _normalize_command(arguments["command"])
+    result = run_process(
+        command,
+        cwd=workspace.root,
+        timeout=config.policy.command_timeout_seconds,
+        max_output_chars=config.budgets.max_output_chars,
+        environment={
+            "PATH": os.environ.get("PATH", ""),
+            "LANG": os.environ.get("LANG", "C.UTF-8"),
+            "PYTHONNOUSERSITE": "1",
+            "GIT_CONFIG_NOSYSTEM": "1",
+            "GIT_CONFIG_GLOBAL": os.devnull,
+        },
+    )
+    metadata = {
+        "command": list(arguments["command"]),
+        "returncode": result.returncode,
+        "timed_out": result.timed_out,
+        "truncated": result.truncated,
+    }
+    if result.timed_out:
+        raise ToolError(f"command timed out after {config.policy.command_timeout_seconds}s")
+    if result.returncode != 0:
+        raise ToolError(f"command exited {result.returncode}:\n{result.output}")
+    return result.output, metadata
+
+
+def _python_run(
+    workspace: Workspace, arguments: dict[str, Any], config: HarnessConfig
+) -> tuple[str, dict[str, Any]]:
+    script = workspace.resolve(arguments["path"], must_exist=True)
+    if script.suffix != ".py" or script.is_symlink() or not script.is_file():
+        raise ToolError("python_run requires a regular workspace-relative .py file")
+    extra = arguments.get("arguments", [])
+    result = run_process(
+        [sys.executable, "-I", str(script), *extra],
+        cwd=workspace.root,
+        timeout=config.policy.command_timeout_seconds,
+        max_output_chars=config.budgets.max_output_chars,
+        environment={
+            "PATH": os.environ.get("PATH", ""),
+            "LANG": os.environ.get("LANG", "C.UTF-8"),
+            "PYTHONNOUSERSITE": "1",
+        },
+    )
+    if result.timed_out:
+        raise ToolError("python script timed out")
+    if result.returncode != 0:
+        raise ToolError(f"python script exited {result.returncode}:\n{result.output}")
+    return result.output, {"path": workspace.relative(script), "returncode": result.returncode}
+
+
+def _git_diff(
+    workspace: Workspace, config: HarnessConfig
+) -> tuple[str, dict[str, Any]]:
+    diff = run_process(
+        ["git", "diff", "--", "."],
+        cwd=workspace.root,
+        timeout=20,
+        max_output_chars=config.budgets.max_output_chars,
+    )
+    names = run_process(
+        ["git", "diff", "--name-only", "--", "."],
+        cwd=workspace.root,
+        timeout=20,
+        max_output_chars=config.budgets.max_output_chars,
+    )
+    if diff.returncode != 0 or names.returncode != 0:
+        raise ToolError("git diff failed")
+    paths = [line for line in names.output.splitlines() if line]
+    return diff.output, {"changed_paths": paths, "count": len(paths)}
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> None:
+        return None
+
+
+def _validate_public_url(url: str, allowed_domains: tuple[str, ...]) -> urllib.parse.ParseResult:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ToolError("browser_fetch requires an http or https URL with a host")
+    hostname = parsed.hostname.rstrip(".").lower()
+    if not any(hostname == domain or hostname.endswith("." + domain) for domain in allowed_domains):
+        raise ToolError(f"URL host is not allowlisted: {hostname}")
+    try:
+        addresses = {item[4][0] for item in socket.getaddrinfo(hostname, parsed.port or 443)}
+    except socket.gaierror as exc:
+        raise ToolError(f"URL host could not be resolved: {hostname}") from exc
+    for address in addresses:
+        ip = ipaddress.ip_address(address)
+        if any(
+            (
+                ip.is_private,
+                ip.is_loopback,
+                ip.is_link_local,
+                ip.is_multicast,
+                ip.is_reserved,
+                ip.is_unspecified,
+            )
+        ):
+            raise ToolError(f"URL resolved to a non-public address: {address}")
+    return parsed
+
+
+def _browser_fetch(arguments: dict[str, Any], config: HarnessConfig) -> tuple[str, dict[str, Any]]:
+    url = arguments["url"]
+    _validate_public_url(url, config.policy.allowed_domains)
+    opener = urllib.request.build_opener(_NoRedirect())
+    request = urllib.request.Request(url, headers={"User-Agent": "aiyatra-mini-harness/1.0"})
+    try:
+        with opener.open(request, timeout=config.policy.browser_timeout_seconds) as response:
+            raw = response.read(config.budgets.max_output_chars + 1)
+            content_type = response.headers.get_content_type()
+            charset = response.headers.get_content_charset() or "utf-8"
+            text = raw.decode(charset, errors="replace")
+            if len(raw) > config.budgets.max_output_chars:
+                text = text[: config.budgets.max_output_chars]
+            return text, {
+                "url": url,
+                "status": response.status,
+                "content_type": content_type,
+                "bytes": len(raw),
+                "redirects_followed": 0,
+            }
+    except urllib.error.HTTPError as exc:
+        raise ToolError(f"HTTP request failed with status {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise ToolError(f"HTTP request failed: {exc.reason}") from exc
+
+
+def _expanded_mcp_command(command: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(sys.executable if part in {"{python}", "python", "python3"} and index == 0 else part for index, part in enumerate(command))
+
+
+def _register_mcp(registry: ToolRegistry, server: MCPServerConfig, workspace: Workspace) -> None:
+    command = _expanded_mcp_command(server.command)
+    with MCPStdioClient(
+        command,
+        cwd=workspace.root,
+        protocol_version=server.protocol_version,
+        timeout_seconds=server.timeout_seconds,
+    ) as client:
+        discovered = client.list_tools()
+    for raw in discovered:
+        name = raw.get("name")
+        description = raw.get("description", "MCP tool")
+        input_schema = raw.get("inputSchema", {"type": "object"})
+        if not isinstance(name, str) or not isinstance(description, str) or not isinstance(input_schema, dict):
+            raise MCPError(f"MCP server {server.name!r} returned an invalid tool definition")
+
+        def handler(arguments: dict[str, Any], *, tool_name: str = name) -> tuple[str, dict[str, Any]]:
+            with MCPStdioClient(
+                command,
+                cwd=workspace.root,
+                protocol_version=server.protocol_version,
+                timeout_seconds=server.timeout_seconds,
+            ) as active_client:
+                result = active_client.call_tool(tool_name, arguments)
+            if result.get("isError"):
+                raise MCPError(f"MCP tool {tool_name!r} returned an error result")
+            text_parts = [
+                item.get("text", "")
+                for item in result.get("content", [])
+                if isinstance(item, dict) and item.get("type") == "text"
+            ]
+            content = "\n".join(text_parts)
+            if not content and "structuredContent" in result:
+                content = json.dumps(result["structuredContent"], sort_keys=True)
+            return content, {
+                "source": "mcp",
+                "server": server.name,
+                "structured_content": result.get("structuredContent"),
+            }
+
+        registry.register(
+            ToolSpec(
+                name=name,
+                description=description,
+                input_schema=input_schema,
+                risk=RiskLevel.READ,
+                source=f"mcp:{server.name}",
+            ),
+            handler,
+        )
+

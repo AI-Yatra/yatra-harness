@@ -1,0 +1,30 @@
+version: 1
+id: palimpsest-contacts
+objective: >-
+  Discover every contact card in the contact_cards directory, exclude the
+  card belonging to Tom, sort the remaining cards alphabetically by full
+  name, and produce a contact.xlsx workbook at the workspace root with
+  columns name, email, phone containing exactly those cards. The pipeline
+  stops at the workbook — do not send any email or perform any network
+  operation.
+workspace_seed: ../fixtures/palimpsest
+constraints:
+  - Inspect the workspace before modifying it.
+  - Do not modify the verify_contact_workbook.py script or any .vcf file.
+  - The workbook must be named contact.xlsx at the workspace root.
+  - Sort order must be alphabetical by full name (case-insensitive).
+  - Exclude the card whose full name is exactly "Tom".
+protected_paths:
+  - verify_contact_workbook.py
+  - contact_cards/**
+acceptance:
+  commands:
+    - [python, verify_contact_workbook.py]
+  require_non_empty_diff: true
+  timeout_seconds: 30
+metadata:
+  workshop_module: palimpsest-synthetic
+  difficulty: intermediate
+  notes: |
+    Synthetic adaptation of the JIT-Agent Palimpsest figure: cross-application
+    artifact pipeline minus the email step. Everything is local and synthetic.

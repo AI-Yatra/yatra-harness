@@ -1,0 +1,7 @@
+BEGIN:VCARD
+VERSION:3.0
+N:Miller;David;;;
+FN:David Miller
+EMAIL;TYPE=INTERNET:david@example.com
+TEL;TYPE=CELL:+1-555-0107
+END:VCARD

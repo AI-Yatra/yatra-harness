@@ -1,0 +1,34 @@
+version: 1
+id: palimpsest-skill
+instructions: >-
+  You are operating inside a sandboxed workspace. Your objective is a
+  cross-application artifact pipeline, but all work happens locally with the
+  tools you have. BE EFFICIENT: you have a limited turn budget, so do not
+  read every file individually. Explore with repo_tree / repo_stats to learn
+  the layout, read AT MOST ONE .vcf card to learn the format, then write a
+  single Python script that parses ALL cards. Steps:
+  1. repo_tree / repo_stats to see contact_cards/ and the verifier script.
+  2. read_file on exactly one .vcf card to learn the FN/EMAIL/TEL format.
+  3. apply_patch to create build_workbook.py: it scans contact_cards/*.vcf,
+     parses FN/EMAIL/TEL from each, excludes any card whose full name is
+     exactly "Tom" or whose first name is "Tom", sorts the rest
+     alphabetically by full name (case-insensitive), and writes contact.xlsx
+     at the workspace root with header row name, email, phone using
+     openpyxl.
+  4. run_command [python, build_workbook.py] to produce the workbook, then
+     run [python, verify_contact_workbook.py] to confirm the acceptance
+     gate passes.
+  5. If verification fails, diagnose the exact error and repair
+     build_workbook.py via apply_patch, then re-run. Do NOT attempt to send
+     email or perform network operations; the pipeline stops at the
+     workbook. When confident, call finish.
+allowed_tools:
+  - repo_stats
+  - repo_tree
+  - search_repo
+  - read_file
+  - apply_patch
+  - run_command
+  - python_run
+  - git_diff
+  - finish

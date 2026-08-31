@@ -1,0 +1,7 @@
+BEGIN:VCARD
+VERSION:3.0
+N:Johnson;Bob;;;
+FN:Bob Johnson
+EMAIL;TYPE=INTERNET:bob@example.com
+TEL;TYPE=CELL:+1-555-0105
+END:VCARD

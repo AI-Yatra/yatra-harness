@@ -1,0 +1,47 @@
+version: 1
+runs_dir: ../.runs
+
+budgets:
+  max_turns: 2
+  max_tool_calls: 4
+  max_seconds: 60
+
+model_router:
+  primary: remote-nvidia-bad
+  fallbacks: []
+  retries_per_route: 1
+  backoff_seconds: 0.1
+  circuit_breaker_failures: 2
+  routes:
+    remote-nvidia-bad:
+      kind: openai_compatible
+      model: moonshotai/this-model-does-not-exist
+      base_url: https://integrate.api.nvidia.com/v1
+      api_key_env: NVIDIA_API_KEY
+      timeout_seconds: 30
+      local: false
+      cost_per_1m_input: 0.0
+      cost_per_1m_output: 0.0
+      latency: medium
+      quality: 3.5
+      context_window: 32768
+
+policy:
+  approval_mode: never
+  allowed_commands:
+    - [python, -m, unittest]
+  network_enabled: false
+  allowed_domains: []
+  command_timeout_seconds: 30
+  browser_timeout_seconds: 10
+
+mcp:
+  - name: repo-stats
+    command: ["{python}", -m, harness.mcp_demo.server]
+    protocol_version: "2025-11-25"
+    timeout_seconds: 10
+    enabled: true
+
+context:
+  recent_observations: 5
+  repo_entries: 100
