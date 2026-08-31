@@ -1,9 +1,10 @@
 version: 1
 runs_dir: ../.runs
 
-# Round 3 — Qwen Cloud (Alibaba DashScope) live-model test.
+# Qwen Cloud (Alibaba DashScope) live-model route.
 # Endpoint: https://dashscope-intl.aliyuncs.com/compatible-mode/v1 (international)
-# Key must be provided via $env:DASHSCOPE_API_KEY — never paste in chat.
+# Credential: run `harness auth add <key>`, or export DASHSCOPE_API_KEY.
+# Never paste a key into a chat, a commit, or a shared terminal.
 budgets:
   max_turns: 8
   max_tool_calls: 16

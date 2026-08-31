@@ -4,7 +4,7 @@ This guide maps the 3.5-hour workshop plan to concrete commands. The teaching
 path is fully offline and deterministic; the local-model path is the authentic
 demonstration of model independence.
 
-## Module 1 — Model vs agent vs harness (15 min)
+## Module 1: Model vs agent vs harness (15 min)
 
 Run the naive baseline: a model with raw shell access is a chat, not an agent.
 Then run the harness and note what is *missing* from the naive version:
@@ -17,7 +17,7 @@ uv run harness run tasks/repair_counter.yaml \
   --config configs/teaching.yaml --skill skills/bugfix.yaml
 ```
 
-## Module 2 — Contracts and architecture (20 min)
+## Module 2: Contracts and architecture (20 min)
 
 ```bash
 uv run harness explain tasks/repair_counter.yaml \
@@ -27,7 +27,7 @@ uv run harness explain tasks/repair_counter.yaml \
 Look at `harness/contracts.py`: `TaskContract`, `ActionProposal`,
 `ToolResult`, `HarnessEvent`, `RunResult`. Every boundary is a dataclass.
 
-## Module 3 — Model independence and context (25 min)
+## Module 3: Model independence and context (25 min)
 
 ```bash
 uv run harness tools --config configs/teaching.yaml
@@ -46,7 +46,7 @@ uv run harness run tasks/repair_counter.yaml \
 Key idea: the run loop, tools, policy, and verifier are identical in both
 cases. Only the route changed.
 
-## Module 4 — Agent loop and typed tools (35 min)
+## Module 4: Agent loop and typed tools (35 min)
 
 ```bash
 uv run harness tools --source native
@@ -64,7 +64,7 @@ uv run harness inspect <run-id>
 Compare how a native tool (`repo_tree`) and an MCP tool (`repo_stats`) pass
 through the same schema, policy, event, and observation contracts.
 
-## Module 5 — Workspace, policy, approvals (35 min)
+## Module 5: Workspace, policy, approvals (35 min)
 
 The teaching config uses `approval_mode: never`. Try the mutations config with
 a scripted approval:
@@ -77,7 +77,7 @@ uv run harness run tasks/repair_counter.yaml \
 Trigger a policy denial by asking for a tool the skill does not enable, or a
 command that is not on the allowlist, and inspect the `POLICY_DECISION` event.
 
-## Module 6 — Verification and self-repair (30 min)
+## Module 6: Verification and self-repair (30 min)
 
 The teaching scenario intentionally fails its first patch. Watch the flow:
 
@@ -90,7 +90,7 @@ uv run harness inspect <run-id>
 The ledger shows: `VERIFICATION_FAILED` → `RETRY_LOOP_ENTERED` → repair patch
 → tests pass → `VERIFICATION_PASSED` → `RUN_COMPLETED`.
 
-## Module 7 — Reliability and budgets (25 min)
+## Module 7: Reliability and budgets (25 min)
 
 ```bash
 # Transient timeout -> retry -> continue
@@ -111,7 +111,7 @@ uv run harness run tasks/repair_counter.yaml \
   --config configs/teaching.yaml --skill skills/bugfix.yaml --max-turns 3
 ```
 
-## Module 8 — Traces, replay, capstone (15 min)
+## Module 8: Traces, replay, capstone (15 min)
 
 ```bash
 uv run harness list-runs
@@ -140,8 +140,8 @@ task accepted
 
 1. Run `harness routes` with different profiles and predict the order before
    running.
-2. Change a route's `quality` in `configs/llm_light.yaml` and re-run `routes`
-   — only the config changed, never the harness.
+2. Change a route's `quality` in `configs/llm_light.yaml` and re-run `routes`.
+   Only the config changed, never the harness.
 3. Add a constraint (`--require-local`, `--max-cost 0.30`) and watch excluded
    routes appear with reasons.
 4. Run the same task through two profiles and diff the `MODEL_ROUTES_RESOLVED`

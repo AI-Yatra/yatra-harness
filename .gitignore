@@ -19,3 +19,6 @@ tasks/chat/
 # Session findings kept alongside the code but deliberately untracked.
 docs/FINDINGS.md
 docs/FINDINGS-CAPABILITY-AUDIT.md
+
+# Local tool state (Command Code writes personal preference notes here).
+.commandcode/

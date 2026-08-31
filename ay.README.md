@@ -5,7 +5,7 @@ get a run. Iterate. Inspect past runs. Switch the model. Resume from
 checkpoints.
 
 This is a thin wrapper around the existing `harness run` / `harness inspect`
-/ `harness resume` / `harness list-runs` subcommands — no changes to the
+/ `harness resume` / `harness list-runs` subcommands, with no changes to the
 harness internals.
 
 ## Quick start
@@ -109,7 +109,7 @@ For each message, `ay`:
    as a subprocess, streaming stdout to your terminal line by line.
 4. Reports the final exit code, with `/inspect` / `/runs` for follow-up.
 
-The chat seed is empty by design — chat tasks are open-ended and the
+The chat seed is empty by design, because chat tasks are open-ended and the
 acceptance is a trivial pass-through. The operator (you) decides if the
 output is right. For tasks that need a real seed (like the Palimpsest
 workbook experiment), run the harness directly with `harness run ...`.
@@ -164,14 +164,14 @@ yatra-harness/
 - **The agent says "Added lower-bound handling" for an unrelated task**:
   the trivial acceptance command always passes, so the harness reports
   COMPLETED. Read `summary.md` and `events.jsonl` in the run's directory
-  to see what the agent actually did — you decide if it was right.
+  to see what the agent actually did. You decide if it was right.
 - **Want to start over**: delete `tasks/chat/` and the relevant entries
   in `.runs/`. The seed and configs stay untouched.
 
 ## The boundary
 
 `ay` is intentionally a 300-line shell. It runs the harness
-exactly the way `harness run` would — no approval prompts, no streaming
-tokens mid-generation, no patch approval flow. The harness is the agent;
+exactly the way `harness run` would, without approval prompts, mid-generation token
+streaming, or a patch approval flow. The harness is the agent;
 the REPL is the operator console. If you want those higher-fidelity
 features, build them in `harness/runtime.py` where the loop lives.

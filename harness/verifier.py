@@ -80,8 +80,8 @@ class Verifier:
         tracked = tuple(line for line in result.output.splitlines() if line) if result.returncode == 0 else ()
         # Untracked files (new artifacts like contact.xlsx, scripts the agent
         # wrote) must count as implementation changes too. Without this, a
-        # task that produces new files — the normal case for artifact-style
-        # tasks — would always report "no implementation diff was produced".
+        # task that produces new files, the normal case for artifact-style
+        # tasks, would always report "no implementation diff was produced".
         untracked = run_process(
             ["git", "ls-files", "--others", "--exclude-standard", "--"],
             cwd=workspace,

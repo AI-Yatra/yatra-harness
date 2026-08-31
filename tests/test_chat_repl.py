@@ -69,7 +69,7 @@ class ChatAppTests(unittest.TestCase):
             path.unlink(missing_ok=True)
 
     def test_detect_model_returns_string(self) -> None:
-        # Doesn't have to be a specific model — just a non-empty string.
+        # Doesn't have to be a specific model, just a non-empty string.
         self.assertTrue(isinstance(self.app.model, str))
         self.assertGreater(len(self.app.model), 0)
 

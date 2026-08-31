@@ -447,7 +447,7 @@ def _recount_patch_hunk_headers(patch: str) -> str:
             old_count += 1
             out.append(line)
         elif line.startswith("\\"):
-            # "\ No newline at end of file" — does not change line counts.
+            # "\ No newline at end of file" does not change line counts.
             out.append(line)
         elif is_new_file:
             # New-file hunk: every bare line is an addition; prefix with `+`.
@@ -512,7 +512,7 @@ def _apply_patch(
         except OSError:
             pass
     if check.returncode != 0:
-        # Re-open the file (it's already deleted) — re-create for the reverse check.
+        # Re-open the file (it's already deleted) and re-create it for the reverse check.
         patch_file = tempfile.NamedTemporaryFile(
             mode="w",
             encoding="utf-8",
@@ -584,7 +584,7 @@ def _apply_patch(
         raise ToolError(
             f"patch failed validation: {check.output.strip()}"
         )
-    # The first apply succeeds — write the patch file again to apply it
+    # The first apply succeeds, so write the patch file again to apply it
     # (the previous temp file was deleted after the check).
     patch_file = tempfile.NamedTemporaryFile(
         mode="w",

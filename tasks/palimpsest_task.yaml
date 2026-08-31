@@ -5,7 +5,7 @@ objective: >-
   card belonging to Tom, sort the remaining cards alphabetically by full
   name, and produce a contact.xlsx workbook at the workspace root with
   columns name, email, phone containing exactly those cards. The pipeline
-  stops at the workbook — do not send any email or perform any network
+  stops at the workbook. Do not send any email or perform any network
   operation.
 workspace_seed: ../fixtures/palimpsest
 constraints:

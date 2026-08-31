@@ -406,7 +406,7 @@ def _approval(yes: bool):
             return True
         if not sys.stdin.isatty():
             return False
-        print(f"Approval required: {spec.name} ({spec.risk.value}) — {reason}")
+        print(f"Approval required for {spec.name} ({spec.risk.value}): {reason}")
         print(json.dumps(arguments, indent=2, sort_keys=True))
         try:
             answer = input("Approve this one action? [y/N] ").strip().lower()

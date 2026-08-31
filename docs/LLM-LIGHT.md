@@ -1,4 +1,4 @@
-# LLM Light — priority-based model routing
+# LLM Light: priority-based model routing
 
 LLM Light turns *declared operator priorities* into an *ordered route plan*.
 It answers one question: **in which order should the configured model routes
@@ -17,7 +17,7 @@ llm_light:
   priorities: [privacy, quality, cost, latency]
 ```
 
-The harness then ranks every configured route by those priorities — with
+The harness then ranks every configured route by those priorities, with
 privacy meaning "prefer local over remote", quality meaning "prefer higher
 quality", cost meaning "prefer cheaper", latency meaning "prefer faster", and
 context meaning "prefer larger context window".
@@ -28,8 +28,8 @@ The split is the teaching point:
 
 | Layer | Owns | Module |
 |---|---|---|
-| LLM Light | *Order* — which route first, which fallback next | `harness/llm_light.py` |
-| Model Router | *Reliability* — retries, backoff, circuit breaking | `harness/model_router.py` |
+| LLM Light | *Order*: which route first, which fallback next | `harness/llm_light.py` |
+| Model Router | *Reliability*: retries, backoff, circuit breaking | `harness/model_router.py` |
 
 An operator restating what they care about (`--priority cost --priority
 latency`) must not perturb retry behavior, and a change to retry behavior must
@@ -60,7 +60,7 @@ without leaking anything.
 | `local` | whether the route is on this machine | derived from kind, or explicit |
 | `cost_per_1m_input` / `cost_per_1m_output` | USD per 1M tokens | blended 75/25 toward input |
 | `latency` | `low` / `medium` / `high` | lower is better |
-| `quality` | 0–5 subjective model quality | higher is better |
+| `quality` | 0 to 5 subjective model quality | higher is better |
 | `context_window` | tokens | higher is better |
 | `tool_support` | whether tool calls work | hard filter when required |
 
@@ -80,7 +80,7 @@ among those, prefer lower cost; then lower latency.
 
 ### Weighted
 
-Blend every key at once into a 0–1 score per route. Each key's values are
+Blend every key at once into a 0 to 1 score per route. Each key's values are
 normalized across candidates, multiplied by the key's weight, and summed.
 
 ```yaml
@@ -160,9 +160,9 @@ The same flags work on `harness run` and appear in `harness explain`.
 
 Every run records the plan in the event ledger:
 
-- `LLM_LIGHT_PLAN` — the full plan with per-route metrics, scores, and
+- `LLM_LIGHT_PLAN` carries the full plan with per-route metrics, scores, and
   exclusion reasons.
-- `MODEL_ROUTES_RESOLVED` — the final ordered route list used by the run.
+- `MODEL_ROUTES_RESOLVED` carries the final ordered route list used by the run.
 
 `harness doctor` verifies the plan can be computed before any run starts, so
 an unsatisfiable routing config fails loudly at readiness time.

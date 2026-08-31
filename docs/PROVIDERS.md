@@ -22,12 +22,12 @@ identical.
 
 Every provider returns:
 
-- `action` — an `ActionProposal`: `tool` (name + arguments), `finish`
+- `action` is an `ActionProposal`: `tool` (name + arguments), `finish`
   (summary), or `clarify` (question).
-- `route` / `provider` — attribution.
-- `raw_summary` — a short human-readable trace of what the model said.
-- `usage` — token usage when the provider reports it.
-- `next_cursor` — replay position (replay only).
+- `route` and `provider` carry attribution.
+- `raw_summary` is a short human-readable trace of what the model said.
+- `usage` is token usage when the provider reports it.
+- `next_cursor` is the replay position (replay only).
 
 The loop consumes only these fields. Swapping a provider never touches tools,
 policy, state, verification, or the loop itself.

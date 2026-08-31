@@ -52,7 +52,7 @@ Transport keys: `kind`, `model`, `base_url`, `api_key_env`, `script`,
 ### llm_light
 
 See [LLM-LIGHT.md](LLM-LIGHT.md). When the section is absent, the configured
-`primary`/`fallbacks` are used verbatim — behavior identical to a harness
+`primary`/`fallbacks` are used verbatim, which behaves identically to a harness
 without LLM Light.
 
 ### policy
@@ -88,7 +88,7 @@ mcp:
 
 ### Environment overrides
 
-- `HARNESS_RUNS_DIR` — overrides `runs_dir` (used by tests and CI).
+- `HARNESS_RUNS_DIR` overrides `runs_dir` (used by tests and CI).
 - Route API keys come from the env var named in `api_key_env`, or the
   provider's conventional variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`)
   when unset.
