@@ -16,7 +16,9 @@ Commands:
 
 Requires:
   - yatra-harness synced with `uv sync` (openpyxl installed)
-  - DASHSCOPE_API_KEY in .env or the environment (Qwen Cloud / DashScope)
+  - a credential for the variable the active config's primary route names
+    (DASHSCOPE_API_KEY by default). Supply it with `ay auth add <key>`, or
+    export it, or put it in .env -- all three are resolved by harness.auth.
 """
 
 from __future__ import annotations
@@ -30,9 +32,9 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent
-ENV_FILE = ROOT / ".env"
 DEFAULT_CONFIG = ROOT / "configs" / "palimpsest-config.yaml"
 DEFAULT_SKILL = ROOT / "skills" / "palimpsest-skill.yaml"
 TASKS_DIR = ROOT / "tasks" / "chat"
@@ -111,27 +113,116 @@ class ChatApp:
     # ---------------------------------------------------------------- setup
 
     def _load_env(self) -> None:
-        if ENV_FILE.exists():
-            for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                key, _, value = line.partition("=")
-                os.environ.setdefault(key.strip(), value.strip())
+        """Load .env through harness.auth so both entry points agree.
+
+        The nearest .env above the working directory wins; the install
+        directory is the fallback, which is what `ay` used to read and keeps
+        a repo-local .env working when run from elsewhere.
+        """
+        from harness import auth  # noqa: PLC0415
+
+        if auth.load_env_file() is None:
+            auth.load_env_file(ROOT)
+
+    def _primary_route(self) -> Any | None:
+        """The config's primary route, or None if the config cannot be read.
+
+        Everything that needs to know about the model, the endpoint or the
+        credential goes through here, so the banner, /model and the startup
+        gate can never disagree about which route is in play.
+
+        The except is narrow deliberately: a blanket one turns a mistake in
+        this method into a silent wrong answer. load_config funnels every
+        bad-config failure into ConfigurationError, so HarnessError is the
+        whole expected set.
+        """
+        try:
+            from harness.config import load_config  # noqa: PLC0415
+            from harness.errors import HarnessError  # noqa: PLC0415
+        except ImportError:
+            return None
+        try:
+            router = load_config(self.config_path).router
+            return router.routes[router.primary]
+        except (HarnessError, OSError, KeyError):
+            return None
 
     def _detect_model(self) -> str:
-        """Read the primary route's model from the active config."""
-        text = self.config_path.read_text(encoding="utf-8")
-        match = re.search(r"^\s*model:\s*(\S+)\s*$", text, re.MULTILINE)
-        return match.group(1) if match else "?"
+        """The primary route's model.
+
+        Resolved through the config loader rather than by matching the first
+        `model:` line, because the routes mapping is not ordered
+        primary-first -- model_router.primary names it.
+        """
+        route = self._primary_route()
+        return route.model if route is not None and route.model else "?"
+
+    @staticmethod
+    def _model_line(text: str, route_name: str) -> int | None:
+        """Index of the `model:` line belonging to `route_name`.
+
+        Scoped to the routes mapping and then to that route's own block. A
+        first-match rewrite retargets a different route the moment the
+        primary is not listed first, and it writes, so it corrupts rather
+        than merely misreports.
+        """
+        lines = text.splitlines()
+        header = re.compile(r"^(\s*)" + re.escape(route_name) + r":\s*(#.*)?$")
+        model = re.compile(r"^\s*model:\s*\S+\s*$")
+        routes_indent: int | None = None
+        for index, line in enumerate(lines):
+            if routes_indent is None:
+                found = re.match(r"^(\s*)routes:\s*$", line)
+                if found:
+                    routes_indent = len(found.group(1))
+                continue
+            stripped = line.strip()
+            if stripped and not stripped.startswith("#"):
+                if len(line) - len(line.lstrip()) <= routes_indent:
+                    return None  # walked out of the routes mapping
+            found = header.match(line)
+            if not found:
+                continue
+            block_indent = len(found.group(1))
+            for offset in range(index + 1, len(lines)):
+                current = lines[offset]
+                if not current.strip() or current.lstrip().startswith("#"):
+                    continue
+                if len(current) - len(current.lstrip()) <= block_indent:
+                    break  # walked out of this route's block
+                if model.match(current):
+                    return offset
+            return None
+        return None
 
     def _check_key(self) -> bool:
+        """Report a missing credential up front rather than mid-run.
+
+        Resolution goes through ``harness.auth``, so a key held by
+        ``ay auth add`` counts here exactly as an exported variable does.
+        Reading the environment alone made a stored key invisible and left
+        the REPL refusing to start on a credential it already had.
+
+        A route with no api_key_env, and a config that cannot be read, both
+        pass: the first needs no credential (a local server or a replay
+        script) and the second has a real error of its own that the harness
+        will report far better than a guess from here.
+        """
         self._load_env()
-        key = os.environ.get("DASHSCOPE_API_KEY", "")
-        if key:
+        from harness import auth  # noqa: PLC0415
+
+        route = self._primary_route()
+        if route is None or not route.api_key_env:
             return True
-        print("No DASHSCOPE_API_KEY found. Set it in .env or the environment.")
-        print("  notepad .env   ->   DASHSCOPE_API_KEY=sk-ws-...")
+        env_var = route.api_key_env
+        if auth.resolve_route(env_var, route.base_url).available:
+            return True
+        # Labels are left-aligned because the variable name makes the
+        # export line an unpredictable width.
+        print(f"No credential for {env_var} (needed by {self.config_path.name}).")
+        print("  store one:  ay auth add <key>   (the provider is inferred)")
+        print(f"  or export:  {env_var}=...   (environment or .env)")
+        print("  check:      ay auth status")
         return False
 
     # ------------------------------------------------------------- task gen
@@ -316,14 +407,33 @@ metadata:
         process.wait()
 
     def _set_model(self, model: str) -> None:
-        text = self.config_path.read_text(encoding="utf-8")
-        updated, count = re.subn(r"^(\s*model:\s*)\S+\s*$", r"\g<1>" + model, text, count=1, flags=re.MULTILINE)
-        if count == 0:
-            print(f"could not find a model line in {self.config_path}")
+        """Rewrite the primary route's model in place.
+
+        Edited as text rather than round-tripped through YAML so the
+        comments in the config -- which explain why particular models were
+        chosen -- survive a /model switch.
+        """
+        route = self._primary_route()
+        if route is None:
+            print(f"could not read the config: {self.config_path}")
             return
-        self.config_path.write_text(updated, encoding="utf-8")
+        try:
+            text = self.config_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            print(f"could not read the config: {exc}")
+            return
+        index = self._model_line(text, route.name)
+        if index is None:
+            print(f"no model line for route {route.name!r} in {self.config_path}")
+            return
+        # keepends so the file's existing line endings are preserved.
+        lines = text.splitlines(keepends=True)
+        lines[index] = re.sub(
+            r"^(\s*model:\s*)\S+(\s*)$", r"\g<1>" + model + r"\g<2>", lines[index]
+        )
+        self.config_path.write_text("".join(lines), encoding="utf-8")
         self.model = model
-        print(f"model -> {model}")
+        print(f"model -> {model}  (route {route.name})")
 
     # ------------------------------------------------------------- main
 

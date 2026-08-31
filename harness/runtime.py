@@ -38,6 +38,22 @@ from .verifier import Verifier
 from .workspace import Workspace, WorkspaceManager
 
 
+def route_secrets(config: HarnessConfig) -> list[str]:
+    """Every credential the configured routes could actually send.
+
+    Resolution has to match `providers._secret` exactly. When the two
+    disagree the run sends a key the redactor never learned about, and it
+    reaches the ledger in the clear -- so this resolves by endpoint as well
+    as by variable name, and both start and resume build the list here
+    rather than each writing their own copy.
+    """
+    return [
+        auth.resolve_route(route.api_key_env, route.base_url).key
+        for route in config.router.routes.values()
+        if route.api_key_env
+    ]
+
+
 class HarnessRuntime:
     def __init__(
         self,
@@ -124,14 +140,7 @@ class HarnessRuntime:
         manager = WorkspaceManager(config.runs_dir)
         workspace = manager.create(run_id, task.workspace_seed, task.protected_paths)
         run_dir = config.runs_dir / run_id
-        # Include stored credentials, not just exported ones: a key resolved
-        # from the auth store must be scrubbed from the ledger just the same.
-        explicit_secrets = [
-            auth.resolve_env(route.api_key_env).key
-            for route in config.router.routes.values()
-            if route.api_key_env
-        ]
-        redactor = Redactor(explicit_secrets)
+        redactor = Redactor(route_secrets(config))
         artifacts = ArtifactStore(run_dir, redactor)
         cls._write_frozen_inputs(artifacts, config, task, skill)
         artifacts.write_manifest(
@@ -241,13 +250,7 @@ class HarnessRuntime:
         skill = load_skill(run_dir / inputs["skill"])
         state_store = StateStore(run_dir / "state.json")
         state = state_store.load()
-        redactor = Redactor(
-            [
-                auth.resolve_env(route.api_key_env).key
-                for route in config.router.routes.values()
-                if route.api_key_env
-            ]
-        )
+        redactor = Redactor(route_secrets(config))
         events = EventLog(run_dir / "events.jsonl", run_id, redactor)
         state.event_sequence = events.sequence
         workspace = WorkspaceManager(config.runs_dir).open(run_id, task.protected_paths)

@@ -82,7 +82,11 @@ ay auth providers
 
 The store lives at `~/.yatra-harness/auth.json`, outside the repository. An
 exported environment variable still takes precedence, and `.env` is loaded on
-startup.
+startup by `ay` and `harness` alike.
+
+Which variable is needed comes from the active config's primary route, so a
+config pointing at a local server or a replay script starts with no key at
+all.
 
 ## Commands
 
@@ -157,8 +161,9 @@ yatra-harness/
 
 ## Troubleshooting
 
-- **`No DASHSCOPE_API_KEY found`**: edit `yatra-harness/.env` and add a line
-  `DASHSCOPE_API_KEY=sk-ws-...`.
+- **`No credential for <VAR>`**: the config's primary route needs a key.
+  Run `ay auth add <key>` (the provider is inferred), or export the variable,
+  or put it in `.env`. `ay auth status` shows what is currently configured.
 - **`error: task workspace seed is not a directory`**: the chat seed
   (`fixtures/chat_seed/`) is missing. Re-run `git restore` or pull.
 - **The agent says "Added lower-bound handling" for an unrelated task**:

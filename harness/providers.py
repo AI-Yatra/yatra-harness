@@ -133,7 +133,11 @@ class _HTTPProvider:
         explicit = self.route.api_key_env
         candidates = (explicit,) if explicit else (self.default_api_key_env,)
         for name in candidates:
-            credential = auth.resolve_env(name)
+            # The endpoint is passed so a route naming a non-standard
+            # variable can still reach a stored key; otherwise the error
+            # below tells the operator to run `auth add` when doing so
+            # could not have helped.
+            credential = auth.resolve_route(name, self.route.base_url)
             if credential.available:
                 return credential.key
         if explicit:

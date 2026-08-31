@@ -165,8 +165,16 @@ The store sits in your home directory rather than the repository, so you cannot
 commit it by accident. Keys resolved from it are scrubbed from the event ledger
 exactly like exported ones.
 
-`harness auth` and `ay auth` run the same code. The `.env` file still works for
-`ay`, which loads it on startup.
+`harness auth` and `ay auth` run the same code, and both load `.env` on
+startup -- the nearest one at or above the working directory. It accepts a
+leading `export` and strips surrounding quotes, so a line pasted out of a
+shell profile works. An exported variable always wins over the file.
+
+A route resolves its credential by the variable it names, and failing that by
+its endpoint. That way a route naming a non-standard variable -- as
+`configs/teaching.yaml` does with `HARNESS_REMOTE_API_KEY` -- can still find a
+key stored for the provider that endpoint belongs to. A stored key is only
+ever offered to its own provider's endpoint.
 
 ## Running against a live model
 
