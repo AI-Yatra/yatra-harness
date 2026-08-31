@@ -1,5 +1,5 @@
 [project]
-name = "aiyatra-mini-harness"
+name = "yatra-harness"
 version = "1.0.0"
 description = "A production-style, provider-neutral agent harness for the AI Yatra workshop"
 readme = "README.md"
@@ -10,13 +10,14 @@ dependencies = ["PyYAML>=6.0,<7"]
 
 [project.scripts]
 harness = "harness.cli:main"
+ay = "ay:main"
 
 [build-system]
 requires = ["hatchling>=1.24"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["harness"]
+only-include = ["harness", "ay.py"]
 
 [tool.ruff]
 line-length = 100
@@ -35,7 +36,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S"]
 "harness/mcp_demo/server.py" = ["T201"]
-"harness_chat.py" = ["S101"]  # subprocess stdout invariant assertion
+"ay.py" = ["S101"]  # subprocess stdout invariant assertion
 
 [dependency-groups]
 dev = [

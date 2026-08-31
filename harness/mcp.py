@@ -73,7 +73,7 @@ class MCPStdioClient:
             {
                 "protocolVersion": self.protocol_version,
                 "capabilities": {},
-                "clientInfo": {"name": "aiyatra-mini-harness", "version": "1.0.0"},
+                "clientInfo": {"name": "yatra-harness", "version": "1.0.0"},
             },
         )
         negotiated = result.get("protocolVersion")

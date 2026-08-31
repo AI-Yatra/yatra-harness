@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the runtime architecture of the mini harness, mapping
+This document describes the runtime architecture of the harness, mapping
 each piece of the workshop diagram to a concrete module.
 
 ## The authority boundary

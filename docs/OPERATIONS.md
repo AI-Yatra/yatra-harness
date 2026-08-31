@@ -1,6 +1,6 @@
 # Operations
 
-Operator runbook for the mini harness.
+Operator runbook for the harness.
 
 ## Quick start
 

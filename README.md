@@ -1,4 +1,4 @@
-# AI Yatra Mini Harness
+# Yatra Harness
 
 A provider-neutral coding-agent harness that implements the workshop flow from
 task intake through bounded context, model routing, policy-governed tools,
@@ -62,13 +62,13 @@ harness list-runs   # list run bundles
 
 ## REPL (Claude Code-style)
 
-`harness_chat.py` is a thin REPL on top of the same CLI. Each message becomes
+`ay` (short for AI Yatra) is a thin REPL on top of the same CLI. Each message becomes
 a generated `tasks/chat/<id>.yaml` and runs through `harness run` with live
 stdout streaming. Slash commands: `/runs`, `/inspect`, `/resume`, `/config`,
-`/model`, `/help`, `/exit`. See `harness_chat.README.md` for full usage.
+`/model`, `/help`, `/exit`. See `ay.README.md` for full usage.
 
 ```bash
-uv run python harness_chat.py \
+uv run ay \
   --config configs/palimpsest-config.yaml \
   --skill skills/palimpsest-skill.yaml
 ```
@@ -79,7 +79,12 @@ not check it; `/config` says so explicitly. To make a chat run verifiable, give
 it a real seed, acceptance command, and protected paths:
 
 ```bash
-uv run python harness_chat.py   --config configs/palimpsest-config.yaml   --skill skills/palimpsest-skill.yaml   --seed fixtures/palimpsest   --accept "python verify_contact_workbook.py"   --protect "verify_contact_workbook.py" --protect "contact_cards/**"
+uv run ay \
+  --config configs/palimpsest-config.yaml \
+  --skill skills/palimpsest-skill.yaml \
+  --seed fixtures/palimpsest \
+  --accept "python verify_contact_workbook.py" \
+  --protect "verify_contact_workbook.py" --protect "contact_cards/**"
 ```
 
 ## LLM Light
@@ -150,8 +155,9 @@ uv run ruff check harness tests
 ## Layout
 
 ```text
-mini-harness/
+yatra-harness/
 ├── harness/            # runtime modules
+├── ay.py               # the `ay` REPL (Claude Code-style front end)
 ├── configs/            # teaching, local, remote, llm_light
 ├── tasks/              # task contracts
 ├── skills/             # skill contracts

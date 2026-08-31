@@ -1,4 +1,4 @@
-"""Unit tests for harness_chat.py.
+"""Unit tests for ay.py.
 
 Tests the task generator and slash-command parsing. Does not run the
 harness itself (that would require an API key and a live model).
@@ -17,10 +17,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _import_chat():
-    # Import lazily so the test works when harness_chat.py is at the project root.
+    # Import lazily so the test works when ay.py is at the project root.
     sys.path.insert(0, str(ROOT))
-    import harness_chat  # noqa: PLC0415
-    return harness_chat
+    import ay  # noqa: PLC0415
+    return ay
 
 
 class ChatAppTests(unittest.TestCase):
@@ -79,16 +79,20 @@ class CommandParsingTests(unittest.TestCase):
 
     def test_help_command_exits_zero(self) -> None:
         result = subprocess.run(
-            [sys.executable, str(ROOT / "harness_chat.py"), "--help"],
+            [sys.executable, str(ROOT / "ay.py"), "--help"],
             cwd=ROOT,
             capture_output=True,
             text=True,
             timeout=30,
         )
         self.assertEqual(result.returncode, 0)
-        self.assertIn("harness_chat.py", result.stdout)
+        # argparse prog is pinned to "ay" so the usage line reads the same
+        # whether the REPL is started as `ay`, `uv run ay`, or `python ay.py`.
+        self.assertIn("usage: ay", result.stdout)
         self.assertIn("--config", result.stdout)
         self.assertIn("--skill", result.stdout)
+        self.assertIn("--seed", result.stdout)
+        self.assertIn("--accept", result.stdout)
 
 
 if __name__ == "__main__":

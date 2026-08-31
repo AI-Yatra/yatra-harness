@@ -55,7 +55,7 @@ def handle(message: dict[str, Any], root: Path, initialized: bool) -> tuple[dict
                 {
                     "protocolVersion": PROTOCOL_VERSION,
                     "capabilities": {"tools": {"listChanged": False}},
-                    "serverInfo": {"name": "aiyatra-repo-stats", "version": "1.0.0"},
+                    "serverInfo": {"name": "yatra-repo-stats", "version": "1.0.0"},
                 },
             ),
             initialized,

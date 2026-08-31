@@ -734,7 +734,7 @@ def _browser_fetch(arguments: dict[str, Any], config: HarnessConfig) -> tuple[st
     url = arguments["url"]
     _validate_public_url(url, config.policy.allowed_domains)
     opener = urllib.request.build_opener(_NoRedirect())
-    request = urllib.request.Request(url, headers={"User-Agent": "aiyatra-mini-harness/1.0"})
+    request = urllib.request.Request(url, headers={"User-Agent": "yatra-harness/1.0"})
     try:
         with opener.open(request, timeout=config.policy.browser_timeout_seconds) as response:
             raw = response.read(config.budgets.max_output_chars + 1)

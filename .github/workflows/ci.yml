@@ -20,7 +20,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: uv sync
       - name: Lint
-        run: uv run ruff check harness tests harness_chat.py
+        run: uv run ruff check harness tests ay.py
       - name: Unit and end-to-end tests
         run: uv run python -m unittest discover -s tests -v
       - name: Doctor

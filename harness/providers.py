@@ -80,7 +80,7 @@ class ReplayProvider:
         )
 
 
-USER_AGENT = "aiyatra-mini-harness/1.0"
+USER_AGENT = "yatra-harness/1.0"
 ANTHROPIC_VERSION = "2023-06-01"
 
 

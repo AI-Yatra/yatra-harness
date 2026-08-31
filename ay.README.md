@@ -1,6 +1,6 @@
-# harness-chat
+# ay
 
-A Claude Code-style REPL on top of the AI Yatra mini-harness. Type a message,
+A Claude Code-style REPL on top of the Yatra Harness. Type a message,
 get a run. Iterate. Inspect past runs. Switch the model. Resume from
 checkpoints.
 
@@ -10,7 +10,7 @@ harness internals.
 
 ## Quick start
 
-From the `mini-harness/` root:
+From the `yatra-harness/` root:
 
 ```powershell
 # one-time
@@ -19,13 +19,13 @@ notepad .env
 # DASHSCOPE_API_KEY=sk-ws-...
 
 # launch the REPL
-uv run python harness_chat.py --config configs/palimpsest-config.yaml --skill skills/palimpsest-skill.yaml
+uv run ay --config configs/palimpsest-config.yaml --skill skills/palimpsest-skill.yaml
 ```
 
 You'll see:
 
 ```
-harness-chat -- Claude Code-style REPL on the mini-harness
+ay -- Claude Code-style REPL on the yatra-harness
 config: configs\palimpsest-config.yaml  model: qwen-plus
 Type a message to run the agent, or /help for commands.
 
@@ -51,7 +51,12 @@ Three optional flags turn a chat message into a falsifiable task:
 | `--protect GLOB` | protected path glob, repeatable |
 
 ```bash
-uv run python harness_chat.py   --config configs/palimpsest-config.yaml   --skill skills/palimpsest-skill.yaml   --seed fixtures/palimpsest   --accept "python verify_contact_workbook.py"   --protect "verify_contact_workbook.py" --protect "contact_cards/**"
+uv run ay \
+  --config configs/palimpsest-config.yaml \
+  --skill skills/palimpsest-skill.yaml \
+  --seed fixtures/palimpsest \
+  --accept "python verify_contact_workbook.py" \
+  --protect "verify_contact_workbook.py" --protect "contact_cards/**"
 ```
 
 With those set, a message that does no real work now fails verification instead
@@ -72,7 +77,7 @@ of reporting success.
 
 ## How it works
 
-For each message, `harness-chat`:
+For each message, `ay`:
 
 1. Slugifies the message into a task id (`chat-<slug>-<hash>`).
 2. Writes a `tasks/chat/<id>.yaml` with the message as the objective, an
@@ -113,7 +118,7 @@ workbook experiment), run the harness directly with `harness run ...`.
 ## Files created at runtime
 
 ```
-mini-harness/
+yatra-harness/
   tasks/chat/                    one YAML per message
     chat-<slug>-<hash>.yaml
   .runs/                          one evidence bundle per run
@@ -130,7 +135,7 @@ mini-harness/
 
 ## Troubleshooting
 
-- **`No DASHSCOPE_API_KEY found`**: edit `mini-harness/.env` and add a line
+- **`No DASHSCOPE_API_KEY found`**: edit `yatra-harness/.env` and add a line
   `DASHSCOPE_API_KEY=sk-ws-...`.
 - **`error: task workspace seed is not a directory`**: the chat seed
   (`fixtures/chat_seed/`) is missing. Re-run `git restore` or pull.
@@ -143,7 +148,7 @@ mini-harness/
 
 ## The boundary
 
-`harness-chat` is intentionally a 300-line shell. It runs the harness
+`ay` is intentionally a 300-line shell. It runs the harness
 exactly the way `harness run` would — no approval prompts, no streaming
 tokens mid-generation, no patch approval flow. The harness is the agent;
 the REPL is the operator console. If you want those higher-fidelity
