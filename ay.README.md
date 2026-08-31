@@ -19,6 +19,11 @@ notepad .env
 # DASHSCOPE_API_KEY=sk-ws-...
 
 # launch the REPL
+# install once, then `ay` works from any directory
+uv tool install --editable . --with openpyxl
+ay
+
+# or without installing
 uv run ay --config configs/palimpsest-config.yaml --skill skills/palimpsest-skill.yaml
 ```
 

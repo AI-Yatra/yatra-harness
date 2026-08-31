@@ -67,6 +67,19 @@ a generated `tasks/chat/<id>.yaml` and runs through `harness run` with live
 stdout streaming. Slash commands: `/runs`, `/inspect`, `/resume`, `/config`,
 `/model`, `/help`, `/exit`. See `ay.README.md` for full usage.
 
+Install once, then `ay` runs from any directory:
+
+```bash
+uv tool install --editable . --with openpyxl
+```
+
+```bash
+ay                                                             # repo defaults
+ay --config configs/teaching.yaml --skill skills/bugfix.yaml   # offline route
+```
+
+Or run it without installing:
+
 ```bash
 uv run ay \
   --config configs/palimpsest-config.yaml \

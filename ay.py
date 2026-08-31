@@ -52,6 +52,39 @@ Commands:
 """
 
 
+BANNER = (
+    "   ███████ ███████     ███ ███ ███████ ███████ ███████ ███████\n"
+    "   ███ ███   ███       ███ ███ ███ ███   ███   ███ ███ ███ ███\n"
+    "   ███████   ███       ███████ ███████   ███   ███████ ███████\n"
+    "   ███ ███   ███         ███   ███ ███   ███   ███ ██  ███ ███\n"
+    "   ███ ███ ███████       ███   ███ ███   ███   ███  ██ ███ ███\n"
+)
+
+
+ASCII_BANNER = (
+    "   #####  ##     ##  ##  ####  ###### ####   ####\n"
+    "   ##  ##  ##      ####  ##  ##   ##   ##  ## ##  ##\n"
+    "   #####   ##       ##   ######   ##   ####   ######\n"
+    "   ##  ##  ##       ##   ##  ##   ##   ## ##  ##  ##\n"
+    "   ##  ## ####      ##   ##  ##   ##   ##  ## ##  ##\n"
+)
+
+
+def _tint(text: str, code: str) -> str:
+    """ANSI colour, skipped when output is piped or NO_COLOR is set."""
+    if os.environ.get("NO_COLOR") or not sys.stdout.isatty():
+        return text
+    return "\033[" + code + "m" + text + "\033[0m"
+
+
+def _short_path(path: Path) -> str:
+    """Render a path with the home directory collapsed to ~."""
+    try:
+        return "~" + os.sep + str(path.relative_to(Path.home()))
+    except ValueError:
+        return str(path)
+
+
 class ChatApp:
     def __init__(
         self,
@@ -294,10 +327,31 @@ metadata:
 
     # ------------------------------------------------------------- main
 
+    def _print_banner(self) -> None:
+        try:
+            from harness import __version__ as version
+        except Exception:  # noqa: BLE001 - the banner must never block startup
+            version = "?"
+        if self.accept:
+            contract = "verified (" + "; ".join(self.accept) + ")"
+        else:
+            contract = "unverified (acceptance always passes)"
+        print()
+        try:
+            print(_tint(BANNER, "36"))
+        except UnicodeEncodeError:
+            # Some Windows consoles are cp1252; the block glyphs cannot be
+            # encoded there. A banner is decoration and must never be fatal.
+            print(_tint(ASCII_BANNER, "36"))
+        print(_tint(f"# Yatra Harness v{version} · ay REPL", "1"))
+        print(_tint(f"# model: {self.model} · config: {self.config_path.name}", "2"))
+        print(_tint(f"# seed: {self.seed.name} · contract: {contract}", "2"))
+        print(_tint(f"# {_short_path(ROOT)}", "2"))
+        print()
+        print("Type a message to run the agent, or /help for commands." + chr(10))
+
     def run(self) -> int:
-        print("ay -- Claude Code-style REPL on the yatra-harness")
-        print(f"config: {self.config_path}  model: {self.model}")
-        print("Type a message to run the agent, or /help for commands.\n")
+        self._print_banner()
         if not self._check_key():
             return 2
         while True:
@@ -325,6 +379,13 @@ metadata:
 
 
 def main() -> int:
+    # Model output and the banner are arbitrary Unicode; a cp1252 console
+    # would otherwise raise UnicodeEncodeError mid-stream and kill the REPL.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     parser = argparse.ArgumentParser(
         prog="ay",
         description="Claude Code-style REPL for the yatra-harness")
