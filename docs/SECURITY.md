@@ -33,7 +33,21 @@ it does not claim to protect against.
 
 ## Provider security
 
-- Credentials are read from environment variables, never from config files.
+- Credentials resolve through `harness/auth.py` and nowhere else. That module
+  is the only one that holds a raw key, and it hands it to the provider adapter
+  alone. `harness doctor` and the runner call the same function, so they cannot
+  disagree about whether a route is ready.
+- Precedence is the environment variable first, then the stored file.
+  `harness auth status` prints which source won.
+- The store is `~/.yatra-harness/auth.json`, outside the repository so it cannot
+  be committed. It is written with mode 0600 on POSIX; on Windows it inherits
+  the user profile ACL, which grants the owner, SYSTEM and Administrators only.
+- A key resolved from the store is added to the `Redactor` exactly like an
+  exported one, so it is scrubbed from the event ledger and artifacts.
+- `harness auth add` accepts the key as an argument or prompts for it without
+  echo. Passing a secret as an argument records it in shell history, so the
+  prompt is the safer path on a shared machine.
+- Credentials are never read from config files.
 - `api_key_env` names the variable; the conventional `OPENAI_API_KEY` /
   `ANTHROPIC_API_KEY` are used when unset.
 - LLM Light (`profile_from_route`) strips endpoints and credential variable

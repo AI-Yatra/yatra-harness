@@ -67,6 +67,23 @@ uv run ay \
 With those set, a message that does no real work now fails verification instead
 of reporting success.
 
+## Keys
+
+`ay auth` and `harness auth` are the same command. Store a key once and the
+provider is inferred from its prefix:
+
+```
+ay auth add sk-ws-...        # or `ay auth add` to be prompted without echo
+ay auth status               # redacted, and shows which source won
+ay auth verify               # a real call, not a variable check
+ay auth remove dashscope
+ay auth providers
+```
+
+The store lives at `~/.yatra-harness/auth.json`, outside the repository. An
+exported environment variable still takes precedence, and `.env` is loaded on
+startup.
+
 ## Commands
 
 | Command | Effect |

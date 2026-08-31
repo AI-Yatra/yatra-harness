@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import shutil
 import socket
 import sys
@@ -11,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
+from . import auth
 from .config import HarnessConfig, load_config, load_skill, load_task
 from .errors import HarnessError
 from .mcp import MCPStdioClient
@@ -105,19 +105,25 @@ def _routing_check(config: HarnessConfig) -> Check:
 
 def _route_check(config: HarnessConfig, name: str, *, required: bool) -> Check:
     route = config.router.routes[name]
+    detail = route.base_url
     if route.kind == "replay":
         ok = route.script is not None and route.script.is_file()
         return Check(f"model:{name}", ok, str(route.script), required)
     # A route whose credential is absent cannot start a run. Preflight has to
     # fail here, otherwise doctor and the runner disagree about readiness and
     # the operator only finds out after paying for a workspace and a run id.
-    if route.api_key_env and not os.environ.get(route.api_key_env):
-        return Check(
-            f"model:{name}",
-            False,
-            f"{route.base_url} (environment variable {route.api_key_env} is not set)",
-            required,
-        )
+    if route.api_key_env:
+        credential = auth.resolve_env(route.api_key_env)
+        if not credential.available:
+            return Check(
+                f"model:{name}",
+                False,
+                f"{route.base_url} (no credential for {route.api_key_env}; "
+                f"export it or run `harness auth add <key>`)",
+                required,
+            )
+        detail = f"{route.base_url} (credential from {credential.source})"
+
     parsed = urlparse(route.base_url)
     if route.local and parsed.hostname:
         port = parsed.port or (443 if parsed.scheme == "https" else 80)
@@ -132,5 +138,5 @@ def _route_check(config: HarnessConfig, name: str, *, required: bool) -> Check:
                 f"configured but unreachable at {parsed.hostname}:{port}: {exc}",
                 required,
             )
-    return Check(f"model:{name}", bool(route.base_url), route.base_url or "missing base_url", required)
+    return Check(f"model:{name}", bool(route.base_url), detail or "missing base_url", required)
 

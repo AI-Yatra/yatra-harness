@@ -378,6 +378,17 @@ metadata:
                 print(f"\n[harness exited {code}] inspect with /inspect or /runs")
 
 
+def _delegate_to_cli(argv: list[str]) -> int:
+    """Hand a subcommand to the harness CLI so `ay` and `harness` agree.
+
+    `ay auth add <key>` and `harness auth add <key>` must be the same code
+    path; two credential systems is the failure this module exists to avoid.
+    """
+    from harness.cli import main as cli_main
+
+    return cli_main(argv)
+
+
 def main() -> int:
     # Model output and the banner are arbitrary Unicode; a cp1252 console
     # would otherwise raise UnicodeEncodeError mid-stream and kill the REPL.
@@ -386,6 +397,10 @@ def main() -> int:
             stream.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, ValueError):
             pass
+    argv = sys.argv[1:]
+    if argv and argv[0] == "auth":
+        return _delegate_to_cli(argv)
+
     parser = argparse.ArgumentParser(
         prog="ay",
         description="Claude Code-style REPL for the yatra-harness")

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 import time
 import uuid
@@ -13,6 +12,7 @@ from typing import Any
 
 import yaml
 
+from . import auth
 from .artifacts import ArtifactStore
 from .config import HarnessConfig, load_config, load_skill, load_task
 from .context import ContextEngine
@@ -124,8 +124,10 @@ class HarnessRuntime:
         manager = WorkspaceManager(config.runs_dir)
         workspace = manager.create(run_id, task.workspace_seed, task.protected_paths)
         run_dir = config.runs_dir / run_id
+        # Include stored credentials, not just exported ones: a key resolved
+        # from the auth store must be scrubbed from the ledger just the same.
         explicit_secrets = [
-            os.environ.get(route.api_key_env, "")
+            auth.resolve_env(route.api_key_env).key
             for route in config.router.routes.values()
             if route.api_key_env
         ]
@@ -241,7 +243,7 @@ class HarnessRuntime:
         state = state_store.load()
         redactor = Redactor(
             [
-                os.environ.get(route.api_key_env, "")
+                auth.resolve_env(route.api_key_env).key
                 for route in config.router.routes.values()
                 if route.api_key_env
             ]

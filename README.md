@@ -120,29 +120,63 @@ Now try asking it to collect the contact cards, exclude Tom, sort them, and
 build `contact.xlsx`. Then ask it to do nothing at all and watch that second run
 fail. A grader that cannot fail is not a grader.
 
-## Using a live model
+## Keys
 
-Copy the example environment file and add a key.
-
-```
-cp .env.example .env                  # macOS, Linux
-Copy-Item .env.example .env           # PowerShell
-```
-
-`ay` reads `.env` on startup. The `harness` CLI does not, so export the variable
-before running it directly:
+Store a key once and every route that needs it resolves without exporting
+anything. The provider is inferred from the key's prefix.
 
 ```
-$env:DASHSCOPE_API_KEY = "sk-..."     # PowerShell
-export DASHSCOPE_API_KEY="sk-..."     # macOS, Linux
+ay auth add sk-ws-...
 ```
+
+```
+stored dashscope key sk-ws-H...i7C4 (116 chars)
+  file:  ~/.yatra-harness/auth.json
+  routes naming DASHSCOPE_API_KEY now resolve without exporting it
+```
+
+Omit the key to be prompted for it instead, which keeps it out of your shell
+history:
+
+```
+ay auth add
+```
+
+Keys are shown redacted here and everywhere else.
+
+```
+ay auth status              # what is configured, and which source won
+ay auth verify              # a real call to every configured provider
+ay auth verify dashscope
+ay auth remove dashscope
+ay auth providers
+```
+
+`verify` asks the provider to list its models. A variable being set is not
+evidence that the key works, which is how an exhausted quota used to reach the
+agent loop before anyone noticed.
+
+Resolution order is the environment variable first, then the stored file, and
+`ay auth status` prints which one won. A stale exported variable shadowing a
+stored key becomes visible instead of mysterious. Ollama and vLLM report ready
+without a key.
+
+The store sits in your home directory rather than the repository, so you cannot
+commit it by accident. Keys resolved from it are scrubbed from the event ledger
+exactly like exported ones.
+
+`harness auth` and `ay auth` run the same code. The `.env` file still works for
+`ay`, which loads it on startup.
+
+## Running against a live model
 
 ```
 uv run harness run tasks/palimpsest_task.yaml --config configs/palimpsest-config.yaml --skill skills/palimpsest-skill.yaml --yes
 ```
 
-Run `harness doctor` first. It fails a route whose API key variable is unset,
-which saves you discovering that after a workspace and a run id already exist.
+Run `harness doctor` first. It fails a route whose credential is missing and
+names the variable, which saves you discovering that after a workspace and a run
+id already exist.
 
 ## LLM Light
 
@@ -164,6 +198,7 @@ reason they were dropped, so a plan is auditable before you spend anything. See
 ## Commands
 
 ```
+harness auth        add, inspect, verify and remove provider credentials
 harness doctor      preflight: environment, configs, credentials, adapters
 harness explain     resolve a task into its contracts without running it
 harness tools       list registered tools with risk classes and provenance

@@ -8,7 +8,6 @@ owns orchestration.
 from __future__ import annotations
 
 import json
-import os
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -16,6 +15,7 @@ from typing import Any, Protocol
 
 import yaml
 
+from . import auth
 from .config import RouteConfig
 from .contracts import ActionKind, ActionProposal, ModelRequest, ModelResponse
 from .errors import ConfigurationError, PermanentProviderError, TransientProviderError
@@ -133,12 +133,13 @@ class _HTTPProvider:
         explicit = self.route.api_key_env
         candidates = (explicit,) if explicit else (self.default_api_key_env,)
         for name in candidates:
-            value = os.environ.get(name, "")
-            if value:
-                return value
+            credential = auth.resolve_env(name)
+            if credential.available:
+                return credential.key
         if explicit:
             raise ConfigurationError(
-                f"route {self.route.name!r} requires environment variable {explicit}"
+                f"route {self.route.name!r} has no credential for {explicit}. "
+                f"export it, or run: harness auth add <key>"
             )
         return ""
 

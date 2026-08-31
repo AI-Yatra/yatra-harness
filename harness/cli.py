@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import sys
 import tempfile
 from pathlib import Path
 from typing import Any
 
-from . import __version__
+from . import __version__, auth
 from .artifacts import ArtifactStore
 from .config import load_config, load_skill, load_task
 from .contracts import RunStatus
@@ -117,6 +118,21 @@ def parser() -> argparse.ArgumentParser:
     replay.add_argument("run_id")
     replay.add_argument("--runs-dir", type=Path, default=Path(".runs"))
 
+    auth_parser = commands.add_parser("auth", help="manage provider credentials")
+    auth_sub = auth_parser.add_subparsers(dest="auth_action")
+    add_cmd = auth_sub.add_parser("add", help="store a key; the provider is inferred")
+    add_cmd.add_argument("key", nargs="?", help="the key; omit to be prompted without echo")
+    add_cmd.add_argument("--provider", help="override provider detection")
+    add_cmd.add_argument("--base-url", help="pin a non-default base URL")
+    status_cmd = auth_sub.add_parser("status", help="show configured credentials")
+    status_cmd.add_argument("--json", action="store_true")
+    verify_cmd = auth_sub.add_parser("verify", help="make a real call to the provider")
+    verify_cmd.add_argument("provider", nargs="?", help="default: every configured provider")
+    verify_cmd.add_argument("--timeout", type=float, default=20.0)
+    remove_cmd = auth_sub.add_parser("remove", help="delete a stored key")
+    remove_cmd.add_argument("provider")
+    auth_sub.add_parser("providers", help="list known providers")
+
     listing = commands.add_parser("list-runs", help="list durable run checkpoints")
     listing.add_argument("--runs-dir", type=Path, default=Path(".runs"))
     return root
@@ -125,6 +141,8 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     arguments = parser().parse_args(argv)
     try:
+        if arguments.command == "auth":
+            return _auth(arguments)
         if arguments.command == "doctor":
             return _doctor(arguments)
         if arguments.command == "explain":
@@ -402,6 +420,70 @@ def _approval(yes: bool):
         return answer in {"y", "yes"}
 
     return decide
+
+
+def _auth(arguments: Any) -> int:
+    action = getattr(arguments, "auth_action", None)
+    if action == "add":
+        key = arguments.key
+        if not key:
+            # Prompting keeps the secret out of shell history.
+            key = getpass.getpass("Paste the API key (input hidden): ").strip()
+        record = auth.add(key, provider=arguments.provider, base_url=arguments.base_url or "")
+        print(f"stored {record['provider']} key {record['key']}")
+        print(f"  file:  {record['path']}")
+        print(f"  routes naming {record['env']} now resolve without exporting it")
+        return 0
+    if action == "status":
+        rows = auth.status()
+        if arguments.json:
+            print(json.dumps(rows, indent=2, sort_keys=True))
+            return 0
+        print(f"{'provider':<12} {'source':<12} {'key':<30} note")
+        print("-" * 80)
+        for row in rows:
+            if not row["ready"]:
+                continue
+            print(f"{row['provider']:<12} {row['source']:<12} {row['key']:<30} {row['note']}")
+        missing = [r["provider"] for r in rows if not r["ready"]]
+        if missing:
+            print()
+            print("no credential: " + ", ".join(missing))
+        print()
+        print(f"store: {auth.store_path()}")
+        return 0
+    if action == "verify":
+        if arguments.provider:
+            names = [arguments.provider]
+        else:
+            names = [r["provider"] for r in auth.status()
+                     if r["source"] != auth.SOURCE_NONE]
+        if not names:
+            print("no credentials configured; nothing to verify")
+            return 1
+        failures = 0
+        for name in names:
+            result = auth.verify(name, timeout=arguments.timeout)
+            print(f"{'PASS' if result.ok else 'FAIL'}  {result.provider:<12} "
+                  f"[{result.source}] {result.detail}")
+            failures += 0 if result.ok else 1
+        return 1 if failures else 0
+    if action == "remove":
+        if auth.remove_key(arguments.provider):
+            print(f"removed the stored {arguments.provider} key")
+            return 0
+        print(f"no stored key for {arguments.provider}")
+        return 1
+    if action == "providers":
+        print(f"{'provider':<12} {'api':<18} {'env var':<22} aliases")
+        print("-" * 80)
+        for provider in auth.PROVIDERS:
+            env = provider.env[0] if provider.env else "-"
+            print(f"{provider.name:<12} {provider.api:<18} {env:<22} "
+                  f"{', '.join(provider.aliases)}")
+        return 0
+    print("usage: harness auth {add,status,verify,remove,providers}", file=sys.stderr)
+    return 2
 
 
 def _print_result(result: Any) -> int:
