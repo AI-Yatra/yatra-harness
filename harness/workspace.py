@@ -66,7 +66,15 @@ class WorkspaceManager:
         workspace_dir = run_dir / "workspace"
         if run_dir.exists():
             raise WorkspaceError(f"run directory already exists: {run_dir}")
-        run_dir.mkdir(parents=True, mode=0o700)
+        # 0o700 keeps run directories private on POSIX, where a bundle can
+        # contain secrets in state.json. On Windows the same call produces an
+        # ACL without an explicit entry for the owning user, which leaves the
+        # directory writable but not renameable or removable by the person who
+        # created it. There, inherit the parent's ACL instead.
+        if os.name == "nt":
+            run_dir.mkdir(parents=True)
+        else:
+            run_dir.mkdir(parents=True, mode=0o700)
         shutil.copytree(seed, workspace_dir, ignore=self._ignore)
         self._initialize_git(workspace_dir)
         return Workspace(workspace_dir, protected_paths)
