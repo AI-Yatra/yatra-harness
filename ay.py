@@ -16,7 +16,9 @@ Commands:
 
 Requires:
   - yatra-harness synced with `uv sync` (openpyxl installed)
-  - DASHSCOPE_API_KEY in .env or the environment (Qwen Cloud / DashScope)
+  - a credential for the variable the active config's primary route names
+    (DASHSCOPE_API_KEY by default). Supply it with `ay auth add <key>`, or
+    export it, or put it in .env -- all three are resolved by harness.auth.
 """
 
 from __future__ import annotations
@@ -125,13 +127,53 @@ class ChatApp:
         match = re.search(r"^\s*model:\s*(\S+)\s*$", text, re.MULTILINE)
         return match.group(1) if match else "?"
 
+    def _detect_key_env(self) -> str:
+        """The environment variable the config's primary route asks for.
+
+        Routes name a variable rather than a provider, which is the same
+        contract ``harness.providers`` resolves against. An empty result
+        means there is nothing to gate on: either the route is a local
+        server or a replay script, or the config could not be read at all,
+        in which case the harness's own error on the run is the useful one
+        and a credential complaint from here would only mislead.
+        """
+        # Narrow on purpose. A blanket `except` here turns a typo in this
+        # method into a silently disabled gate, which is the same class of
+        # bug the gate itself had. load_config funnels every bad-config
+        # failure into ConfigurationError, so HarnessError is the whole set.
+        try:
+            from harness.config import load_config  # noqa: PLC0415
+            from harness.errors import HarnessError  # noqa: PLC0415
+        except ImportError:
+            return ""
+        try:
+            router = load_config(self.config_path).router
+            return router.routes[router.primary].api_key_env
+        except (HarnessError, OSError):
+            return ""
+
     def _check_key(self) -> bool:
+        """Report a missing credential up front rather than mid-run.
+
+        Resolution goes through ``harness.auth``, so a key held by
+        ``ay auth add`` counts here exactly as an exported variable does.
+        Reading the environment alone made a stored key invisible and left
+        the REPL refusing to start on a credential it already had.
+        """
         self._load_env()
-        key = os.environ.get("DASHSCOPE_API_KEY", "")
-        if key:
+        from harness import auth  # noqa: PLC0415
+
+        env_var = self._detect_key_env()
+        if not env_var:
             return True
-        print("No DASHSCOPE_API_KEY found. Set it in .env or the environment.")
-        print("  notepad .env   ->   DASHSCOPE_API_KEY=sk-ws-...")
+        if auth.resolve_env(env_var).available:
+            return True
+        # Labels are left-aligned because the variable name makes the
+        # export line an unpredictable width.
+        print(f"No credential for {env_var} (needed by {self.config_path.name}).")
+        print("  store one:  ay auth add <key>   (the provider is inferred)")
+        print(f"  or export:  {env_var}=...   (environment or .env)")
+        print("  check:      ay auth status")
         return False
 
     # ------------------------------------------------------------- task gen
