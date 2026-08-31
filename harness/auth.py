@@ -259,6 +259,137 @@ def resolve_env(env_var: str) -> Credential:
     return Credential(name, "", SOURCE_NONE, env_var)
 
 
+def _normalize_url(url: str) -> str:
+    """Compare endpoints without tripping over case or a trailing slash."""
+    return (url or "").strip().rstrip("/").lower()
+
+
+def provider_for_base_url(base_url: str) -> Provider | None:
+    """Map a route's endpoint back to a provider.
+
+    A stored ``base_url`` recorded by ``auth add --base-url`` wins over the
+    built-in endpoint, because that entry was created for exactly this
+    gateway and a shared default endpoint would otherwise shadow it.
+    """
+    target = _normalize_url(base_url)
+    if not target:
+        return None
+    try:
+        data = load_store()
+    except AuthError:
+        data = {}
+    for name, entry in (data.get("providers") or {}).items():
+        if not isinstance(entry, dict):
+            continue
+        if _normalize_url(str(entry.get("base_url", ""))) == target:
+            provider = BY_NAME.get(name)
+            if provider is not None:
+                return provider
+    for provider in PROVIDERS:
+        if _normalize_url(provider.base_url) == target:
+            return provider
+    return None
+
+
+def resolve_route(env_var: str, base_url: str = "") -> Credential:
+    """Resolve the credential for a configured route.
+
+    A route names a variable and an endpoint, and the variable need not be
+    one this module knows: ``api_key_env: HARNESS_REMOTE_API_KEY`` is a
+    perfectly ordinary thing to write, and teaching.yaml ships exactly that.
+    Resolving on the name alone left such a route unable to see a stored key
+    while the error it raised told the operator to store one -- advice that
+    could not work. The endpoint is the second way in.
+
+    Precedence is unchanged and deliberate: an exported variable wins, then
+    the store by variable name, then the store by endpoint.
+    """
+    credential = resolve_env(env_var)
+    if credential.available or not base_url:
+        return credential
+    provider = provider_for_base_url(base_url)
+    if provider is None:
+        return credential
+    stored = _stored_key(provider.name)
+    if not stored:
+        return credential
+    return Credential(provider.name, stored, SOURCE_STORED, env_var)
+
+
+ENV_FILE_NAME = ".env"
+
+
+def env_file_path(start: Path | None = None) -> Path | None:
+    """Locate the .env to load: the override, else the nearest one above.
+
+    Walking up from the working directory means a run started from a
+    subdirectory of a project finds the same file as one started at its
+    root, which is the behaviour every other dotenv-reading tool has.
+    """
+    override = os.environ.get("YATRA_HARNESS_ENV_FILE")
+    if override:
+        candidate = Path(override).expanduser()
+        return candidate if candidate.is_file() else None
+    try:
+        base = Path(start).expanduser().resolve() if start else Path.cwd().resolve()
+    except OSError:
+        return None
+    for directory in (base, *base.parents):
+        candidate = directory / ENV_FILE_NAME
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def parse_env_file(text: str) -> dict[str, str]:
+    """Parse the shapes people actually write in a .env.
+
+    Accepts a leading ``export`` because that is what gets pasted out of a
+    shell profile, and strips one matching pair of surrounding quotes
+    because a quoted key would otherwise be sent to the provider with the
+    quotes attached and fail as a 401 with nothing to point at.
+    """
+    values: dict[str, str] = {}
+    for raw in text.splitlines():
+        line = raw.strip().lstrip("\ufeff")
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):].lstrip()
+        name, _, value = line.partition("=")
+        name = name.strip()
+        if not name:
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        values[name] = value
+    return values
+
+
+def load_env_file(start: Path | None = None) -> Path | None:
+    """Load .env into the environment. Exported variables always win.
+
+    Both entry points call this, so `ay` and `harness` agree about which
+    credentials exist. Previously only the REPL read .env, and a key that
+    made `ay` work left `harness run` reporting none.
+
+    A missing or unreadable file is not an error: .env is a convenience,
+    and failing to start over a malformed one would be worse than ignoring
+    it, since the credential may well be exported already.
+    """
+    path = env_file_path(start)
+    if path is None:
+        return None
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+    for name, value in parse_env_file(text).items():
+        os.environ.setdefault(name, value)
+    return path
+
+
 def status() -> list[dict]:
     """One row per provider: where its credential comes from, if anywhere."""
     rows = []

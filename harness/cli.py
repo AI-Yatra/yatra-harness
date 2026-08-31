@@ -140,6 +140,10 @@ def parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = parser().parse_args(argv)
+    # Load .env before anything resolves a credential, so `harness` and `ay`
+    # see the same file. Exported variables still win; a missing or
+    # unreadable .env is ignored rather than fatal.
+    auth.load_env_file()
     try:
         if arguments.command == "auth":
             return _auth(arguments)

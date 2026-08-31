@@ -113,7 +113,7 @@ def _route_check(config: HarnessConfig, name: str, *, required: bool) -> Check:
     # fail here, otherwise doctor and the runner disagree about readiness and
     # the operator only finds out after paying for a workspace and a run id.
     if route.api_key_env:
-        credential = auth.resolve_env(route.api_key_env)
+        credential = auth.resolve_route(route.api_key_env, route.base_url)
         if not credential.available:
             return Check(
                 f"model:{name}",

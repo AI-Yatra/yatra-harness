@@ -240,5 +240,59 @@ class RuntimeUnitTests(unittest.TestCase):
         self.assertEqual(config.router.routes["remote-api"].kind, "openai_compatible")
 
 
+class RedactionCoverageTests(unittest.TestCase):
+    """Every credential a run can actually send must be scrubbable.
+
+    The redactor is built from the configured routes before the run starts.
+    If a route resolves its key by one path and the redactor collects keys
+    by another, the key reaches the provider but never reaches the scrubber,
+    and lands in the ledger in the clear.
+    """
+
+    NAMES = ("YATRA_HARNESS_AUTH_FILE", "YATRA_HARNESS_ENV_FILE",
+             "DASHSCOPE_API_KEY", "HARNESS_REMOTE_API_KEY", "OPENAI_API_KEY")
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self._previous = {name: os.environ.get(name) for name in self.NAMES}
+        for name in self.NAMES:
+            os.environ.pop(name, None)
+        os.environ["YATRA_HARNESS_AUTH_FILE"] = str(self.tmp / "auth.json")
+        os.environ["YATRA_HARNESS_ENV_FILE"] = str(self.tmp / "absent.env")
+
+    def tearDown(self) -> None:
+        for name, value in self._previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+        self._tmp.cleanup()
+
+    def test_a_key_resolved_by_endpoint_is_still_redacted(self) -> None:
+        """teaching.yaml's remote-api route names a custom variable and
+        points at api.openai.com, so its key resolves by endpoint."""
+        from harness import auth  # noqa: PLC0415
+        from harness.runtime import route_secrets  # noqa: PLC0415
+
+        secret = "sk-proj-" + "z" * 30
+        auth.add(secret)
+        config = load_config(ROOT / "configs" / "teaching.yaml")
+        self.assertIn(secret, route_secrets(config))
+
+    def test_an_exported_key_is_still_collected(self) -> None:
+        from harness.runtime import route_secrets  # noqa: PLC0415
+
+        os.environ["HARNESS_REMOTE_API_KEY"] = "sk-proj-exported-value"
+        config = load_config(ROOT / "configs" / "teaching.yaml")
+        self.assertIn("sk-proj-exported-value", route_secrets(config))
+
+    def test_routes_without_a_credential_contribute_nothing(self) -> None:
+        from harness.runtime import route_secrets  # noqa: PLC0415
+
+        config = load_config(ROOT / "configs" / "teaching.yaml")
+        self.assertEqual([s for s in route_secrets(config) if s], [])
+
+
 if __name__ == "__main__":
     unittest.main()

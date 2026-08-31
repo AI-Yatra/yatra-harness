@@ -99,16 +99,16 @@ class CommandParsingTests(unittest.TestCase):
         self.assertIn("--accept", result.stdout)
 
 
-class CredentialGateTests(unittest.TestCase):
-    """The startup gate in `ay` must agree with `ay auth`.
+class ChatTestCase(unittest.TestCase):
+    """Shared isolation for tests that touch credentials or the config.
 
-    `ay auth add` and `harness auth add` are one code path by construction
-    (ay delegates), so a key accepted by one must be visible to the other.
     Every test runs against a throwaway store and a non-existent .env, never
     the developer's real credentials.
     """
 
-    ENV_VARS = ("YATRA_HARNESS_AUTH_FILE", "DASHSCOPE_API_KEY", "ANTHROPIC_API_KEY")
+    ENV_VARS = ("YATRA_HARNESS_AUTH_FILE", "YATRA_HARNESS_ENV_FILE",
+                "DASHSCOPE_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY",
+                "HARNESS_REMOTE_API_KEY")
 
     def setUp(self) -> None:
         self.chat = _import_chat()
@@ -120,15 +120,13 @@ class CredentialGateTests(unittest.TestCase):
         os.environ["YATRA_HARNESS_AUTH_FILE"] = str(self.tmp / "auth.json")
         for name in ("DASHSCOPE_API_KEY", "ANTHROPIC_API_KEY"):
             os.environ.pop(name, None)
-        # _load_env() would otherwise read the developer's real .env and
-        # setdefault a live key into the environment, hiding the bug.
-        self._previous_env_file = self.chat.ENV_FILE
-        self.chat.ENV_FILE = self.tmp / "absent.env"
+        # _load_env() would otherwise walk up to the developer's real .env
+        # and setdefault a live key into the environment, hiding the bug.
+        os.environ["YATRA_HARNESS_ENV_FILE"] = str(self.tmp / "absent.env")
         self.config = ROOT / "configs" / "palimpsest-config.yaml"
         self.skill = ROOT / "skills" / "palimpsest-skill.yaml"
 
     def tearDown(self) -> None:
-        self.chat.ENV_FILE = self._previous_env_file
         for name, value in self._previous_env.items():
             if value is None:
                 os.environ.pop(name, None)
@@ -142,13 +140,43 @@ class CredentialGateTests(unittest.TestCase):
         with io.StringIO() as sink, contextlib.redirect_stdout(sink):
             return app._check_key()
 
-    def _config_needing(self, env_var: str) -> Path:
-        """A copy of the default config whose primary route wants `env_var`."""
+    def _reprimaried(self, route: str) -> Path:
+        """teaching.yaml with `route` promoted to primary.
+
+        teaching.yaml lists five routes and `teaching` is first, so pointing
+        primary at a later one separates "the primary route" from "the first
+        route in the file" without inventing a config from scratch.
+        """
+        source = ROOT / "configs" / "teaching.yaml"
+        text = source.read_text(encoding="utf-8")
+        text = text.replace("primary: teaching", f"primary: {route}", 1)
+        path = self.tmp / "reprimaried.yaml"
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    DASHSCOPE_URL = "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+
+    def _config_needing(self, env_var: str, base_url: str) -> Path:
+        """The default config, repointed at another provider.
+
+        Both the variable and the endpoint move. Changing only one produces
+        a config that contradicts itself -- a DashScope endpoint labelled
+        with an Anthropic variable -- which is not a case worth pinning
+        behaviour on.
+        """
         text = self.config.read_text(encoding="utf-8")
         text = text.replace("api_key_env: DASHSCOPE_API_KEY", f"api_key_env: {env_var}")
+        text = text.replace(f"base_url: {self.DASHSCOPE_URL}", f"base_url: {base_url}")
         path = self.tmp / "rerouted-config.yaml"
         path.write_text(text, encoding="utf-8")
         return path
+
+class CredentialGateTests(ChatTestCase):
+    """The startup gate in `ay` must agree with `ay auth`.
+
+    `ay auth add` and `harness auth add` are one code path by construction
+    (ay delegates), so a key accepted by one must be visible to the other.
+    """
 
     def test_stored_credential_satisfies_the_startup_gate(self) -> None:
         """The reported bug: `ay auth add` stores a key, then `ay` says none."""
@@ -165,12 +193,23 @@ class CredentialGateTests(unittest.TestCase):
 
     def test_gate_follows_the_config_not_a_hardcoded_provider(self) -> None:
         """The config states which variable it needs; the gate must read it."""
-        config = self._config_needing("ANTHROPIC_API_KEY")
+        config = self._config_needing("ANTHROPIC_API_KEY", "https://api.anthropic.com")
         self.auth.add("sk-ant-api03-" + "a" * 30)
         self.assertTrue(self._gate(config))
 
     def test_a_key_for_the_wrong_provider_does_not_open_the_gate(self) -> None:
-        config = self._config_needing("ANTHROPIC_API_KEY")
+        config = self._config_needing("ANTHROPIC_API_KEY", "https://api.anthropic.com")
+        self.auth.add("sk-ws-" + "s" * 20, provider="dashscope")
+        self.assertFalse(self._gate(config))
+
+    def test_a_stored_key_is_only_offered_to_its_own_endpoint(self) -> None:
+        """The safety property behind resolving by endpoint.
+
+        The endpoint fallback matches only a provider's own base URL, so it
+        can hand a key to that provider and to nobody else. A config
+        pointing a custom variable at somebody else's host gets nothing.
+        """
+        config = self._config_needing("CUSTOM_KEY", "https://api.anthropic.com")
         self.auth.add("sk-ws-" + "s" * 20, provider="dashscope")
         self.assertFalse(self._gate(config))
 
@@ -184,6 +223,82 @@ class CredentialGateTests(unittest.TestCase):
         path = self.tmp / "broken-config.yaml"
         path.write_text("this: [is not a valid harness config", encoding="utf-8")
         self.assertTrue(self._gate(path))
+
+
+    def test_a_custom_variable_resolves_through_the_route_endpoint(self) -> None:
+        """teaching.yaml's remote-api route names HARNESS_REMOTE_API_KEY and
+        points at api.openai.com. A stored OpenAI key must satisfy it."""
+        config = self._reprimaried("remote-api")
+        self.auth.add("sk-proj-" + "o" * 30)
+        self.assertTrue(self._gate(config))
+
+    def test_a_custom_variable_with_no_stored_key_is_still_refused(self) -> None:
+        config = self._reprimaried("remote-api")
+        self.assertFalse(self._gate(config))
+
+
+class RouteAwarenessTests(ChatTestCase):
+    """`ay` must read and write the *primary* route, not the first one.
+
+    Every config shipped here happens to list its primary route first, so a
+    first-match regex is right by luck. Reorder the routes and /model would
+    rewrite a different route's model line than the banner reports.
+    """
+
+    def test_detect_model_reads_the_primary_route_not_the_first(self) -> None:
+        config = self._reprimaried("remote-api")
+        app = self.chat.ChatApp(config, self.skill, verbose=False)
+        # `teaching` is the first route in the file; `remote-api` is primary.
+        self.assertEqual(app.model, "configure-me")
+
+    def test_set_model_writes_the_primary_route_not_the_first(self) -> None:
+        config = self._reprimaried("remote-api")
+        app = self.chat.ChatApp(config, self.skill, verbose=False)
+        with io.StringIO() as sink, contextlib.redirect_stdout(sink):
+            app._set_model("gpt-4o-mini")
+        self.assertEqual(app.model, "gpt-4o-mini")
+        reloaded = self.chat.ChatApp(config, self.skill, verbose=False)
+        self.assertEqual(reloaded.model, "gpt-4o-mini")
+        # The first route must be untouched.
+        body = config.read_text(encoding="utf-8")
+        self.assertIn("model: deterministic-repair-demo", body)
+
+    def test_set_model_preserves_comments_and_structure(self) -> None:
+        # The default config carries comments inside the primary route's own
+        # block, immediately above the model line -- exactly what a careless
+        # rewrite would eat. teaching.yaml has none, so it cannot show this.
+        source = (self.config).read_text(encoding="utf-8")
+        config = self.tmp / "commented.yaml"
+        config.write_text(source, encoding="utf-8")
+        before = config.read_text(encoding="utf-8")
+        self.assertTrue([line for line in before.splitlines()
+                         if line.strip().startswith("#")],
+                        "fixture must actually contain comments")
+        app = self.chat.ChatApp(config, self.skill, verbose=False)
+        with io.StringIO() as sink, contextlib.redirect_stdout(sink):
+            app._set_model("gpt-4o-mini")
+        after = config.read_text(encoding="utf-8")
+        self.assertEqual(len(before.splitlines()), len(after.splitlines()))
+        for line in before.splitlines():
+            if line.strip().startswith("#"):
+                self.assertIn(line, after)
+
+    def test_detect_model_on_an_unreadable_config_is_not_fatal(self) -> None:
+        path = self.tmp / "broken.yaml"
+        path.write_text("this: [is not valid", encoding="utf-8")
+        app = self.chat.ChatApp(path, self.skill, verbose=False)
+        self.assertEqual(app.model, "?")
+
+    def test_set_model_on_an_unreadable_config_reports_and_does_not_write(self) -> None:
+        path = self.tmp / "broken.yaml"
+        original = "this: [is not valid"
+        path.write_text(original, encoding="utf-8")
+        app = self.chat.ChatApp(path, self.skill, verbose=False)
+        with io.StringIO() as sink, contextlib.redirect_stdout(sink):
+            app._set_model("gpt-4o-mini")
+            output = sink.getvalue()
+        self.assertEqual(path.read_text(encoding="utf-8"), original)
+        self.assertTrue(output.strip(), "a refusal must say something")
 
 
 if __name__ == "__main__":

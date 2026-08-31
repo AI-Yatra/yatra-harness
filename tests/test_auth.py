@@ -157,5 +157,161 @@ class ResolutionTests(AuthTestCase):
             self.assertNotIn(secret, json.dumps(row))
 
 
+class RouteResolutionTests(AuthTestCase):
+    """A route names a variable and an endpoint. Either must reach the store.
+
+    Naming a non-standard variable in a config is legitimate, and the error
+    the adapters raise on a miss tells the operator to run `harness auth
+    add` -- so a stored key that `add` accepted has to be reachable, or that
+    advice sends them in a circle.
+    """
+
+    def test_a_known_variable_still_resolves(self) -> None:
+        auth.add("sk-ws-" + "s" * 20, provider="dashscope")
+        credential = auth.resolve_route("DASHSCOPE_API_KEY")
+        self.assertEqual(credential.source, auth.SOURCE_STORED)
+
+    def test_the_environment_still_wins_over_the_store(self) -> None:
+        auth.add("sk-ws-" + "s" * 20, provider="dashscope")
+        os.environ["DASHSCOPE_API_KEY"] = "sk-ws-from-environment"
+        credential = auth.resolve_route("DASHSCOPE_API_KEY")
+        self.assertEqual(credential.source, auth.SOURCE_ENV)
+        self.assertEqual(credential.key, "sk-ws-from-environment")
+
+    def test_a_custom_variable_resolves_through_the_endpoint(self) -> None:
+        """The gap: `api_key_env: MY_QWEN_KEY` could not see a stored key."""
+        auth.add("sk-ws-" + "s" * 20, provider="dashscope")
+        credential = auth.resolve_route(
+            "MY_QWEN_KEY",
+            "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        )
+        self.assertEqual(credential.source, auth.SOURCE_STORED)
+        self.assertEqual(credential.provider, "dashscope")
+
+    def test_endpoint_matching_ignores_a_trailing_slash_and_case(self) -> None:
+        auth.add("nvapi-" + "n" * 30)
+        credential = auth.resolve_route(
+            "CUSTOM", "HTTPS://Integrate.API.NVIDIA.com/v1/"
+        )
+        self.assertEqual(credential.provider, "nvidia")
+
+    def test_a_custom_variable_set_in_the_environment_is_used_verbatim(self) -> None:
+        os.environ["MY_QWEN_KEY"] = "sk-ws-exported"
+        try:
+            credential = auth.resolve_route("MY_QWEN_KEY", "https://example.invalid/v1")
+            self.assertEqual(credential.source, auth.SOURCE_ENV)
+            self.assertEqual(credential.key, "sk-ws-exported")
+        finally:
+            os.environ.pop("MY_QWEN_KEY", None)
+
+    def test_an_unmatched_endpoint_resolves_to_nothing(self) -> None:
+        auth.add("sk-ws-" + "s" * 20, provider="dashscope")
+        credential = auth.resolve_route("CUSTOM", "https://unknown.example/v1")
+        self.assertFalse(credential.available)
+
+    def test_a_stored_base_url_override_is_matched_too(self) -> None:
+        """`auth add --base-url` records an endpoint; honour it on lookup."""
+        auth.add("nvapi-" + "n" * 30, base_url="https://gateway.internal/v1")
+        credential = auth.resolve_route("CUSTOM", "https://gateway.internal/v1")
+        self.assertEqual(credential.provider, "nvidia")
+
+    def test_no_endpoint_and_no_known_variable_is_empty_not_an_error(self) -> None:
+        credential = auth.resolve_route("CUSTOM", "")
+        self.assertFalse(credential.available)
+        self.assertEqual(credential.source, auth.SOURCE_NONE)
+
+
+class EnvFileTests(unittest.TestCase):
+    """`.env` must parse the shapes people actually write, and both entry
+    points must read it. Previously only `ay` loaded it, so a key that made
+    the REPL work left `harness run` reporting no credential."""
+
+    NAMES = ("YATRA_HARNESS_ENV_FILE", "DASHSCOPE_API_KEY", "ANTHROPIC_API_KEY",
+             "OPENAI_API_KEY", "QUOTED_KEY", "EXPORTED_KEY", "SPACED_KEY")
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self._previous = {name: os.environ.get(name) for name in self.NAMES}
+        for name in self.NAMES:
+            os.environ.pop(name, None)
+
+    def tearDown(self) -> None:
+        for name, value in self._previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+        self._tmp.cleanup()
+
+    def _write(self, body: str) -> Path:
+        path = self.tmp / ".env"
+        path.write_text(body, encoding="utf-8")
+        os.environ["YATRA_HARNESS_ENV_FILE"] = str(path)
+        return path
+
+    def test_a_plain_assignment_is_loaded(self) -> None:
+        self._write("DASHSCOPE_API_KEY=sk-ws-plain\n")
+        auth.load_env_file()
+        self.assertEqual(os.environ["DASHSCOPE_API_KEY"], "sk-ws-plain")
+
+    def test_double_quotes_are_stripped(self) -> None:
+        self._write('QUOTED_KEY="sk-ws-quoted"\n')
+        auth.load_env_file()
+        self.assertEqual(os.environ["QUOTED_KEY"], "sk-ws-quoted")
+
+    def test_single_quotes_are_stripped(self) -> None:
+        self._write("QUOTED_KEY='sk-ws-quoted'\n")
+        auth.load_env_file()
+        self.assertEqual(os.environ["QUOTED_KEY"], "sk-ws-quoted")
+
+    def test_an_export_prefix_is_accepted(self) -> None:
+        """People paste the line they use in a shell profile."""
+        self._write("export EXPORTED_KEY=sk-ws-exported\n")
+        auth.load_env_file()
+        self.assertEqual(os.environ["EXPORTED_KEY"], "sk-ws-exported")
+
+    def test_surrounding_whitespace_is_trimmed(self) -> None:
+        self._write("  SPACED_KEY  =  sk-ws-spaced  \n")
+        auth.load_env_file()
+        self.assertEqual(os.environ["SPACED_KEY"], "sk-ws-spaced")
+
+    def test_comments_and_blank_lines_are_ignored(self) -> None:
+        self._write("# a comment\n\n   \nDASHSCOPE_API_KEY=sk-ws-real\n")
+        auth.load_env_file()
+        self.assertEqual(os.environ["DASHSCOPE_API_KEY"], "sk-ws-real")
+
+    def test_a_key_containing_an_equals_sign_survives(self) -> None:
+        self._write("DASHSCOPE_API_KEY=sk-ws-a=b=c\n")
+        auth.load_env_file()
+        self.assertEqual(os.environ["DASHSCOPE_API_KEY"], "sk-ws-a=b=c")
+
+    def test_an_exported_variable_is_never_overwritten(self) -> None:
+        os.environ["DASHSCOPE_API_KEY"] = "sk-ws-already-exported"
+        self._write("DASHSCOPE_API_KEY=sk-ws-from-file\n")
+        auth.load_env_file()
+        self.assertEqual(os.environ["DASHSCOPE_API_KEY"], "sk-ws-already-exported")
+
+    def test_a_missing_file_is_not_an_error(self) -> None:
+        os.environ["YATRA_HARNESS_ENV_FILE"] = str(self.tmp / "absent.env")
+        self.assertIsNone(auth.load_env_file())
+
+    def test_an_unreadable_file_is_not_fatal(self) -> None:
+        """A malformed .env must not stop the CLI from starting."""
+        path = self.tmp / ".env"
+        path.write_bytes(b"\xff\xfe not utf-8 at all \x00")
+        os.environ["YATRA_HARNESS_ENV_FILE"] = str(path)
+        auth.load_env_file()  # must not raise
+
+    def test_the_file_is_found_by_walking_up_from_a_subdirectory(self) -> None:
+        """Running from a nested working directory must still find it."""
+        os.environ.pop("YATRA_HARNESS_ENV_FILE", None)
+        (self.tmp / ".env").write_text("DASHSCOPE_API_KEY=sk-ws-walked\n", encoding="utf-8")
+        nested = self.tmp / "a" / "b"
+        nested.mkdir(parents=True)
+        auth.load_env_file(nested)
+        self.assertEqual(os.environ["DASHSCOPE_API_KEY"], "sk-ws-walked")
+
+
 if __name__ == "__main__":
     unittest.main()
