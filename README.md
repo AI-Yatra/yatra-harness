@@ -280,6 +280,7 @@ harness goal        attempt a goal until its acceptance command passes
 harness deliver     commit, push and open a pull request for a completed run
 harness eval        run an eval suite and gate on its pass rate
 harness loop        work a feature_list.json backlog until it is done or stuck
+harness review      score a completed run against a fixed rubric
 harness resume      continue a run from its last checkpoint
 harness inspect     terminal state plus the recent event timeline
 harness replay      rebuild a run from its ledger and hash it
@@ -446,6 +447,33 @@ eat the whole run while the rest of the backlog stayed untouched.
 Three endings, each named: the backlog is finished, the feature budget is
 spent, or everything left has already failed. A loop that cannot say why it
 stopped is not autonomous, it is unattended.
+
+## Scoring a run
+
+```
+uv run harness review <run-id> --config configs/remote-qwen.yaml
+```
+
+```
+  correctness        2/2
+  verification       2/2
+  scope              2/2
+  maintainability    2/2
+verdict: ACCEPT  (average 2.00)
+```
+
+The reviewing agent did not write the change and does not decide whether the
+run is done — the verifier already did that. It works from a copy of the run's
+workspace that keeps its git history, so `git_diff` shows the change under
+review.
+
+Prose is fine to read and impossible to gate on. Fixing the dimensions in
+advance means the reviewer scores what it was asked to score rather than
+whatever it happened to notice. A dimension it does not score counts as
+**zero** — defaulting to full marks would let a reviewer pass anything by
+saying less — and the verdict uses a floor per dimension rather than an
+average, because an average lets a perfect score somewhere hide a total
+failure somewhere else.
 
 ## Evals
 

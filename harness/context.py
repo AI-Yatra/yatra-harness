@@ -54,6 +54,11 @@ class ContextEngine:
                 "protected_paths": list(task.protected_paths),
                 "acceptance_commands": [list(command) for command in task.acceptance.commands],
             },
+            # What the model may actually run. Without this it guesses --
+            # a live reviewer spent its whole turn budget trying `pytest`
+            # against a repository that uses unittest, and never reached the
+            # point of writing its answer down.
+            "available_commands": [list(command) for command in self.config.policy.allowed_commands],
             "run": {
                 "turn": state.turn,
                 "tool_calls": state.tool_calls,

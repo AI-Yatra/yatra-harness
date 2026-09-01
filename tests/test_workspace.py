@@ -149,6 +149,64 @@ class RepositoryWorkspaceTests(unittest.TestCase):
         self.assertTrue((reopened.root / "counter.py").is_file())
 
 
+class PreservedGitTests(unittest.TestCase):
+    """A workspace copied for review has to still show the change under review.
+
+    Seed mode re-initialises git and commits a baseline, which is right for a
+    fixture and wrong for a copy of a workspace someone has been working in:
+    the uncommitted change becomes part of the baseline and `git diff` goes
+    empty. A reviewer then correctly concludes that nothing was done.
+    """
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory(prefix="harness-preserve-")
+        self.addCleanup(self.temporary.cleanup)
+        self.base = Path(self.temporary.name)
+        self.runs = self.base / "runs"
+        self.upstream = self.base / "upstream.git"
+        self.source = self.base / "source"
+        git("init", "--bare", "-q", str(self.upstream), cwd=self.base)
+        self.source.mkdir()
+        git("init", "-q", "-b", "main", cwd=self.source)
+        (self.source / "counter.py").write_text("value = 1\n", encoding="utf-8")
+        git("add", "-A", cwd=self.source)
+        git("commit", "-q", "-m", "initial", cwd=self.source)
+        git("remote", "add", "origin", str(self.upstream), cwd=self.source)
+        self.manager = WorkspaceManager(self.runs)
+        # A worked-in workspace: one committed baseline, one uncommitted edit.
+        self.worked = self.manager.create_from_repository("run-1", self.source, ())
+        (self.worked.root / "counter.py").write_text("value = 2\n", encoding="utf-8")
+
+    def test_a_plain_copy_loses_the_uncommitted_change(self) -> None:
+        copied = self.manager.create("run-2", self.worked.root, ())
+        self.assertEqual(git("status", "--porcelain", cwd=copied.root), "")
+
+    def test_a_preserved_copy_still_shows_it(self) -> None:
+        copied = self.manager.create("run-3", self.worked.root, (), preserve_git=True)
+        self.assertIn("counter.py", git("diff", "--name-only", cwd=copied.root))
+
+    def test_the_preserved_copy_has_the_original_history(self) -> None:
+        copied = self.manager.create("run-4", self.worked.root, (), preserve_git=True)
+        self.assertIn("initial", git("log", "--oneline", cwd=copied.root))
+
+    def test_the_preserved_copy_cannot_push_anywhere(self) -> None:
+        # It carries the original's remotes otherwise, and a copy made for
+        # reading must not be able to publish.
+        copied = self.manager.create("run-5", self.worked.root, (), preserve_git=True)
+        self.assertEqual(git("remote", cwd=copied.root), "")
+
+    def test_preserving_a_workspace_with_no_git_still_works(self) -> None:
+        plain = self.base / "plain"
+        plain.mkdir()
+        (plain / "a.txt").write_text("a\n", encoding="utf-8")
+        copied = self.manager.create("run-6", plain, (), preserve_git=True)
+        self.assertTrue((copied.root / "a.txt").is_file())
+
+    def test_the_source_workspace_is_untouched(self) -> None:
+        self.manager.create("run-7", self.worked.root, (), preserve_git=True)
+        self.assertIn("counter.py", git("diff", "--name-only", cwd=self.worked.root))
+
+
 class RepositoryTaskTests(unittest.TestCase):
     """A task names either a seed directory or a repository, never both."""
 

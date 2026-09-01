@@ -102,6 +102,11 @@ def subagent_task(
         "id": f"subagent-{safe_slug(agent)}-{index:02d}-{safe_slug(objective)[:24]}",
         "objective": objective,
         "workspace_seed": str(Path(workspace).resolve()),
+        # The sub-agent works on a copy, but the copy keeps the parent's git
+        # repository. Without that a reviewing sub-agent sees an empty
+        # git_diff and concludes, correctly for what it can see, that nothing
+        # was changed.
+        "preserve_git": True,
         "constraints": [
             "You are a sub-agent. Your deliverable is a report, not a change.",
             "Answer the objective from evidence you read in the workspace.",

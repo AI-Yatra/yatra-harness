@@ -89,11 +89,46 @@ class WorkspaceManager:
     def __init__(self, runs_dir: Path) -> None:
         self.runs_dir = runs_dir.resolve()
 
-    def create(self, run_id: str, seed: Path, protected_paths: tuple[str, ...]) -> Workspace:
+    def create(
+        self,
+        run_id: str,
+        seed: Path,
+        protected_paths: tuple[str, ...],
+        *,
+        preserve_git: bool = False,
+    ) -> Workspace:
+        """Copy `seed` into a run workspace.
+
+        By default the copy gets a fresh history with one baseline commit,
+        which is what a fixture wants: the run's diff is then exactly what the
+        agent did.
+
+        `preserve_git` copies the existing repository instead. That is for a
+        copy of a workspace someone has already been working in -- a review, a
+        sub-agent -- where re-baselining would fold the uncommitted change into
+        the baseline and leave `git diff` empty, so the reviewer would
+        correctly conclude that nothing had been done.
+        """
         workspace_dir = self._prepare_run_dir(run_id)
-        shutil.copytree(seed, workspace_dir, ignore=self._ignore)
-        self._initialize_git(workspace_dir)
+        source_git = Path(seed) / ".git"
+        keep_git = preserve_git and source_git.exists()
+        shutil.copytree(
+            seed, workspace_dir, ignore=self._keep_git_ignore if keep_git else self._ignore
+        )
+        if keep_git:
+            self._detach_remotes(workspace_dir)
+        else:
+            self._initialize_git(workspace_dir)
         return Workspace(workspace_dir, protected_paths)
+
+    def _detach_remotes(self, workspace: Path) -> None:
+        """Strip every remote from a copy made for reading.
+
+        The copy inherits the original's remotes, and a workspace handed to a
+        reviewer must not be able to publish anything.
+        """
+        for remote in (self._git(("remote",), cwd=workspace) or "").split():
+            self._git(("remote", "remove", remote), cwd=workspace)
 
     def create_from_repository(
         self,
@@ -259,6 +294,11 @@ class WorkspaceManager:
     @staticmethod
     def _ignore(_directory: str, names: list[str]) -> set[str]:
         return {name for name in names if name in IGNORED_NAMES or name.endswith(".pyc")}
+
+    @staticmethod
+    def _keep_git_ignore(_directory: str, names: list[str]) -> set[str]:
+        keep = IGNORED_NAMES - {".git"}
+        return {name for name in names if name in keep or name.endswith(".pyc")}
 
     @staticmethod
     def _initialize_git(workspace: Path) -> None:

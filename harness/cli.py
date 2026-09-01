@@ -10,6 +10,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from . import __version__, auth
 from .artifacts import ArtifactStore
 from .backlog import load_backlog
@@ -25,10 +27,12 @@ from .loop import LoopRequest, goal_for, run_loop
 from .model_router import build_llm_light, profile_from_route
 from .policy import PolicyEngine
 from .replay import replay_run
+from .rubric import RubricConfig, parse_review, render_rubric_prompt, verdict_for
 from .runtime import HarnessRuntime
 from .state import StateStore
 from .tools import build_registry
 from .tracing import root_context, trace_id_for
+from .util import atomic_write_json, atomic_write_text
 from .workspace import Workspace
 
 ROUTE_PRIORITY_KEYS = ("privacy", "quality", "cost", "latency", "context")
@@ -184,6 +188,16 @@ def parser() -> argparse.ArgumentParser:
         help="approve the push and the pull request non-interactively",
     )
 
+    review = commands.add_parser(
+        "review", help="score a completed run against a fixed rubric"
+    )
+    review.add_argument("run_id")
+    review.add_argument("--runs-dir", type=Path, default=Path(".runs"))
+    review.add_argument("--config", type=Path, default=None,
+                        help="config for the reviewing agent; defaults to the run's own")
+    review.add_argument("--skill", type=Path, default=Path("skills/review.yaml"))
+    review.add_argument("--accept-at", type=float, default=2.0)
+
     loop = commands.add_parser(
         "loop", help="work a feature_list.json backlog until it is done or stuck"
     )
@@ -285,6 +299,8 @@ def main(argv: list[str] | None = None) -> int:
             return _deliver(
                 run_dir, mode=arguments.mode, base=arguments.base, yes=arguments.deliver_yes
             )
+        if arguments.command == "review":
+            return _review(arguments)
         if arguments.command == "loop":
             return _loop(arguments)
         if arguments.command == "eval":
@@ -648,6 +664,96 @@ def _goal(arguments: Any) -> int:
             yes=arguments.deliver_yes,
         )
     return 0
+
+
+def _review(arguments: Any) -> int:
+    """Score a finished run with an independent reviewer.
+
+    The reviewer runs against a copy of the run's workspace and never against
+    the run itself, and it is a separate agent from the one that did the
+    work. Both facts are the point: an author reviewing its own change is the
+    failure the whole rubric exists to catch.
+    """
+    run_dir = arguments.runs_dir.expanduser().resolve() / arguments.run_id
+    state = StateStore(run_dir / "state.json").load()
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    config_path = arguments.config or (run_dir / manifest["inputs"]["config"])
+    rubric = RubricConfig(accept_at=arguments.accept_at)
+    task = load_task(run_dir / manifest["inputs"]["task"])
+    try:
+        patch = (run_dir / "patch.diff").read_text(encoding="utf-8")
+    except OSError:
+        patch = ""
+    if not patch.strip():
+        print(f"error: run {arguments.run_id} produced no diff to review", file=sys.stderr)
+        return 2
+    directory = run_dir / "review"
+    directory.mkdir(parents=True, exist_ok=True)
+    task_path = directory / "review-task.yaml"
+    atomic_write_text(
+        task_path,
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "id": f"review-{arguments.run_id[:40]}",
+                "objective": (
+                    f"Review the change made for this task: {task.objective}\n\n"
+                    + render_rubric_prompt(rubric)
+                ),
+                "workspace_seed": str(Path(state.workspace).resolve()),
+                # Keeps the run's git repository, so git_diff shows the change
+                # under review instead of an empty diff.
+                "preserve_git": True,
+                "constraints": [
+                    "You did not write this change and you are not deciding whether the run is done.",
+                    "Start from git_diff, then read the surrounding code before judging it.",
+                ],
+                "protected_paths": [],
+                "acceptance": {
+                    "commands": [["python", "-c", "print('review recorded')"]],
+                    "require_non_empty_diff": False,
+                    "timeout_seconds": 30,
+                },
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        mode=0o600,
+    )
+    result = HarnessRuntime.start(
+        config_path=config_path,
+        task_path=task_path,
+        skill_path=arguments.skill,
+        approval_callback=_approval(True),
+    )
+    try:
+        reviewer_state = json.loads(
+            (result.run_dir / "state.json").read_text(encoding="utf-8")
+        )
+        report = str(reviewer_state.get("finish_summary") or "")
+    except (OSError, json.JSONDecodeError):
+        report = ""
+    parsed = parse_review(report, rubric)
+    verdict = verdict_for(parsed.scores, rubric)
+    record = {
+        "run_id": arguments.run_id,
+        "reviewer_run_id": result.run_id,
+        "verdict": verdict,
+        "average": parsed.average,
+        "scores": parsed.scores,
+        "missing": list(parsed.missing),
+        "unparsed": parsed.unparsed,
+        "notes": parsed.notes,
+    }
+    atomic_write_json(directory / "review.json", record)
+    print(f"reviewer run: {result.run_id}")
+    for dimension, score in parsed.scores.items():
+        print(f"  {dimension:18} {score}/2")
+    if parsed.missing:
+        print(f"  unscored: {', '.join(parsed.missing)} (counted as 0)")
+    print(f"verdict: {verdict.upper()}  (average {parsed.average:.2f})")
+    print(f"record: {directory / 'review.json'}")
+    return 0 if verdict == "accept" else 2
 
 
 def _loop(arguments: Any) -> int:

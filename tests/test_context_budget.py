@@ -97,6 +97,20 @@ class ContextBudgetTests(unittest.TestCase):
         payload = self.user_payload(self.build(self.state(observations=30)))
         self.assertIn("remaining_turns", payload["run"])
 
+    def test_the_model_is_told_which_commands_it_may_run(self) -> None:
+        # Guessing at the allowlist costs turns. A live reviewer spent its
+        # whole budget trying pytest against a unittest repository.
+        payload = self.user_payload(self.build(self.state()))
+        self.assertIn("available_commands", payload)
+        self.assertEqual(
+            payload["available_commands"],
+            [list(command) for command in self.config.policy.allowed_commands],
+        )
+
+    def test_the_command_list_survives_a_full_context(self) -> None:
+        payload = self.user_payload(self.build(self.state(observations=30)))
+        self.assertIn("available_commands", payload)
+
     def test_the_payload_is_still_valid_json_under_pressure(self) -> None:
         # String-truncating a JSON document produces something no model can
         # parse. Whatever is dropped, the result stays well-formed.

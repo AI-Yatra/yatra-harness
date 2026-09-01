@@ -111,6 +111,17 @@ Budget exhaustion always produces an explicit terminal status
 └── summary.md             # human-readable report
 ```
 
+## Reviewing a run
+
+`harness review <run-id>` runs an independent reviewing agent over a finished
+run and scores it against a fixed rubric, writing `review/review.json` into
+the run bundle. Exit code 0 means `accept`; anything else means `revise` or
+`block`, so it can gate a pipeline.
+
+Give it `--config` pointing at a different model than the run used. The
+argument the verifier embodies — the author of a piece of work is the worst
+judge of it — applies to the reviewer too.
+
 ## Traces
 
 Every run writes `spans.jsonl` next to its ledger, in the shape

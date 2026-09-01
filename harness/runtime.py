@@ -305,7 +305,12 @@ class HarnessRuntime:
                 run_id, task.repository, task.protected_paths, base_ref=task.base_ref
             )
         else:
-            workspace = manager.create(run_id, task.workspace_seed, task.protected_paths)
+            workspace = manager.create(
+                run_id,
+                task.workspace_seed,
+                task.protected_paths,
+                preserve_git=task.preserve_git,
+            )
         run_dir = config.runs_dir / run_id
         redactor = Redactor(route_secrets(config))
         artifacts = ArtifactStore(run_dir, redactor)

@@ -546,6 +546,7 @@ def load_task(path: str | Path) -> TaskContract:
             "id",
             "objective",
             "workspace_seed",
+            "preserve_git",
             "repository",
             "base_ref",
             "constraints",
@@ -564,6 +565,7 @@ def load_task(path: str | Path) -> TaskContract:
         workspace_seed=seed,
         repository=repository,
         base_ref=base_ref,
+        preserve_git=schema.boolean(raw.get("preserve_git", False), "task.preserve_git"),
         constraints=schema.string_list(raw.get("constraints", []), "task.constraints"),
         protected_paths=schema.string_list(raw.get("protected_paths", []), "task.protected_paths"),
         acceptance=VerificationSpec.from_dict(

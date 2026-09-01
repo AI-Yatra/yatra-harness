@@ -123,6 +123,10 @@ class TaskContract:
     metadata: dict[str, Any] = field(default_factory=dict)
     repository: Path | None = None
     base_ref: str = ""
+    # Copy the seed's git repository instead of starting a fresh history.
+    # Set for a workspace copied from one already worked in, where a new
+    # baseline would fold the change under review into it.
+    preserve_git: bool = False
 
     @property
     def origin(self) -> Path:
