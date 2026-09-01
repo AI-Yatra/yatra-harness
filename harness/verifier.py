@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import sys
 import time
 from pathlib import Path
@@ -10,6 +9,7 @@ from pathlib import Path
 from .config import HarnessConfig
 from .contracts import TaskContract, VerificationResult
 from .process import run_process
+from .sandbox import build_sandbox
 from .workspace import Workspace
 
 
@@ -23,20 +23,21 @@ class Verifier:
         violations = tuple(path for path in changed if workspace.is_protected(path))
         command_results = []
         commands_passed = True
+        # Acceptance runs in the same sandbox the tools did. A change proved
+        # to work on the host and never tried in the environment it will
+        # actually run in has not been proved to work.
+        sandbox = build_sandbox(self.config.sandbox)
+        local = self.config.sandbox.kind == "local"
         for command in task.acceptance.commands:
-            normalized = [sys.executable, *command[1:]] if command and command[0] in {"python", "python3"} else list(command)
-            result = run_process(
+            if local and command and command[0] in {"python", "python3"}:
+                normalized = [sys.executable, *command[1:]]
+            else:
+                normalized = list(command)
+            result = sandbox.run(
                 normalized,
-                cwd=workspace.root,
+                workspace=workspace.root,
                 timeout=task.acceptance.timeout_seconds,
                 max_output_chars=self.config.budgets.max_output_chars,
-                environment={
-                    "PATH": os.environ.get("PATH", ""),
-                    "LANG": os.environ.get("LANG", "C.UTF-8"),
-                    "PYTHONNOUSERSITE": "1",
-                    "GIT_CONFIG_NOSYSTEM": "1",
-                    "GIT_CONFIG_GLOBAL": os.devnull,
-                },
             )
             command_results.append(
                 {

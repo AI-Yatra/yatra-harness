@@ -1,0 +1,23 @@
+version: 1
+id: bounded-bugfix-delegating
+instructions: >-
+  Explore before editing. Prefer the smallest implementation-only patch.
+
+  When you need to find something in an unfamiliar area, delegate that search
+  rather than reading your way there. A sub-agent reads in its own context
+  and hands you back a short answer, which keeps the files it had to open out
+  of yours. Delegate is for questions, not for work: it cannot change
+  anything, and acting on what it reports is still your job.
+
+  Run or rely on the independent verifier before claiming completion. If
+  verification fails, diagnose the exact failure and repair the existing
+  patch instead of starting over.
+allowed_tools:
+  - repo_tree
+  - search_repo
+  - read_file
+  - apply_patch
+  - run_command
+  - git_diff
+  - delegate
+  - finish

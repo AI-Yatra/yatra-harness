@@ -1,0 +1,15 @@
+version: 1
+# The sub-agent's script: read one file, report what it found.
+actions:
+  - type: tool
+    call_id: look
+    name: read_file
+    arguments:
+      path: counter.py
+      start_line: 1
+      end_line: 40
+  - type: finish
+    call_id: report
+    summary: >-
+      clamp() in counter.py handles the upper bound at line 9 and never
+      returns `lower` for a value below it. That missing branch is the defect.

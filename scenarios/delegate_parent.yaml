@@ -1,0 +1,27 @@
+version: 1
+# The parent asks a sub-agent one question, then finishes. Deterministic, so
+# the delegation path is exercised on every machine without a model call.
+actions:
+  - type: tool
+    call_id: ask-explorer
+    name: delegate
+    arguments:
+      agent: explore
+      objective: Where is the clamp lower bound handled?
+  - type: tool
+    call_id: fix-it
+    name: apply_patch
+    arguments:
+      patch: |
+        diff --git a/counter.py b/counter.py
+        --- a/counter.py
+        +++ b/counter.py
+        @@ -8,3 +8,5 @@ def clamp(value: int, lower: int, upper: int) -> int:
+             if value > upper:
+                 return upper
+        +    if value < lower:
+        +        return lower
+             return value
+  - type: finish
+    call_id: done
+    summary: Delegated the search, then applied the repair the sub-agent pointed at.

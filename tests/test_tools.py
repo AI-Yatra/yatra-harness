@@ -68,6 +68,7 @@ class PolicyTests(unittest.TestCase):
         base = {
             "approval_mode": "never",
             "allowed_commands": (("python", "-m", "unittest"), ("git", "diff")),
+            "denied_commands": (),
             "network_enabled": False,
             "allowed_domains": (),
             "command_timeout_seconds": 30.0,

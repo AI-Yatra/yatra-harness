@@ -102,6 +102,26 @@ you>
 Slash commands: `/runs`, `/inspect <id>`, `/resume <id>`, `/config`, `/model`,
 `/help`, `/exit`. Full usage lives in [ay.README.md](ay.README.md).
 
+### Messages in a session build on each other
+
+Every `ay` conversation gets a session: one workspace and one written memory,
+so the second message edits what the first one wrote and knows it happened.
+
+```
+you> create a file called SCRATCH.md containing the single word hello
+you> now create SCRATCH2.md containing the same word that is in SCRATCH.md
+```
+
+The workspace lives at `.runs/sessions/<id>/workspace` and the memory at
+`session.json` beside it. Outstanding work is committed before each new turn
+begins, so a turn's diff is its own and the session's history is a sequence
+of commits rather than one blob. Failures are remembered as well as
+successes, because a memory that only holds what worked teaches the next turn
+to repeat what did not.
+
+`--session <id>` resumes a named session later. `--stateless` restores the
+old behaviour of a fresh workspace per message.
+
 ### Read the contract line before you trust a verdict
 
 A plain chat message runs against an empty scratch workspace with an acceptance
@@ -176,6 +196,50 @@ its endpoint. That way a route naming a non-standard variable -- as
 key stored for the provider that endpoint belongs to. A stored key is only
 ever offered to its own provider's endpoint.
 
+## From a repository to a pull request
+
+Point a run at a real repository and it works on a clone of it, on its own
+branch, with the repository's history and remote intact.
+
+```
+ay --repo . --skill skills/repo-edit.yaml --accept "./init.sh" --deliver pr
+```
+
+```
+you> fix the typo in the installation section of README.md
+```
+
+The agent edits the clone. The verifier runs the acceptance command itself.
+Only if that passes does delivery start: commit the diff, ask before pushing
+the branch, ask again before opening the pull request. The body is built from
+the run's verification record, not from the model's description of its work.
+
+Use `skills/repo-edit.yaml` for this rather than `skills/bugfix.yaml`.
+`bugfix` tells the model to find and repair a defect, so given a plain edit
+request it goes looking for a bug that is not there.
+
+`--deliver commit` stops after the local commit and `--deliver branch` stops
+after the push, so you can watch each step before allowing the next. Nothing
+leaves the machine without an explicit yes -- an unattended run with no
+terminal denies the push rather than performing it.
+
+Publishing has its own flag. `--yes` approves what the model may do inside
+the workspace; `--deliver-yes` approves sending the result somewhere other
+people can see. Conflating them would make `ay`, which always passes `--yes`
+so tool calls are not gated mid-conversation, push without being asked.
+
+The same thing from the CLI, or afterwards from a finished run:
+
+```
+uv run harness run tasks/fix_typo.yaml --config configs/remote-qwen.yaml --skill skills/repo-edit.yaml --deliver pr --deliver-yes
+uv run harness deliver <run-id> --mode pr
+```
+
+Opening a pull request needs the [GitHub CLI](https://cli.github.com/)
+authenticated (`gh auth login`). The branch is pushed before `gh` is called,
+so if that step fails the work is still on the remote and the pull request
+can be opened by hand.
+
 ## Running against a live model
 
 ```
@@ -212,11 +276,44 @@ harness explain     resolve a task into its contracts without running it
 harness tools       list registered tools with risk classes and provenance
 harness routes      show the resolved route plan and what was excluded
 harness run         execute a task
+harness goal        attempt a goal until its acceptance command passes
+harness deliver     commit, push and open a pull request for a completed run
+harness eval        run an eval suite and gate on its pass rate
+harness loop        work a feature_list.json backlog until it is done or stuck
+harness review      score a completed run against a fixed rubric
 harness resume      continue a run from its last checkpoint
 harness inspect     terminal state plus the recent event timeline
 harness replay      rebuild a run from its ledger and hash it
 harness list-runs   list run bundles
 ```
+
+## Goal mode
+
+A run is one attempt. A goal is "keep attempting until this is true".
+
+```
+uv run harness goal "make the counter tests pass" --seed fixtures/buggy_counter --accept "python -m unittest discover -s tests" --config configs/teaching.yaml --skill skills/bugfix.yaml
+```
+
+```
+== attempt 1 ==
+   COMPLETED: acceptance criteria passed
+
+goal: ACHIEVED
+reason: acceptance criteria passed
+attempts: 1
+record: .runs/goal-make-the-counter-tests-pass-c39270/goal.json
+```
+
+`--accept` is required and is the whole point: it is the stopping condition,
+and it is not the model's opinion. A failed attempt is retried with the
+reason carried into the next one's constraints, so attempt two is told what
+attempt one hit. A `BLOCKED` run stops the pursuit instead — the model asked
+a question, and asking it again unchanged cannot produce a different answer.
+
+`--max-attempts` and `--max-seconds` bound the whole pursuit rather than each
+try. Add `--repo` and `--deliver pr` to end an achieved goal with a pull
+request.
 
 ## Breaking it on purpose
 
@@ -237,6 +334,61 @@ uninterrupted run, so nothing is executed twice.
 `harness replay <run-id>` reconstructs a finished run from `events.jsonl` and
 prints a SHA-256 of the ledger. Edit one event and the hash changes. Delete one
 and the sequence check names the gap.
+
+## Finding things in a large repository
+
+`search_repo` matches a literal string. `retrieve` ranks excerpts against a
+question:
+
+```
+retrieve  "how are credentials redacted from the ledger"
+
+--- README.md:161-200 (score 12.89)
+--- docs/SECURITY.md:41-80 (score 11.40)
+--- harness/redaction.py:1-40 (score 10.37)
+```
+
+BM25 by default — no key, no network, deterministic, and therefore actually
+covered by CI. Point `retrieval.kind: embedding` at any OpenAI-compatible
+`/embeddings` endpoint for vector search; it falls back to lexical when the
+provider is unreachable, because retrieval going quiet is worse than
+retrieval being approximate.
+
+## Running tools in a container
+
+```
+docker build -t yatra-harness-sandbox .
+uv run harness run tasks/repair_counter.yaml --config configs/sandboxed.yaml --skill skills/bugfix.yaml
+```
+
+Every `run_command`, `python_run` and acceptance command then runs in a
+throwaway container: no network, no new privileges, all capabilities dropped,
+a non-root uid, bounded memory and CPU, and only the run workspace mounted.
+
+The allowlist confines what the model may *ask* for. This confines what the
+resulting process can *reach*. `docs/SECURITY.md` has always said the harness
+had the first and not the second; `sandbox.kind: docker` is the second.
+
+Local execution stays the default, so a laptop without docker still works.
+
+## Sub-agents
+
+The agent can ask a second agent a question instead of reading its way to the
+answer.
+
+```
+uv run harness run tasks/repair_counter.yaml --config configs/delegation.yaml --skill skills/bugfix-delegating.yaml
+```
+
+That run delegates "where is the clamp lower bound handled?", gets a report
+back, and applies the repair the sub-agent pointed at. Both sides are replay
+scripts, so it needs no key.
+
+A sub-agent is read-only and works from a copy of the workspace: its
+deliverable is findings, not an edit. It gets its own run bundle, so it is as
+inspectable as its parent, and it can be given its own config — a reviewer
+running the same model as the writer shares its blind spots. See
+[Configuration](docs/CONFIGURATION.md).
 
 ## Providers
 
@@ -259,16 +411,110 @@ uv run python -m unittest discover -s tests -v
 uv run ruff check harness tests ay.py
 ```
 
-84 tests cover the runtime, the tool registry, provider adapters, routing and
-the REPL. CI runs them on three Python versions along with `harness doctor` and
+540 tests cover the runtime, the tool registry, provider adapters, routing,
+repository workspaces, delivery, sessions, sub-agents, retrieval, streaming,
+the sandbox and the REPL. Tests that need docker skip themselves where it is
+absent. CI runs them on three Python versions along with `harness doctor` and
 a full deterministic run.
+
+## Working a backlog on its own
+
+Goal mode still needs you to say what the goal is. `harness loop` reads the
+goals from a file.
+
+```
+uv run harness loop examples/feature_list.json --seed fixtures/buggy_counter --config configs/teaching.yaml --skill skills/bugfix.yaml
+```
+
+```
+=== clamp-lower-bound: clamp() returns the lower bound for values below it.
+  attempt 1
+  ACHIEVED: acceptance criteria passed
+
+loop: COMPLETE
+reason: nothing left to do; every feature passes
+```
+
+Each feature in `feature_list.json` carries its own acceptance commands, and
+the loop is *refused* a feature that has none: without one there is nothing to
+stop on, and "done" falls back to whoever last read the diff.
+
+A completed feature is marked against evidence — the run id and the reason —
+and a failed one is written down rather than erased, because a backlog that
+forgets its failures sends the loop round the same wall until the budget runs
+out. A failed feature is skipped rather than retried immediately: goal mode
+already retried it, and going straight round again would let one hard feature
+eat the whole run while the rest of the backlog stayed untouched.
+
+Running that example **edits the file**: the feature is marked passing with
+the run id that earned it. That is the point of a backlog, and it also means
+`git checkout examples/feature_list.json` is how you run it twice.
+
+Three endings, each named: the backlog is finished, the feature budget is
+spent, or everything left has already failed. A loop that cannot say why it
+stopped is not autonomous, it is unattended.
+
+## Scoring a run
+
+```
+uv run harness review <run-id> --config configs/remote-qwen.yaml
+```
+
+```
+  correctness        2/2
+  verification       2/2
+  scope              2/2
+  maintainability    2/2
+verdict: ACCEPT  (average 2.00)
+```
+
+The reviewing agent did not write the change and does not decide whether the
+run is done — the verifier already did that. It works from a copy of the run's
+workspace that keeps its git history, so `git_diff` shows the change under
+review.
+
+Prose is fine to read and impossible to gate on. Fixing the dimensions in
+advance means the reviewer scores what it was asked to score rather than
+whatever it happened to notice. A dimension it does not score counts as
+**zero** — defaulting to full marks would let a reviewer pass anything by
+saying less — and the verdict uses a floor per dimension rather than an
+average, because an average lets a perfect score somewhere hide a total
+failure somewhere else.
+
+## Evals
+
+```
+uv run harness eval evals/teaching.yaml
+```
+
+```
+suite: teaching  cases: 3
+PASS  repair-counter                       COMPLETED             254ms
+PASS  broken-acceptance-is-refused         FAILED                203ms
+PASS  delegation                           COMPLETED             208ms
+
+pass rate: 100% (threshold 100%)
+```
+
+The unit suite proves each part behaves. It cannot answer the question that
+matters when a prompt, a model or a budget changes: does a run still finish
+the task. `harness eval` runs a set of cases, records the outcome of each, and
+exits non-zero when the pass rate falls below the suite's threshold. CI runs
+it on every push.
+
+The middle case is expected to **fail**, and that is the point. Its acceptance
+command always exits non-zero, so a harness whose verifier stopped verifying
+would turn it green — while every unit test in this repository stayed green
+too. That case is the one that notices.
 
 ## Layout
 
 ```text
 yatra-harness/
 ├── harness/            runtime: contracts, context, routing, tools, policy,
-│                       workspace, verifier, events, checkpoints, replay
+│                       workspace, verifier, events, checkpoints, replay,
+│                       sandbox, sessions, sub-agents, delivery, goal, loop,
+│                       retrieval, search, tracing, evals, rubric
 ├── ay.py               the ay REPL
 ├── configs/            teaching, local, remote, llm_light
 ├── tasks/              task contracts
@@ -276,6 +522,7 @@ yatra-harness/
 ├── scenarios/          deterministic replay scripts
 ├── fixtures/           seeded repositories the agent works on
 ├── tests/              unit and end-to-end suite
+├── evals/              eval suites run in CI
 ├── docs/               architecture and workshop guides
 └── .runs/              one evidence bundle per run
 ```

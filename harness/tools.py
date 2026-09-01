@@ -16,6 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from . import auth
 from .artifacts import ArtifactStore
 from .config import HarnessConfig, MCPServerConfig
 from .contracts import RiskLevel, SkillContract, ToolResult, ToolSpec
@@ -23,6 +24,17 @@ from .errors import MCPError, ToolError, WorkspaceError
 from .mcp import MCPStdioClient
 from .policy import PolicyEngine
 from .process import run_process
+from .retrieval import (
+    BM25Index,
+    EmbeddingIndex,
+    embedding_request,
+    iter_chunks,
+    parse_embeddings,
+    render_hits,
+    workspace_signature,
+)
+from .sandbox import build_sandbox
+from .search import build_request, parse_results, render
 from .util import truncate
 from .workspace import Workspace
 
@@ -152,6 +164,30 @@ def validate_json_schema(value: Any, spec: dict[str, Any], path: str) -> None:
         raise ToolError(f"{path} must be one of {spec['enum']!r}")
 
 
+def _register_delegate(
+    registry: ToolRegistry,
+    config: HarnessConfig,
+    workspace: Workspace,
+    dispatcher: Any,
+) -> None:
+    agents = ", ".join(sorted(config.subagents.agents))
+    registry.register(
+        ToolSpec(
+            "delegate",
+            "Ask a read-only sub-agent a question about this workspace and get "
+            f"its report back. Available agents: {agents}.",
+            _object_schema(
+                {"agent": {"type": "string"}, "objective": {"type": "string"}},
+                ("agent", "objective"),
+            ),
+            # CONTROL rather than EXECUTE: delegation spends budget and starts
+            # another run, but it cannot itself change the workspace.
+            RiskLevel.CONTROL,
+        ),
+        lambda args: dispatcher(str(args["agent"]), str(args["objective"])),
+    )
+
+
 def build_registry(
     config: HarnessConfig,
     skill: SkillContract,
@@ -159,6 +195,7 @@ def build_registry(
     artifacts: ArtifactStore,
     policy: PolicyEngine,
     event_callback: EventCallback | None = None,
+    dispatcher: Any = None,
 ) -> ToolRegistry:
     registry = ToolRegistry(
         policy,
@@ -167,6 +204,8 @@ def build_registry(
         event_callback=event_callback,
     )
     _register_native(registry, config, workspace)
+    if config.subagents.enabled and dispatcher is not None:
+        _register_delegate(registry, config, workspace, dispatcher)
     for server in config.mcp_servers:
         if server.enabled:
             _register_mcp(registry, server, workspace)
@@ -276,6 +315,27 @@ def _register_native(registry: ToolRegistry, config: HarnessConfig, workspace: W
             RiskLevel.NETWORK,
         ),
         lambda args: _browser_fetch(args, config),
+    )
+    registry.register(
+        ToolSpec(
+            "retrieve",
+            "Find the parts of the workspace most relevant to a question, "
+            "ranked, as excerpts with their file and line range.",
+            object_schema(
+                {"query": {"type": "string"}, "limit": {"type": "integer"}}, ("query",)
+            ),
+            RiskLevel.READ,
+        ),
+        lambda args: _retrieve(workspace, args, config),
+    )
+    registry.register(
+        ToolSpec(
+            "web_search",
+            "Search the public web and return titles, URLs and snippets.",
+            object_schema({"query": {"type": "string"}}, ("query",)),
+            RiskLevel.NETWORK,
+        ),
+        lambda args: _web_search(args, config),
     )
     registry.register(
         ToolSpec(
@@ -616,28 +676,30 @@ def _apply_patch(
     }
 
 
-def _normalize_command(command: list[str]) -> list[str]:
+def _normalize_command(command: list[str], config: HarnessConfig) -> list[str]:
+    """Point `python` at the interpreter that will actually be used.
+
+    On the host that is this venv's interpreter, so a command reaches the same
+    Python the harness runs under. Inside a container it is emphatically not:
+    the host's absolute venv path does not exist there, and substituting it
+    produces a "no such file" that looks nothing like its cause.
+    """
+    if config.sandbox.kind != "local":
+        return list(command)
     if command and command[0] in {"python", "python3"}:
         return [sys.executable, *command[1:]]
-    return command
+    return list(command)
 
 
 def _run_command(
     workspace: Workspace, arguments: dict[str, Any], config: HarnessConfig
 ) -> tuple[str, dict[str, Any]]:
-    command = _normalize_command(arguments["command"])
-    result = run_process(
+    command = _normalize_command(arguments["command"], config)
+    result = build_sandbox(config.sandbox).run(
         command,
-        cwd=workspace.root,
+        workspace=workspace.root,
         timeout=config.policy.command_timeout_seconds,
         max_output_chars=config.budgets.max_output_chars,
-        environment={
-            "PATH": os.environ.get("PATH", ""),
-            "LANG": os.environ.get("LANG", "C.UTF-8"),
-            "PYTHONNOUSERSITE": "1",
-            "GIT_CONFIG_NOSYSTEM": "1",
-            "GIT_CONFIG_GLOBAL": os.devnull,
-        },
     )
     metadata = {
         "command": list(arguments["command"]),
@@ -659,16 +721,18 @@ def _python_run(
     if script.suffix != ".py" or script.is_symlink() or not script.is_file():
         raise ToolError("python_run requires a regular workspace-relative .py file")
     extra = arguments.get("arguments", [])
-    result = run_process(
-        [sys.executable, "-I", str(script), *extra],
-        cwd=workspace.root,
+    # Inside a container the script is addressed by its workspace-relative
+    # path and run by the image's own `python`; the host's interpreter path
+    # and the host's absolute script path both mean nothing there.
+    if config.sandbox.kind == "local":
+        argv = [sys.executable, "-I", str(script), *extra]
+    else:
+        argv = ["python", "-I", workspace.relative(script), *extra]
+    result = build_sandbox(config.sandbox).run(
+        argv,
+        workspace=workspace.root,
         timeout=config.policy.command_timeout_seconds,
         max_output_chars=config.budgets.max_output_chars,
-        environment={
-            "PATH": os.environ.get("PATH", ""),
-            "LANG": os.environ.get("LANG", "C.UTF-8"),
-            "PYTHONNOUSERSITE": "1",
-        },
     )
     if result.timed_out:
         raise ToolError("python script timed out")
@@ -754,6 +818,131 @@ def _browser_fetch(arguments: dict[str, Any], config: HarnessConfig) -> tuple[st
         raise ToolError(f"HTTP request failed with status {exc.code}") from exc
     except urllib.error.URLError as exc:
         raise ToolError(f"HTTP request failed: {exc.reason}") from exc
+
+
+# Keyed by workspace and backend, and invalidated by a cheap signature of the
+# tree. The agent patches files as it works, so an index built on turn two is
+# wrong by turn four.
+_INDEX_CACHE: dict[tuple[str, str], tuple[tuple[int, int], Any]] = {}
+# Bounded because the process outlives the run. `harness loop` and
+# `harness goal` create a workspace per feature or per attempt, and an
+# unbounded cache would hold every one of their chunk sets -- with the
+# embedding backend, every one of their vector sets -- until the process
+# exited. A run only ever queries its own workspace, so a handful is plenty.
+_INDEX_CACHE_LIMIT = 4
+
+
+def _remember_index(
+    key: tuple[str, str], signature: tuple[int, int], index: Any
+) -> None:
+    _INDEX_CACHE[key] = (signature, index)
+    while len(_INDEX_CACHE) > _INDEX_CACHE_LIMIT:
+        # Insertion-ordered, so the oldest workspace leaves first.
+        _INDEX_CACHE.pop(next(iter(_INDEX_CACHE)))
+
+
+def _retrieve(
+    workspace: Workspace, arguments: dict[str, Any], config: HarnessConfig
+) -> tuple[str, dict[str, Any]]:
+    """Rank workspace chunks against a question.
+
+    The index is built once per workspace and reused. Rebuilding it on every
+    call would re-read the repository -- and, with the embedding backend,
+    re-embed all of it -- for each question the agent asks.
+    """
+    settings = config.retrieval
+    key = (str(workspace.root), settings.kind)
+    signature = workspace_signature(workspace.root, settings)
+    cached = _INDEX_CACHE.get(key)
+    if cached is not None and cached[0] == signature:
+        index = cached[1]
+    else:
+        chunks = iter_chunks(workspace.root, settings)
+        if settings.kind == "embedding":
+            index = EmbeddingIndex(chunks, lambda texts: _embed(texts, config))
+        else:
+            index = BM25Index(chunks)
+        _remember_index(key, signature, index)
+    limit = int(arguments.get("limit") or settings.limit)
+    hits = index.search(str(arguments["query"]), limit=max(1, min(limit, 20)))
+    return render_hits(hits), {
+        "backend": settings.kind,
+        "query": str(arguments["query"]),
+        "hits": len(hits),
+        "paths": [f"{hit.chunk.path}:{hit.chunk.start_line}" for hit in hits],
+    }
+
+
+def _embed(texts: list[str], config: HarnessConfig) -> list[list[float]]:
+    """One /embeddings call, batched, with the key in a header."""
+    settings = config.retrieval
+    secret = auth.resolve_env(settings.api_key_env).key if settings.api_key_env else ""
+    request = embedding_request(settings, texts, key=secret)
+    host = urllib.parse.urlparse(request.url).hostname or ""
+    _validate_public_url(request.url, (*config.policy.allowed_domains, host))
+    http_request = urllib.request.Request(
+        request.url,
+        data=request.body.encode("utf-8"),
+        headers={"User-Agent": "yatra-harness/1.0", **request.headers},
+        method="POST",
+    )
+    try:
+        with urllib.request.build_opener(_NoRedirect()).open(
+            http_request, timeout=max(config.policy.browser_timeout_seconds, 30)
+        ) as response:
+            payload = response.read().decode(
+                response.headers.get_content_charset() or "utf-8", errors="replace"
+            )
+    except urllib.error.HTTPError as exc:
+        # The status, never the body: a failed embeddings call can echo the
+        # key back and must not reach an observation.
+        raise ToolError(f"embeddings request failed with status {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise ToolError(f"embeddings request failed: {exc.reason}") from exc
+    return parse_embeddings(payload, len(texts))
+
+
+def _web_search(arguments: dict[str, Any], config: HarnessConfig) -> tuple[str, dict[str, Any]]:
+    """Run one search through the configured backend.
+
+    The search endpoint is reached under the same SSRF and allowlist rules as
+    browser_fetch, with one addition: the backend's own host is allowlisted
+    implicitly. Requiring an operator to also list `api.search.brave.com` in
+    allowed_domains after configuring it as their search backend would be a
+    trap, not a control -- they have already said where search goes.
+    """
+    settings = config.search
+    key = ""
+    if settings.api_key_env:
+        key = auth.resolve_env(settings.api_key_env).key
+    request = build_request(settings, str(arguments["query"]), key=key)
+    domains = (*config.policy.allowed_domains, settings.host) if settings.host else config.policy.allowed_domains
+    _validate_public_url(request.url, domains)
+    opener = urllib.request.build_opener(_NoRedirect())
+    http_request = urllib.request.Request(
+        request.url,
+        data=request.body.encode("utf-8") if request.body else None,
+        headers={"User-Agent": "yatra-harness/1.0", **request.headers},
+        method=request.method,
+    )
+    try:
+        with opener.open(http_request, timeout=config.policy.browser_timeout_seconds) as response:
+            raw = response.read(config.budgets.max_output_chars * 4)
+            charset = response.headers.get_content_charset() or "utf-8"
+            payload = raw.decode(charset, errors="replace")
+    except urllib.error.HTTPError as exc:
+        # The status is the useful part; the body of a failed search request
+        # can echo the key back and must not reach an observation.
+        raise ToolError(f"search request failed with status {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise ToolError(f"search request failed: {exc.reason}") from exc
+    results = parse_results(settings, payload)
+    return render(results), {
+        "backend": settings.kind,
+        "query": " ".join(str(arguments["query"]).split()),
+        "results": len(results),
+        "urls": [result.url for result in results],
+    }
 
 
 def _expanded_mcp_command(command: tuple[str, ...]) -> tuple[str, ...]:

@@ -10,22 +10,50 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from . import __version__, auth
 from .artifacts import ArtifactStore
+from .backlog import load_backlog
 from .config import load_config, load_skill, load_task
 from .contracts import RunStatus
+from .delivery import DeliveryRequest, deliver
 from .doctor import run_doctor
-from .errors import HarnessError, InjectedCrash
+from .errors import HarnessError, InjectedCrash, WorkspaceError
+from .evals import load_suite, run_suite
 from .events import EventLog
+from .goal import GoalRequest, pursue
+from .loop import LoopRequest, goal_for, run_loop
 from .model_router import build_llm_light, profile_from_route
 from .policy import PolicyEngine
 from .replay import replay_run
+from .rubric import RubricConfig, parse_review, render_rubric_prompt, verdict_for
 from .runtime import HarnessRuntime
 from .state import StateStore
 from .tools import build_registry
+from .tracing import root_context, trace_id_for
+from .util import atomic_write_json, atomic_write_text
 from .workspace import Workspace
 
 ROUTE_PRIORITY_KEYS = ("privacy", "quality", "cost", "latency", "context")
+
+
+def run_directory(runs_dir: Path, run_id: str) -> Path:
+    """Resolve a run bundle, refusing a run id that leaves the runs directory.
+
+    `resume` and the workspace manager both guard this and the commands added
+    later did not. It matters most for `deliver`, which pushes: a run id that
+    resolved somewhere else would publish from a directory nobody chose.
+    """
+    root = Path(runs_dir).expanduser().resolve()
+    candidate = (root / run_id).resolve()
+    if not run_id or candidate == root:
+        raise WorkspaceError("a run id is required")
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise WorkspaceError(f"run id resolves outside the runs directory: {run_id!r}") from exc
+    return candidate
 
 
 def _add_routing_arguments(command: Any) -> None:
@@ -87,6 +115,13 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--max-turns", type=int)
     run.add_argument("--max-seconds", type=float)
     run.add_argument("--fault", default="")
+    run.add_argument(
+        "--session",
+        default="",
+        metavar="ID",
+        help="reuse this session's workspace, so the run continues earlier work "
+        "instead of starting from the seed again",
+    )
     run.add_argument("--yes", action="store_true", help="approve policy-gated actions non-interactively")
     run.add_argument(
         "--scenario",
@@ -98,6 +133,7 @@ def parser() -> argparse.ArgumentParser:
         choices=("prompt", "auto", "never"),
         help="override policy.approval_mode (workshop compatibility)",
     )
+    _add_delivery_arguments(run)
     _add_routing_arguments(run)
 
     routes = commands.add_parser("routes", help="show the LLM Light route plan without running")
@@ -132,6 +168,76 @@ def parser() -> argparse.ArgumentParser:
     remove_cmd = auth_sub.add_parser("remove", help="delete a stored key")
     remove_cmd.add_argument("provider")
     auth_sub.add_parser("providers", help="list known providers")
+
+    goal = commands.add_parser(
+        "goal", help="attempt a goal repeatedly until its acceptance command passes"
+    )
+    goal.add_argument("objective", help="what must become true")
+    goal.add_argument(
+        "--accept", action="append", default=[], metavar="CMD", required=True,
+        help="acceptance command, repeatable. This is the stopping condition",
+    )
+    goal.add_argument("--repo", type=Path, default=None, help="work on a clone of this repository")
+    goal.add_argument("--seed", type=Path, default=None, help="work on a copy of this directory")
+    goal.add_argument("--base-ref", default="", help="branch, tag or commit to start from")
+    goal.add_argument("--protect", action="append", default=[], metavar="GLOB")
+    goal.add_argument("--config", type=Path, default=Path("configs/teaching.yaml"))
+    goal.add_argument("--skill", type=Path, default=Path("skills/repo-edit.yaml"))
+    goal.add_argument("--max-attempts", type=int, default=3)
+    goal.add_argument("--max-seconds", type=float, default=1800.0)
+    goal.add_argument("--yes", action="store_true", help="approve policy-gated actions")
+    _add_delivery_arguments(goal)
+    _add_routing_arguments(goal)
+
+    deliver_cmd = commands.add_parser(
+        "deliver", help="commit, push and open a pull request for a completed run"
+    )
+    deliver_cmd.add_argument("run_id")
+    deliver_cmd.add_argument("--runs-dir", type=Path, default=Path(".runs"))
+    deliver_cmd.add_argument(
+        "--mode", choices=("commit", "branch", "pr"), default="pr",
+        help="how far to go: local commit, pushed branch, or pull request",
+    )
+    deliver_cmd.add_argument("--base", default="", help="pull request target branch")
+    deliver_cmd.add_argument(
+        "--yes",
+        dest="deliver_yes",
+        action="store_true",
+        help="approve the push and the pull request non-interactively",
+    )
+
+    review = commands.add_parser(
+        "review", help="score a completed run against a fixed rubric"
+    )
+    review.add_argument("run_id")
+    review.add_argument("--runs-dir", type=Path, default=Path(".runs"))
+    review.add_argument("--config", type=Path, default=None,
+                        help="config for the reviewing agent; defaults to the run's own")
+    review.add_argument("--skill", type=Path, default=Path("skills/review.yaml"))
+    review.add_argument("--accept-at", type=float, default=2.0)
+
+    loop = commands.add_parser(
+        "loop", help="work a feature_list.json backlog until it is done or stuck"
+    )
+    loop.add_argument("backlog", type=Path, help="path to feature_list.json")
+    loop.add_argument("--repo", type=Path, default=None)
+    loop.add_argument("--seed", type=Path, default=None)
+    loop.add_argument("--base-ref", default="")
+    loop.add_argument("--config", type=Path, default=Path("configs/teaching.yaml"))
+    loop.add_argument("--skill", type=Path, default=Path("skills/repo-edit.yaml"))
+    loop.add_argument("--max-features", type=int, default=10)
+    loop.add_argument("--max-attempts", type=int, default=2,
+                      help="goal attempts per feature")
+    loop.add_argument("--yes", action="store_true")
+    _add_routing_arguments(loop)
+
+    evals = commands.add_parser("eval", help="run an eval suite and gate on its pass rate")
+    evals.add_argument("suite", type=Path)
+    evals.add_argument("--runs-dir", type=Path, default=None,
+                       help="where run bundles go; defaults to the first case's config")
+    evals.add_argument("--report-dir", type=Path, default=Path(".evals"))
+    evals.add_argument("--min-pass-rate", type=float, default=None,
+                       help="override the suite's own threshold")
 
     listing = commands.add_parser("list-runs", help="list durable run checkpoints")
     listing.add_argument("--runs-dir", type=Path, default=Path(".runs"))
@@ -174,9 +280,23 @@ def main(argv: list[str] | None = None) -> int:
                 priorities=tuple(arguments.priorities),
                 require_local=arguments.require_local,
                 max_cost_per_1m=arguments.max_cost,
+                session_id=arguments.session,
+                # Runs in one session share a trace derived from its id, so a
+                # conversation resumed days later still joins the same story.
+                trace_context=(
+                    root_context(trace_id_for(arguments.session)) if arguments.session else ""
+                ),
                 approval_callback=approval,
             )
-            return _print_result(result)
+            code = _print_result(result)
+            if arguments.deliver != "none" and code == 0:
+                code = _deliver(
+                    result.run_dir,
+                    mode=arguments.deliver,
+                    base=arguments.base,
+                    yes=arguments.deliver_yes,
+                )
+            return code
         if arguments.command == "resume":
             result = HarnessRuntime.resume(
                 arguments.run_id,
@@ -188,6 +308,19 @@ def main(argv: list[str] | None = None) -> int:
             return _inspect(arguments)
         if arguments.command == "replay":
             return _replay(arguments)
+        if arguments.command == "goal":
+            return _goal(arguments)
+        if arguments.command == "deliver":
+            run_dir = run_directory(arguments.runs_dir, arguments.run_id)
+            return _deliver(
+                run_dir, mode=arguments.mode, base=arguments.base, yes=arguments.deliver_yes
+            )
+        if arguments.command == "review":
+            return _review(arguments)
+        if arguments.command == "loop":
+            return _loop(arguments)
+        if arguments.command == "eval":
+            return _eval(arguments)
         if arguments.command == "list-runs":
             return _list_runs(arguments)
     except InjectedCrash as exc:
@@ -215,7 +348,9 @@ def _explain(arguments: Any) -> int:
         "task": {
             "id": task.task_id,
             "objective": task.objective,
-            "workspace_seed": str(task.workspace_seed),
+            "workspace_mode": "repository" if task.repository else "seed",
+            "workspace_origin": str(task.origin),
+            "base_ref": task.base_ref,
             "constraints": list(task.constraints),
             "protected_paths": list(task.protected_paths),
             "acceptance": [list(command) for command in task.acceptance.commands],
@@ -490,6 +625,314 @@ def _auth(arguments: Any) -> int:
     return 2
 
 
+def _goal(arguments: Any) -> int:
+    """Pursue a goal, then deliver it if it was reached and delivery was asked for."""
+    if (arguments.repo is None) == (arguments.seed is None):
+        print("error: goal needs exactly one of --repo or --seed", file=sys.stderr)
+        return 2
+    config = load_config(arguments.config)
+    approval = _resolve_approval(arguments)
+
+    def runner(task_path: Path, attempt: int, trace_context: str = "") -> Any:
+        print(f"\n== attempt {attempt} ==")
+        result = HarnessRuntime.start(
+            config_path=arguments.config,
+            task_path=task_path,
+            skill_path=arguments.skill,
+            trace_context=trace_context,
+            profile=arguments.profile,
+            priorities=tuple(arguments.priorities),
+            require_local=arguments.require_local,
+            max_cost_per_1m=arguments.max_cost,
+            approval_callback=approval,
+        )
+        print(f"   {result.status.value}: {result.terminal_reason}")
+        return result
+
+    result = pursue(
+        GoalRequest(
+            objective=arguments.objective,
+            acceptance=tuple(arguments.accept),
+            config_path=arguments.config,
+            skill_path=arguments.skill,
+            runs_dir=config.runs_dir,
+            seed=arguments.seed,
+            repository=arguments.repo,
+            base_ref=arguments.base_ref,
+            protect=tuple(arguments.protect),
+            max_attempts=arguments.max_attempts,
+            max_seconds=arguments.max_seconds,
+        ),
+        runner=runner,
+    )
+    print()
+    print(f"goal: {'ACHIEVED' if result.achieved else 'NOT ACHIEVED'}")
+    print(f"reason: {result.reason}")
+    print(f"attempts: {len(result.attempts)}")
+    print(f"record: {result.record_path}")
+    if not result.achieved:
+        return 2
+    if arguments.deliver != "none":
+        return _deliver(
+            config.runs_dir / result.last_run_id,
+            mode=arguments.deliver,
+            base=arguments.base,
+            yes=arguments.deliver_yes,
+        )
+    return 0
+
+
+def _review(arguments: Any) -> int:
+    """Score a finished run with an independent reviewer.
+
+    The reviewer runs against a copy of the run's workspace and never against
+    the run itself, and it is a separate agent from the one that did the
+    work. Both facts are the point: an author reviewing its own change is the
+    failure the whole rubric exists to catch.
+    """
+    run_dir = run_directory(arguments.runs_dir, arguments.run_id)
+    state = StateStore(run_dir / "state.json").load()
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    config_path = arguments.config or (run_dir / manifest["inputs"]["config"])
+    rubric = RubricConfig(accept_at=arguments.accept_at)
+    task = load_task(run_dir / manifest["inputs"]["task"])
+    try:
+        patch = (run_dir / "patch.diff").read_text(encoding="utf-8")
+    except OSError:
+        patch = ""
+    if not patch.strip():
+        print(f"error: run {arguments.run_id} produced no diff to review", file=sys.stderr)
+        return 2
+    directory = run_dir / "review"
+    directory.mkdir(parents=True, exist_ok=True)
+    task_path = directory / "review-task.yaml"
+    atomic_write_text(
+        task_path,
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "id": f"review-{arguments.run_id[:40]}",
+                "objective": (
+                    f"Review the change made for this task: {task.objective}\n\n"
+                    + render_rubric_prompt(rubric)
+                ),
+                "workspace_seed": str(Path(state.workspace).resolve()),
+                # Keeps the run's git repository, so git_diff shows the change
+                # under review instead of an empty diff.
+                "preserve_git": True,
+                "constraints": [
+                    "You did not write this change and you are not deciding whether the run is done.",
+                    "Start from git_diff, then read the surrounding code before judging it.",
+                ],
+                "protected_paths": [],
+                "acceptance": {
+                    "commands": [["python", "-c", "print('review recorded')"]],
+                    "require_non_empty_diff": False,
+                    "timeout_seconds": 30,
+                },
+            },
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        mode=0o600,
+    )
+    result = HarnessRuntime.start(
+        config_path=config_path,
+        task_path=task_path,
+        skill_path=arguments.skill,
+        approval_callback=_approval(True),
+    )
+    try:
+        reviewer_state = json.loads(
+            (result.run_dir / "state.json").read_text(encoding="utf-8")
+        )
+        report = str(reviewer_state.get("finish_summary") or "")
+    except (OSError, json.JSONDecodeError):
+        report = ""
+    parsed = parse_review(report, rubric)
+    verdict = verdict_for(parsed.scores, rubric)
+    record = {
+        "run_id": arguments.run_id,
+        "reviewer_run_id": result.run_id,
+        "verdict": verdict,
+        "average": parsed.average,
+        "scores": parsed.scores,
+        "missing": list(parsed.missing),
+        "unparsed": parsed.unparsed,
+        "notes": parsed.notes,
+    }
+    atomic_write_json(directory / "review.json", record)
+    print(f"reviewer run: {result.run_id}")
+    for dimension, score in parsed.scores.items():
+        print(f"  {dimension:18} {score}/2")
+    if parsed.missing:
+        print(f"  unscored: {', '.join(parsed.missing)} (counted as 0)")
+    print(f"verdict: {verdict.upper()}  (average {parsed.average:.2f})")
+    print(f"record: {directory / 'review.json'}")
+    return 0 if verdict == "accept" else 2
+
+
+def _loop(arguments: Any) -> int:
+    """Work a backlog: pick, pursue, record, repeat."""
+    if (arguments.repo is None) == (arguments.seed is None):
+        print("error: loop needs exactly one of --repo or --seed", file=sys.stderr)
+        return 2
+    config = load_config(arguments.config)
+    approval = _resolve_approval(arguments)
+    request = LoopRequest(
+        backlog=arguments.backlog,
+        config_path=arguments.config,
+        skill_path=arguments.skill,
+        runs_dir=config.runs_dir,
+        seed=arguments.seed,
+        repository=arguments.repo,
+        base_ref=arguments.base_ref,
+        max_features=arguments.max_features,
+        max_attempts=arguments.max_attempts,
+    )
+
+    def pursue_feature(feature: Any, loop_request: LoopRequest) -> Any:
+        print(f"\n=== {feature.feature_id}: {feature.description}")
+
+        def runner(task_path: Path, attempt: int, trace_context: str = "") -> Any:
+            print(f"  attempt {attempt}")
+            return HarnessRuntime.start(
+                config_path=arguments.config,
+                task_path=task_path,
+                skill_path=arguments.skill,
+                trace_context=trace_context,
+                profile=arguments.profile,
+                priorities=tuple(arguments.priorities),
+                require_local=arguments.require_local,
+                max_cost_per_1m=arguments.max_cost,
+                approval_callback=approval,
+            )
+
+        result = pursue(goal_for(feature, loop_request), runner=runner)
+        print(f"  {'ACHIEVED' if result.achieved else 'NOT ACHIEVED'}: {result.reason}")
+        return result
+
+    total = len(load_backlog(arguments.backlog))
+    print(f"backlog: {arguments.backlog} ({total} feature(s))")
+    result = run_loop(request, pursue=pursue_feature)
+    print()
+    print(f"loop: {'COMPLETE' if result.completed else 'STOPPED'}")
+    print(f"reason: {result.reason}")
+    for outcome in result.outcomes:
+        marker = "done" if outcome.achieved else "left"
+        print(f"  {marker}  {outcome.feature_id}")
+    print(f"record: {result.record_path}")
+    return 0 if result.completed else 2
+
+
+def _eval(arguments: Any) -> int:
+    """Run an eval suite and turn its pass rate into an exit code."""
+    from dataclasses import replace as _replace  # noqa: PLC0415
+
+    suite = load_suite(arguments.suite)
+    if arguments.min_pass_rate is not None:
+        suite = _replace(suite, min_pass_rate=arguments.min_pass_rate)
+
+    def runner(case: Any) -> Any:
+        return HarnessRuntime.start(
+            config_path=case.config,
+            task_path=case.task,
+            skill_path=case.skill,
+            model=case.model or None,
+            # Every gate is approved: an eval measures whether the harness
+            # completes the task, and a run that stalls on an approval prompt
+            # measures the operator instead.
+            approval_callback=_approval(True),
+        )
+
+    def report_case(result: Any) -> None:
+        marker = "PASS" if result.passed else "FAIL"
+        print(f"{marker}  {result.case_id:36} {result.actual:18} {result.duration_ms:>6}ms")
+
+    print(f"suite: {suite.suite_id}  cases: {len(suite.cases)}")
+    report = run_suite(
+        suite, runner=runner, report_dir=arguments.report_dir, on_case=report_case
+    )
+    print()
+    print(f"pass rate: {report.pass_rate:.0%} (threshold {suite.min_pass_rate:.0%})")
+    print(f"report: {report.report_path}")
+    for result in report.results:
+        if not result.passed:
+            print(f"  {result.case_id}: {result.detail}")
+    return 0 if report.passed else 2
+
+
+def _add_delivery_arguments(command: Any) -> None:
+    group = command.add_argument_group("delivery")
+    group.add_argument(
+        "--deliver",
+        choices=("none", "commit", "branch", "pr"),
+        default="none",
+        help="what to do with a run that passes verification (default: nothing)",
+    )
+    group.add_argument("--base", default="", help="pull request target branch")
+    group.add_argument(
+        "--deliver-yes",
+        action="store_true",
+        help="approve pushing and opening the pull request without prompting. "
+        "Deliberately separate from --yes: that approves what the model may do "
+        "inside the workspace, this approves publishing the result",
+    )
+
+
+def _deliver(run_dir: Path, *, mode: str, base: str, yes: bool) -> int:
+    """Deliver a finished run from its bundle.
+
+    The bundle is the only input, so `harness run --deliver` and
+    `harness deliver <run-id>` cannot drift apart: both read the run's own
+    frozen task and durable state rather than whatever the caller has to hand.
+    """
+    state = StateStore(run_dir / "state.json").load()
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    task = load_task(run_dir / manifest["inputs"]["task"])
+    request = DeliveryRequest(
+        mode=mode,
+        run_id=state.run_id,
+        run_dir=run_dir,
+        workspace=Path(state.workspace),
+        objective=task.objective,
+        status=state.status,
+        summary=state.finish_summary,
+        base=base,
+    )
+    result = deliver(request, approve=_delivery_approval(yes))
+    print(f"delivered: {result.mode}")
+    print(f"branch: {result.branch}")
+    print(f"commit: {result.commit}")
+    if result.pushed:
+        print(f"pushed: {result.branch} -> origin")
+    if result.pull_request_url:
+        print(f"pull request: {result.pull_request_url}")
+    return 0
+
+
+def _delivery_approval(yes: bool):
+    """Confirm an outward-facing delivery step.
+
+    Deliberately separate from the policy approver: that one authorises what
+    the model asked to do inside the workspace, this one authorises what the
+    operator is about to publish. Without a terminal and without --yes the
+    answer is no, so an unattended run never pushes by accident.
+    """
+    def decide(description: str) -> bool:
+        if yes:
+            return True
+        if not sys.stdin.isatty():
+            return False
+        try:
+            answer = input(f"{description}? [y/N] ").strip().lower()
+        except EOFError:
+            return False
+        return answer in {"y", "yes"}
+
+    return decide
+
+
 def _print_result(result: Any) -> int:
     print(f"run_id: {result.run_id}")
     print(f"status: {result.status.value}")
@@ -500,7 +943,7 @@ def _print_result(result: Any) -> int:
 
 
 def _inspect(arguments: Any) -> int:
-    run_dir = arguments.runs_dir.expanduser().resolve() / arguments.run_id
+    run_dir = run_directory(arguments.runs_dir, arguments.run_id)
     state = StateStore(run_dir / "state.json").load()
     events = list(EventLog(run_dir / "events.jsonl", arguments.run_id).read())
     print(
@@ -524,7 +967,7 @@ def _inspect(arguments: Any) -> int:
 
 
 def _replay(arguments: Any) -> int:
-    summary = replay_run(arguments.runs_dir.expanduser().resolve() / arguments.run_id)
+    summary = replay_run(run_directory(arguments.runs_dir, arguments.run_id))
     print(json.dumps({
         "run_id": summary.run_id,
         "events": summary.events,

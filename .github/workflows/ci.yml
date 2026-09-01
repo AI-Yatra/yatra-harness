@@ -27,3 +27,8 @@ jobs:
         run: uv run harness doctor --config configs/teaching.yaml --task tasks/repair_counter.yaml --skill skills/bugfix.yaml
       - name: Deterministic teaching run
         run: uv run harness run tasks/repair_counter.yaml --config configs/teaching.yaml --skill skills/bugfix.yaml
+      # The unit suite proves each part behaves. This proves a run still
+      # finishes the task, which is the thing a prompt or budget change
+      # breaks without breaking a single unit test.
+      - name: Eval suite
+        run: uv run harness eval evals/teaching.yaml

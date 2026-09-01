@@ -11,6 +11,7 @@ from typing import Any
 import yaml
 
 from . import schema
+from .compaction import CompactionConfig, compaction_config_from_dict
 from .contracts import BudgetSpec, SkillContract, TaskContract, VerificationSpec
 from .errors import ConfigurationError
 from .llm_light import (
@@ -20,6 +21,10 @@ from .llm_light import (
     RoutingPolicy,
     validate_priorities,
 )
+from .retrieval import RetrievalConfig, retrieval_config_from_dict
+from .sandbox import SandboxConfig, sandbox_config_from_dict
+from .search import SearchConfig, search_config_from_dict
+from .subagents import SubagentConfig, subagent_config_from_dict
 
 ENV_PATTERN = re.compile(r"^\$\{([A-Z][A-Z0-9_]*)\}$")
 
@@ -43,6 +48,10 @@ class RouteConfig:
     script: Path | None = None
     timeout_seconds: float = 45.0
     local: bool = True
+    # Streaming is a transport choice, so it belongs to the route rather than
+    # to the harness: one config can stream from a remote model and not from
+    # a scripted one.
+    stream: bool = False
     # LLM Light decision attributes. Credentials and endpoints are never here.
     cost_per_1m_input: float = 0.0
     cost_per_1m_output: float = 0.0
@@ -66,6 +75,9 @@ class ModelRouterConfig:
 class PolicyConfig:
     approval_mode: str
     allowed_commands: tuple[tuple[str, ...], ...]
+    # Checked before the allowlist and never overridden by it. See
+    # PolicyEngine._command_denied for why both lists are needed.
+    denied_commands: tuple[tuple[str, ...], ...]
     network_enabled: bool
     allowed_domains: tuple[str, ...]
     command_timeout_seconds: float
@@ -91,6 +103,15 @@ class HarnessConfig:
     mcp_servers: tuple[MCPServerConfig, ...]
     context_recent_observations: int = 6
     context_repo_entries: int = 120
+    # The repository's own conventions, read from the run workspace. An empty
+    # tuple switches the behaviour off entirely.
+    context_instruction_files: tuple[str, ...] = ("AGENTS.md", "CLAUDE.md")
+    context_max_instruction_chars: int = 4_000
+    search: SearchConfig = field(default_factory=SearchConfig)
+    compaction: CompactionConfig = field(default_factory=CompactionConfig)
+    subagents: SubagentConfig = field(default_factory=SubagentConfig)
+    sandbox: SandboxConfig = field(default_factory=SandboxConfig)
+    retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
     llm_light: LLMLightConfig = field(default_factory=LLMLightConfig)
     fault: str = ""
     selected_model: str = ""
@@ -179,6 +200,10 @@ def load_config(path: str | Path) -> HarnessConfig:
             "policy",
             "mcp",
             "context",
+            "search",
+            "subagents",
+            "sandbox",
+            "retrieval",
             "llm_light",
             # Written by the runtime so a resumed run routes identically; not
             # part of the operator-facing hand-authored schema.
@@ -224,6 +249,7 @@ def load_config(path: str | Path) -> HarnessConfig:
                 item.get("api_key_env", ""), f"routes.{name}.api_key_env", allow_empty=True
             ),
             script=script,
+            stream=schema.boolean(item.get("stream", False), f"routes.{name}.stream"),
             timeout_seconds=schema.number(
                 item.get("timeout_seconds", 45), f"routes.{name}.timeout_seconds", minimum=0.1
             ),
@@ -261,6 +287,7 @@ def load_config(path: str | Path) -> HarnessConfig:
         {
             "approval_mode",
             "allowed_commands",
+            "denied_commands",
             "network_enabled",
             "allowed_domains",
             "command_timeout_seconds",
@@ -274,6 +301,9 @@ def load_config(path: str | Path) -> HarnessConfig:
     policy = PolicyConfig(
         approval_mode=approval_mode,
         allowed_commands=schema.command_list(policy_raw.get("allowed_commands", []), "policy.allowed_commands"),
+        denied_commands=schema.command_list(
+            policy_raw.get("denied_commands", []), "policy.denied_commands"
+        ),
         network_enabled=schema.boolean(
             policy_raw.get("network_enabled", False), "policy.network_enabled"
         ),
@@ -314,7 +344,22 @@ def load_config(path: str | Path) -> HarnessConfig:
             )
         )
     context_raw = schema.mapping(raw.get("context", {}), "context")
-    schema.reject_unknown(context_raw, {"recent_observations", "repo_entries"}, "context")
+    schema.reject_unknown(
+        context_raw,
+        {
+            "recent_observations",
+            "repo_entries",
+            "instruction_files",
+            "max_instruction_chars",
+            "compaction",
+        },
+        "context",
+    )
+    instruction_files = (
+        schema.string_list(context_raw["instruction_files"], "context.instruction_files")
+        if context_raw.get("instruction_files") is not None
+        else ("AGENTS.md", "CLAUDE.md")
+    )
     return HarnessConfig(
         config_path=config_path,
         runs_dir=_resolve(base, str(runs_dir)),
@@ -328,6 +373,17 @@ def load_config(path: str | Path) -> HarnessConfig:
         context_repo_entries=schema.integer(
             context_raw.get("repo_entries", 120), "context.repo_entries", minimum=10
         ),
+        search=search_config_from_dict(raw.get("search"), "search"),
+        subagents=subagent_config_from_dict(raw.get("subagents"), base, "subagents"),
+        sandbox=sandbox_config_from_dict(raw.get("sandbox"), "sandbox"),
+        retrieval=retrieval_config_from_dict(raw.get("retrieval"), "retrieval"),
+        compaction=compaction_config_from_dict(context_raw.get("compaction")),
+        context_instruction_files=instruction_files,
+        context_max_instruction_chars=schema.integer(
+            context_raw.get("max_instruction_chars", 4_000),
+            "context.max_instruction_chars",
+            minimum=0,
+        ),
         llm_light=_load_llm_light(raw.get("llm_light"), router),
     )
 
@@ -340,6 +396,7 @@ ROUTE_BASE_KEYS = {
     "script",
     "timeout_seconds",
     "local",
+    "stream",
 }
 ROUTE_ROUTING_KEYS = {
     "cost_per_1m_input",
@@ -489,6 +546,9 @@ def load_task(path: str | Path) -> TaskContract:
             "id",
             "objective",
             "workspace_seed",
+            "preserve_git",
+            "repository",
+            "base_ref",
             "constraints",
             "protected_paths",
             "acceptance",
@@ -498,16 +558,14 @@ def load_task(path: str | Path) -> TaskContract:
     )
     if schema.integer(schema.require(raw, "version", "task"), "task.version") != 1:
         raise ConfigurationError("task.version must be 1")
-    seed = _resolve(
-        task_path.parent,
-        schema.string(schema.require(raw, "workspace_seed", "task"), "task.workspace_seed"),
-    )
-    if not seed.is_dir():
-        raise ConfigurationError(f"task workspace seed is not a directory: {seed}")
+    seed, repository, base_ref = _task_origin(task_path, raw)
     return TaskContract(
         task_id=schema.string(schema.require(raw, "id", "task"), "task.id"),
         objective=schema.string(schema.require(raw, "objective", "task"), "task.objective"),
         workspace_seed=seed,
+        repository=repository,
+        base_ref=base_ref,
+        preserve_git=schema.boolean(raw.get("preserve_git", False), "task.preserve_git"),
         constraints=schema.string_list(raw.get("constraints", []), "task.constraints"),
         protected_paths=schema.string_list(raw.get("protected_paths", []), "task.protected_paths"),
         acceptance=VerificationSpec.from_dict(
@@ -516,6 +574,48 @@ def load_task(path: str | Path) -> TaskContract:
         ),
         metadata=schema.mapping(raw.get("metadata", {}), "task.metadata"),
     )
+
+
+def _task_origin(
+    task_path: Path, raw: dict[str, Any]
+) -> tuple[Path | None, Path | None, str]:
+    """Resolve where a task's workspace comes from, and refuse ambiguity.
+
+    A task that names both a seed and a repository has two answers to one
+    question, and picking either silently would make the run's provenance a
+    guess. Naming neither is the same problem with no answers.
+    """
+    has_seed = raw.get("workspace_seed") is not None
+    has_repository = raw.get("repository") is not None
+    if has_seed == has_repository:
+        raise ConfigurationError(
+            "task must name exactly one of workspace_seed or repository"
+        )
+    base_ref = (
+        schema.string(raw["base_ref"], "task.base_ref")
+        if raw.get("base_ref") is not None
+        else ""
+    )
+    if has_seed:
+        if base_ref:
+            raise ConfigurationError("task.base_ref only applies to a repository task")
+        seed = _resolve(
+            task_path.parent,
+            schema.string(raw["workspace_seed"], "task.workspace_seed"),
+        )
+        if not seed.is_dir():
+            raise ConfigurationError(f"task workspace seed is not a directory: {seed}")
+        return seed, None, ""
+    repository = _resolve(
+        task_path.parent, schema.string(raw["repository"], "task.repository")
+    )
+    if not repository.is_dir():
+        raise ConfigurationError(f"task repository is not a directory: {repository}")
+    # Checked here rather than at workspace creation so `harness explain` and
+    # `harness doctor` fail on a bad path before a run id exists.
+    if not (repository / ".git").exists():
+        raise ConfigurationError(f"task repository is not a git repository: {repository}")
+    return None, repository, base_ref
 
 
 def load_skill(path: str | Path) -> SkillContract:

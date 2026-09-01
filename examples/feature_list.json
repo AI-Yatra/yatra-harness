@@ -1,0 +1,14 @@
+[
+  {
+    "id": "clamp-lower-bound",
+    "description": "clamp() returns the configured lower bound for values below it, leaving the upper-bound and validation behaviour unchanged.",
+    "acceptance": [
+      "python -m unittest discover -s tests"
+    ],
+    "passes": false,
+    "category": "correctness",
+    "protect": [
+      "tests/**"
+    ]
+  }
+]

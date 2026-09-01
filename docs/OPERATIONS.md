@@ -111,6 +111,44 @@ Budget exhaustion always produces an explicit terminal status
 └── summary.md             # human-readable report
 ```
 
+## Reviewing a run
+
+`harness review <run-id>` runs an independent reviewing agent over a finished
+run and scores it against a fixed rubric, writing `review/review.json` into
+the run bundle. Exit code 0 means `accept`; anything else means `revise` or
+`block`, so it can gate a pipeline.
+
+Give it `--config` pointing at a different model than the run used. The
+argument the verifier embodies — the author of a piece of work is the worst
+judge of it — applies to the reviewer too.
+
+## Traces
+
+Every run writes `spans.jsonl` next to its ledger, in the shape
+OpenTelemetry uses: a 32-hex `trace_id`, a 16-hex `span_id`, and a
+`parent_span_id`. Spans are `run`, `model`, `tool` and `verification`.
+
+The point is what the ledger cannot say. A run's events explain that run; a
+goal is several runs, a session is many, and a delegation is a run inside a
+run. Those relationships now exist in the data:
+
+- every attempt of a `harness goal` shares one trace;
+- every run in a `--session` shares a trace derived from the session id, so a
+  conversation resumed days later from another terminal still joins it;
+- a sub-agent's root `run` span hangs off the exact `tool` span that
+  delegated to it.
+
+```
+jq -r '[.trace_id[0:8], .name, (.parent_span_id//"-")[0:8], .span_id[0:8], .status] | @tsv' \
+  .runs/*/spans.jsonl | sort
+```
+
+There is no OpenTelemetry SDK in the path. The wire *shape* is what makes the
+data portable — anything that reads JSON can ship it to a collector — while
+an SDK would add a dependency, a version constraint and a failure mode to a
+teaching harness for no matching benefit. Nothing here can end a run: a path
+that cannot be written degrades to no spans, never to no work.
+
 ## Troubleshooting
 
 | Symptom | Cause / fix |

@@ -14,11 +14,14 @@ import yaml
 
 from . import auth
 from .artifacts import ArtifactStore
+from .compaction import build_compactor
 from .config import HarnessConfig, load_config, load_skill, load_task
 from .context import ContextEngine
 from .contracts import (
     SCHEMA_VERSION,
     ActionKind,
+    ModelRequest,
+    RiskLevel,
     RunResult,
     RunState,
     RunStatus,
@@ -32,14 +35,41 @@ from .model_router import ModelRouter, build_llm_light
 from .policy import ApprovalCallback, PolicyEngine
 from .redaction import Redactor
 from .state import StateStore
+from .subagents import check_delegation_allowed, subagent_task
 from .tools import ToolRegistry, build_registry
+from .tracing import SpanRecorder, new_trace_id, parse_trace_context
 from .util import atomic_write_text, content_hash, safe_slug, truncate, utc_now
 from .verifier import Verifier
 from .workspace import Workspace, WorkspaceManager
 
 
+def subagent_approval() -> ApprovalCallback:
+    """The approver a delegated sub-agent runs under.
+
+    Giving a sub-agent no approver at all was the obvious choice and the wrong
+    one. It is true that a read-only agent needs no authorisation to read, and
+    false that it needs none to execute: under `approval_mode: mutations` --
+    which every remote config ships -- run_command is approval-gated, so a
+    reviewing sub-agent was silently refused the test run its own skill had
+    just told it to perform.
+
+    So reading and executing are approved and writing and network are not.
+    The invariant being protected is that a sub-agent cannot change anything
+    or reach outside the machine; it was never that a sub-agent cannot run the
+    repository's own checks inside a throwaway copy. The command allowlist and
+    the deny-list still apply, because those are decided before an approver is
+    ever consulted.
+    """
+
+    def decide(tool: Any, arguments: dict[str, Any], reason: str) -> bool:
+        del arguments, reason
+        return tool.risk in {RiskLevel.READ, RiskLevel.EXECUTE, RiskLevel.CONTROL}
+
+    return decide
+
+
 def route_secrets(config: HarnessConfig) -> list[str]:
-    """Every credential the configured routes could actually send.
+    """Every credential a run could actually send.
 
     Resolution has to match `providers._secret` exactly. When the two
     disagree the run sends a key the redactor never learned about, and it
@@ -47,11 +77,19 @@ def route_secrets(config: HarnessConfig) -> list[str]:
     as by variable name, and both start and resume build the list here
     rather than each writing their own copy.
     """
-    return [
+    secrets = [
         auth.resolve_route(route.api_key_env, route.base_url).key
         for route in config.router.routes.values()
         if route.api_key_env
     ]
+    # The search backend sends a credential the model router knows nothing
+    # about. Collected anywhere but here it would reach the ledger in the
+    # clear, which is the same bug this function was written to close.
+    if config.search.api_key_env:
+        secrets.append(auth.resolve_env(config.search.api_key_env).key)
+    # An unresolved credential is the empty string. The Redactor drops values
+    # under four characters, but returning them invites a caller that does not.
+    return [secret for secret in secrets if secret]
 
 
 class HarnessRuntime:
@@ -67,6 +105,8 @@ class HarnessRuntime:
         events: EventLog,
         state_store: StateStore,
         approval_callback: ApprovalCallback | None = None,
+        subagent_depth: int = 0,
+        trace_context: str = "",
         sleeper: Any = time.sleep,
     ) -> None:
         self.config = config
@@ -79,7 +119,9 @@ class HarnessRuntime:
         self.state_store = state_store
         self._elapsed_base = state.elapsed_seconds
         self._active_started = time.monotonic()
-        self.context_engine = ContextEngine(config)
+        self.context_engine = ContextEngine(config, build_compactor(
+            config.compaction, summarize=self._summarizer()
+        ))
         self.router = ModelRouter(
             config.router,
             sleeper=sleeper,
@@ -87,8 +129,19 @@ class HarnessRuntime:
             routes=config.router.routes,
             pinned=config.selected_model,
         )
+        self._streamed = False
+        self.router.on_delta = self._model_delta
         self.verifier = Verifier(config)
         self.policy = PolicyEngine(config.policy, skill.allowed_tools, approval_callback)
+        self.subagent_depth = subagent_depth
+        self.subagent_calls = 0
+        trace_id, parent_span = parse_trace_context(trace_context)
+        self.spans = SpanRecorder(
+            artifacts.run_dir / "spans.jsonl",
+            run_id=state.run_id,
+            trace_id=trace_id or new_trace_id(),
+            parent_span_id=parent_span,
+        )
         self.registry: ToolRegistry = build_registry(
             config,
             skill,
@@ -96,6 +149,7 @@ class HarnessRuntime:
             artifacts,
             self.policy,
             event_callback=self._emit,
+            dispatcher=self._delegate,
         )
         self.faults = FaultInjector(
             config.fault,
@@ -103,6 +157,128 @@ class HarnessRuntime:
             persist=lambda: self._checkpoint("fault-injection"),
             event=self._emit,
         )
+
+    def _model_delta(self, text: str) -> None:
+        """Show a streamed turn arriving.
+
+        Straight to stdout and deliberately not to the ledger: this is tens of
+        fragments a second, the whole of it is already recorded once in
+        MODEL_RESPONSE, and an append-and-fsync per token would make the
+        ledger the slowest part of a run.
+        """
+        self._streamed = True
+        sys.stdout.write(text)
+        sys.stdout.flush()
+
+    def _end_stream(self) -> None:
+        """Close the streamed line so the next output starts on its own."""
+        if self._streamed:
+            self._streamed = False
+            sys.stdout.write("\n")
+            sys.stdout.flush()
+
+    def _delegate(self, agent: str, objective: str) -> tuple[str, dict[str, Any]]:
+        """Run one sub-agent and hand its report back as an observation.
+
+        The sub-run goes through `HarnessRuntime.start` like any other, so it
+        gets its own bundle, ledger and checkpoints. A sub-agent that
+        misbehaves is then exactly as inspectable and replayable as the parent
+        -- which is the reason for reusing this machinery rather than writing
+        a second, quieter path for delegated work.
+        """
+        subagent = check_delegation_allowed(
+            self.config.subagents, agent, depth=self.subagent_depth, calls=self.subagent_calls
+        )
+        self.subagent_calls += 1
+        index = self.subagent_calls
+        task_path = subagent_task(
+            self.artifacts.run_dir / "subagents",
+            agent,
+            objective,
+            self.workspace.root,
+            index=index,
+        )
+        self._emit(
+            "SUBAGENT_STARTED",
+            {"agent": agent, "objective": objective, "index": index, "depth": self.subagent_depth},
+        )
+        result = HarnessRuntime.start(
+            # The sub-run joins this run's trace, so the whole delegation
+            # reads as one causal chain instead of two unrelated bundles.
+            trace_context=self.spans.context(),
+            # A sub-agent may run on its own config, and therefore its own
+            # model. A reviewer sharing the writer's model shares its blind
+            # spots, which is the failure the second opinion exists to catch.
+            config_path=subagent.config or self.config.config_path,
+            task_path=task_path,
+            skill_path=subagent.skill,
+            max_turns=self.config.subagents.max_turns,
+            max_seconds=self.config.subagents.max_seconds,
+            subagent_depth=self.subagent_depth + 1,
+            # Not the parent's approver: an inherited one would let a nested
+            # run spend the operator's yes on something they never saw. This
+            # one permits reading and running and refuses writing and network,
+            # which is the guarantee a sub-agent actually makes.
+            approval_callback=subagent_approval(),
+        )
+        report = self._subagent_report(result)
+        self._emit(
+            "SUBAGENT_FINISHED",
+            {"agent": agent, "index": index, "run_id": result.run_id, "status": result.status.value},
+        )
+        return report, {
+            "agent": agent,
+            "run_id": result.run_id,
+            "status": result.status.value,
+            "run_dir": str(result.run_dir),
+        }
+
+    @staticmethod
+    def _subagent_report(result: RunResult) -> str:
+        """The sub-agent's findings, or an honest account of why there are none."""
+        try:
+            state = json.loads((result.run_dir / "state.json").read_text(encoding="utf-8"))
+            summary = str(state.get("finish_summary") or "").strip()
+        except (OSError, json.JSONDecodeError, ValueError):
+            summary = ""
+        if result.status is RunStatus.COMPLETED and summary:
+            return summary
+        if summary:
+            return f"[sub-agent ended {result.status.value}] {summary}"
+        return (
+            f"[sub-agent ended {result.status.value} with no report] "
+            f"{result.terminal_reason}"
+        )
+
+    def _summarizer(self) -> Any:
+        """A callable that asks a model to digest text, or None.
+
+        Returned only when the config actually asks for summarizing
+        compaction, so a harness configured to truncate never constructs a
+        path that could make an extra provider call.
+
+        The request reuses the ordinary action protocol -- the model is asked
+        for a `finish` action and its summary is the digest -- rather than
+        adding a raw-completion path to every adapter for one caller.
+        """
+        if self.config.compaction.kind != "summarize":
+            return None
+
+        def summarize(prompt: str) -> str:
+            request = ModelRequest(
+                run_id=self.state.run_id,
+                turn=self.state.turn,
+                messages=(
+                    {"role": "system", "content": "You summarize. You do not act."},
+                    {"role": "user", "content": prompt},
+                ),
+                tools=(),
+                max_output_chars=self.config.budgets.max_output_chars,
+            )
+            response = self.router.call(request, self.state, event=self._emit)
+            return response.action.summary or response.raw_summary
+
+        return summarize
 
     @classmethod
     def start(
@@ -120,6 +296,9 @@ class HarnessRuntime:
         priorities: tuple[str, ...] = (),
         require_local: bool = False,
         max_cost_per_1m: float | None = None,
+        session_id: str = "",
+        subagent_depth: int = 0,
+        trace_context: str = "",
         approval_callback: ApprovalCallback | None = None,
         sleeper: Any = time.sleep,
     ) -> RunResult:
@@ -138,7 +317,27 @@ class HarnessRuntime:
         skill = load_skill(skill_path)
         run_id = cls._new_run_id(task.task_id)
         manager = WorkspaceManager(config.runs_dir)
-        workspace = manager.create(run_id, task.workspace_seed, task.protected_paths)
+        if session_id:
+            # A session's workspace outlives the run that created it, so the
+            # next message edits what this one wrote instead of starting over.
+            workspace = manager.create_for_session(
+                session_id,
+                protected_paths=task.protected_paths,
+                seed=task.workspace_seed,
+                repository=task.repository,
+                base_ref=task.base_ref,
+            )
+        elif task.repository is not None:
+            workspace = manager.create_from_repository(
+                run_id, task.repository, task.protected_paths, base_ref=task.base_ref
+            )
+        else:
+            workspace = manager.create(
+                run_id,
+                task.workspace_seed,
+                task.protected_paths,
+                preserve_git=task.preserve_git,
+            )
         run_dir = config.runs_dir / run_id
         redactor = Redactor(route_secrets(config))
         artifacts = ArtifactStore(run_dir, redactor)
@@ -159,6 +358,8 @@ class HarnessRuntime:
                     "skill": str(Path(skill_path).resolve()),
                 },
                 "fault": config.fault,
+                "session_id": session_id,
+                "trace_context": trace_context,
                 "input_digest": cls._input_digest(config, task, skill),
             }
         )
@@ -197,6 +398,8 @@ class HarnessRuntime:
                 events=events,
                 state_store=state_store,
                 approval_callback=approval_callback,
+                subagent_depth=subagent_depth,
+                trace_context=trace_context,
                 sleeper=sleeper,
             )
         except Exception as exc:
@@ -281,6 +484,13 @@ class HarnessRuntime:
         return runtime.execute()
 
     def execute(self) -> RunResult:
+        # One span for the whole run, so every model call, tool call and
+        # verification below it hangs off a single root -- and a sub-agent's
+        # root hangs off the tool span that asked for it.
+        with self.spans.span("run", {"task_id": self.state.task_id}):
+            return self._execute()
+
+    def _execute(self) -> RunResult:
         self.state.status = RunStatus.RUNNING
         self._emit("RUN_STARTED", {"turn": self.state.turn})
         self._checkpoint("run-start")
@@ -306,22 +516,33 @@ class HarnessRuntime:
                     "character_count": context.character_count,
                     "repo_entries": context.repo_entries,
                     "compacted_observations": context.compacted_observations,
+                    # Which of the repository's own instruction files the model
+                    # was shown. Recorded every turn so a run's behaviour can
+                    # be explained by what it was actually told.
+                    "instruction_sources": list(context.instruction_sources),
+                    "instructions_truncated": context.instructions_truncated,
                 },
             )
             if context.compacted_observations:
                 self._emit(
                     "CONTEXT_COMPACTED",
-                    {"observations": context.compacted_observations},
+                    {
+                        "observations": context.compacted_observations,
+                        "strategy": self.config.compaction.kind,
+                    },
                 )
             try:
-                response = self.router.call(
-                    context.request,
-                    self.state,
-                    event=self._emit,
-                    before_call=self.faults.before_model,
-                )
+                with self.spans.span("model", {"turn": self.state.turn}):
+                    response = self.router.call(
+                        context.request,
+                        self.state,
+                        event=self._emit,
+                        before_call=self.faults.before_model,
+                    )
             except ProviderExhausted as exc:
+                self._end_stream()
                 return self._terminate(RunStatus.FAILED, str(exc))
+            self._end_stream()
             action = response.action
             self.state.last_action = {
                 "kind": action.kind.value,
@@ -372,7 +593,8 @@ class HarnessRuntime:
             return result
         self.state.tool_calls += 1
         self._emit("TOOL_REQUESTED", {"call_id": call_id, "tool": name, "arguments": arguments})
-        result = self.registry.execute(call_id, name, arguments)
+        with self.spans.span("tool", {"tool": name, "call_id": call_id}):
+            result = self.registry.execute(call_id, name, arguments)
         self.state.completed_tool_calls[call_id] = asdict(result)
         observation = result.as_observation()
         self.state.observations.append(observation)
@@ -398,7 +620,8 @@ class HarnessRuntime:
         attempt = self.state.verification_attempts
         self._emit("VERIFICATION_STARTED", {"attempt": attempt, "claim": summary})
         self._checkpoint("verification-start")
-        result = self.verifier.verify(self.task, self.workspace)
+        with self.spans.span("verification", {"attempt": attempt}):
+            result = self.verifier.verify(self.task, self.workspace)
         reference = self.artifacts.write_verification(attempt, result)
         payload = {
             "attempt": attempt,
@@ -605,7 +828,19 @@ class HarnessRuntime:
             "version": 1,
             "id": task.task_id,
             "objective": task.objective,
-            "workspace_seed": str(task.workspace_seed),
+            # Only the mode this task actually uses is written, so the frozen
+            # copy reloads through the same "exactly one of" check the
+            # original did rather than becoming a task no loader would accept.
+            **(
+                {
+                    "repository": str(task.repository),
+                    # An empty base_ref means "the repository's default", and
+                    # writing it out as "" would be rejected on reload.
+                    **({"base_ref": task.base_ref} if task.base_ref else {}),
+                }
+                if task.repository is not None
+                else {"workspace_seed": str(task.workspace_seed)}
+            ),
             "constraints": list(task.constraints),
             "protected_paths": list(task.protected_paths),
             "acceptance": {

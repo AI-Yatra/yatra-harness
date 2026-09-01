@@ -49,11 +49,19 @@ class ModelRouter:
         # Resolved at first use and then frozen: every turn of a run must see
         # the same ordering, or a retry could silently use a different model.
         self._plan: RoutingPlan | None = None
+        # Where streamed text goes. Set by the runtime; None means the turn
+        # arrives all at once, exactly as it always did.
+        self.on_delta: Callable[[str], None] | None = None
 
     def _provider(self, route_name: str) -> Provider:
         if route_name not in self.providers:
             self.providers[route_name] = provider_for(self.routes[route_name])
-        return self.providers[route_name]
+        provider = self.providers[route_name]
+        # Attached here rather than at construction so a provider injected by
+        # a test stays untouched unless it declares the attribute itself.
+        if hasattr(provider, "on_delta"):
+            provider.on_delta = self.on_delta
+        return provider
 
     def resolve_routes(self, event: RouterEvent | None = None) -> tuple[str, ...]:
         """Return the ordered route names for this run, deciding once.

@@ -39,6 +39,39 @@ you>
 
 Type a message to run the agent. Slash commands are also available.
 
+## Working on a repository
+
+`--repo` swaps the scratch seed for a clone of a real git repository. The run
+lands on a `harness/<run-id>` branch with the repository's history and its
+remote, which is what makes a pull request possible at the end.
+
+```
+ay --repo . --skill skills/repo-edit.yaml --accept "./init.sh" --deliver pr
+```
+
+| Flag | Meaning |
+|---|---|
+| `--repo PATH` | work on a clone of this repository (not with `--seed`) |
+| `--base-ref REF` | branch, tag or commit the work starts from |
+| `--deliver MODE` | `none`, `commit`, `branch` or `pr` after verification |
+| `--base BRANCH` | pull request target; defaults to the remote's own default |
+| `--deliver-yes` | push and open without prompting |
+| `--session ID` | resume a named session's workspace and memory |
+| `--stateless` | a fresh workspace per message, as before |
+
+`--deliver` needs `--repo`, because a seed workspace has no remote to push
+to. Your own checkout is only ever read, and a clone starts from a commit, so
+uncommitted work in it is not carried into the run.
+
+The pushing and the opening are approved separately, and both prompt at the
+terminal unless `--deliver-yes` is given. `ay` always passes `--yes` to the
+harness so the model's tool calls are not gated mid-conversation; that flag
+deliberately does not authorise publishing.
+`/pr [run_id]` delivers a finished run afterwards without rerunning it.
+
+An `AGENTS.md` at the repository root is read into the model's system prompt,
+so the repository's own conventions reach the agent instead of being guessed.
+
 ## Making a chat run verifiable
 
 By default a chat task is seeded from an empty scratch workspace

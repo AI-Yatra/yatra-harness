@@ -29,6 +29,8 @@ model_router:
       base_url: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
       api_key_env: DASHSCOPE_API_KEY
       timeout_seconds: 120
+      # Show the turn arriving instead of after it finishes.
+      stream: true
       local: false
       cost_per_1m_input: 0.0
       cost_per_1m_output: 0.0
@@ -49,6 +51,20 @@ policy:
     - [python, -m, unittest]
     - [git, diff]
     - [git, status]
+  # Refused wherever they appear in a command, even when the allowlist
+  # prefix above would otherwise permit it. Delivery is the harness's job,
+  # not the model's, and egress belongs to browser_fetch.
+  denied_commands:
+    - [git, push]
+    - [git, remote]
+    - [git, config, --global]
+    - [pip, install]
+    - [uv, pip]
+    - [npm, install]
+    - [curl]
+    - [wget]
+    - [ssh]
+    - [sudo]
   network_enabled: false
   allowed_domains: []
   command_timeout_seconds: 45

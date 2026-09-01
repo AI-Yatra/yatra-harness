@@ -40,6 +40,14 @@ class PolicyEngine:
             command = arguments.get("command")
             if not isinstance(command, list) or not all(isinstance(part, str) for part in command):
                 return PolicyDecision(False, False, "run_command requires a string array")
+            # The deny-list is checked first and cannot be overridden, so a
+            # refusal here never reaches an approver: a human clicking yes on
+            # a prompt is exactly the mistake it exists to prevent.
+            denied = self._command_denied(tuple(command))
+            if denied is not None:
+                return PolicyDecision(
+                    False, False, f"command matches the deny-list pattern {denied!r}"
+                )
             if not self._command_allowed(tuple(command)):
                 return PolicyDecision(False, False, "command is not on the configured allowlist")
         requires_approval = self._requires_approval(tool.risk)
@@ -50,6 +58,30 @@ class PolicyEngine:
         if self.approval_callback(tool, arguments, f"authorize {tool.risk.value} capability"):
             return PolicyDecision(True, True, "approved by operator")
         return PolicyDecision(False, True, "operator denied approval")
+
+    def _command_denied(self, command: tuple[str, ...]) -> str | None:
+        """The deny-list pattern this command matches, or None.
+
+        The allowlist answers "may a command of this shape run at all", which
+        it can only do by prefix. That is not enough on its own, because the
+        dangerous forms are reachable as arguments to a command that is
+        legitimately allowed -- `python` has to be on the allowlist for the
+        tests to run, and `python -c "..."` is arbitrary code.
+
+        So a deny pattern matches as a contiguous subsequence anywhere in the
+        command rather than only at the front. A prefix-only check is dodged
+        by one inserted flag, and a rule that is trivially dodged is worse
+        than none: it reads like a control and is not one.
+        """
+        normalized = self._normalize_command(command)
+        for pattern in self.config.denied_commands:
+            if not pattern:
+                continue
+            span = len(pattern)
+            for start in range(len(normalized) - span + 1):
+                if normalized[start : start + span] == pattern:
+                    return " ".join(pattern)
+        return None
 
     def _command_allowed(self, command: tuple[str, ...]) -> bool:
         # Mirror the execution normalization in tools._normalize_command so

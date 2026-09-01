@@ -22,3 +22,4 @@ docs/FINDINGS-CAPABILITY-AUDIT.md
 
 # Local tool state (Command Code writes personal preference notes here).
 .commandcode/
+.evals/

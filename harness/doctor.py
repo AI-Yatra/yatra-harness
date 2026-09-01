@@ -52,7 +52,7 @@ def run_doctor(
     if task_path:
         try:
             task = load_task(task_path)
-            checks.append(Check("task", True, f"{task.task_id}: {task.workspace_seed}"))
+            checks.append(Check("task", True, f"{task.task_id}: {task.origin}"))
         except Exception as exc:
             checks.append(Check("task", False, str(exc)))
     if skill_path:
