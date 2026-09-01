@@ -333,6 +333,25 @@ uninterrupted run, so nothing is executed twice.
 prints a SHA-256 of the ledger. Edit one event and the hash changes. Delete one
 and the sequence check names the gap.
 
+## Finding things in a large repository
+
+`search_repo` matches a literal string. `retrieve` ranks excerpts against a
+question:
+
+```
+retrieve  "how are credentials redacted from the ledger"
+
+--- README.md:161-200 (score 12.89)
+--- docs/SECURITY.md:41-80 (score 11.40)
+--- harness/redaction.py:1-40 (score 10.37)
+```
+
+BM25 by default — no key, no network, deterministic, and therefore actually
+covered by CI. Point `retrieval.kind: embedding` at any OpenAI-compatible
+`/embeddings` endpoint for vector search; it falls back to lexical when the
+provider is unreachable, because retrieval going quiet is worse than
+retrieval being approximate.
+
 ## Running tools in a container
 
 ```

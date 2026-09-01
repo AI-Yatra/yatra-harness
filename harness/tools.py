@@ -24,6 +24,15 @@ from .errors import MCPError, ToolError, WorkspaceError
 from .mcp import MCPStdioClient
 from .policy import PolicyEngine
 from .process import run_process
+from .retrieval import (
+    BM25Index,
+    EmbeddingIndex,
+    embedding_request,
+    iter_chunks,
+    parse_embeddings,
+    render_hits,
+    workspace_signature,
+)
 from .sandbox import build_sandbox
 from .search import build_request, parse_results, render
 from .util import truncate
@@ -306,6 +315,18 @@ def _register_native(registry: ToolRegistry, config: HarnessConfig, workspace: W
             RiskLevel.NETWORK,
         ),
         lambda args: _browser_fetch(args, config),
+    )
+    registry.register(
+        ToolSpec(
+            "retrieve",
+            "Find the parts of the workspace most relevant to a question, "
+            "ranked, as excerpts with their file and line range.",
+            object_schema(
+                {"query": {"type": "string"}, "limit": {"type": "integer"}}, ("query",)
+            ),
+            RiskLevel.READ,
+        ),
+        lambda args: _retrieve(workspace, args, config),
     )
     registry.register(
         ToolSpec(
@@ -797,6 +818,73 @@ def _browser_fetch(arguments: dict[str, Any], config: HarnessConfig) -> tuple[st
         raise ToolError(f"HTTP request failed with status {exc.code}") from exc
     except urllib.error.URLError as exc:
         raise ToolError(f"HTTP request failed: {exc.reason}") from exc
+
+
+# Keyed by workspace and backend, and invalidated by a cheap signature of the
+# tree. The agent patches files as it works, so an index built on turn two is
+# wrong by turn four.
+_INDEX_CACHE: dict[tuple[str, str], tuple[tuple[int, int], Any]] = {}
+
+
+def _retrieve(
+    workspace: Workspace, arguments: dict[str, Any], config: HarnessConfig
+) -> tuple[str, dict[str, Any]]:
+    """Rank workspace chunks against a question.
+
+    The index is built once per workspace and reused. Rebuilding it on every
+    call would re-read the repository -- and, with the embedding backend,
+    re-embed all of it -- for each question the agent asks.
+    """
+    settings = config.retrieval
+    key = (str(workspace.root), settings.kind)
+    signature = workspace_signature(workspace.root, settings)
+    cached = _INDEX_CACHE.get(key)
+    if cached is not None and cached[0] == signature:
+        index = cached[1]
+    else:
+        chunks = iter_chunks(workspace.root, settings)
+        if settings.kind == "embedding":
+            index = EmbeddingIndex(chunks, lambda texts: _embed(texts, config))
+        else:
+            index = BM25Index(chunks)
+        _INDEX_CACHE[key] = (signature, index)
+    limit = int(arguments.get("limit") or settings.limit)
+    hits = index.search(str(arguments["query"]), limit=max(1, min(limit, 20)))
+    return render_hits(hits), {
+        "backend": settings.kind,
+        "query": str(arguments["query"]),
+        "hits": len(hits),
+        "paths": [f"{hit.chunk.path}:{hit.chunk.start_line}" for hit in hits],
+    }
+
+
+def _embed(texts: list[str], config: HarnessConfig) -> list[list[float]]:
+    """One /embeddings call, batched, with the key in a header."""
+    settings = config.retrieval
+    secret = auth.resolve_env(settings.api_key_env).key if settings.api_key_env else ""
+    request = embedding_request(settings, texts, key=secret)
+    host = urllib.parse.urlparse(request.url).hostname or ""
+    _validate_public_url(request.url, (*config.policy.allowed_domains, host))
+    http_request = urllib.request.Request(
+        request.url,
+        data=request.body.encode("utf-8"),
+        headers={"User-Agent": "yatra-harness/1.0", **request.headers},
+        method="POST",
+    )
+    try:
+        with urllib.request.build_opener(_NoRedirect()).open(
+            http_request, timeout=max(config.policy.browser_timeout_seconds, 30)
+        ) as response:
+            payload = response.read().decode(
+                response.headers.get_content_charset() or "utf-8", errors="replace"
+            )
+    except urllib.error.HTTPError as exc:
+        # The status, never the body: a failed embeddings call can echo the
+        # key back and must not reach an observation.
+        raise ToolError(f"embeddings request failed with status {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise ToolError(f"embeddings request failed: {exc.reason}") from exc
+    return parse_embeddings(payload, len(texts))
 
 
 def _web_search(arguments: dict[str, Any], config: HarnessConfig) -> tuple[str, dict[str, Any]]:
