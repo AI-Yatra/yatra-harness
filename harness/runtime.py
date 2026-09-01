@@ -36,6 +36,7 @@ from .redaction import Redactor
 from .state import StateStore
 from .subagents import check_delegation_allowed, subagent_task
 from .tools import ToolRegistry, build_registry
+from .tracing import SpanRecorder, new_trace_id, parse_trace_context
 from .util import atomic_write_text, content_hash, safe_slug, truncate, utc_now
 from .verifier import Verifier
 from .workspace import Workspace, WorkspaceManager
@@ -79,6 +80,7 @@ class HarnessRuntime:
         state_store: StateStore,
         approval_callback: ApprovalCallback | None = None,
         subagent_depth: int = 0,
+        trace_context: str = "",
         sleeper: Any = time.sleep,
     ) -> None:
         self.config = config
@@ -105,6 +107,13 @@ class HarnessRuntime:
         self.policy = PolicyEngine(config.policy, skill.allowed_tools, approval_callback)
         self.subagent_depth = subagent_depth
         self.subagent_calls = 0
+        trace_id, parent_span = parse_trace_context(trace_context)
+        self.spans = SpanRecorder(
+            artifacts.run_dir / "spans.jsonl",
+            run_id=state.run_id,
+            trace_id=trace_id or new_trace_id(),
+            parent_span_id=parent_span,
+        )
         self.registry: ToolRegistry = build_registry(
             config,
             skill,
@@ -147,6 +156,9 @@ class HarnessRuntime:
             {"agent": agent, "objective": objective, "index": index, "depth": self.subagent_depth},
         )
         result = HarnessRuntime.start(
+            # The sub-run joins this run's trace, so the whole delegation
+            # reads as one causal chain instead of two unrelated bundles.
+            trace_context=self.spans.context(),
             # A sub-agent may run on its own config, and therefore its own
             # model. A reviewer sharing the writer's model shares its blind
             # spots, which is the failure the second opinion exists to catch.
@@ -238,6 +250,7 @@ class HarnessRuntime:
         max_cost_per_1m: float | None = None,
         session_id: str = "",
         subagent_depth: int = 0,
+        trace_context: str = "",
         approval_callback: ApprovalCallback | None = None,
         sleeper: Any = time.sleep,
     ) -> RunResult:
@@ -293,6 +306,7 @@ class HarnessRuntime:
                 },
                 "fault": config.fault,
                 "session_id": session_id,
+                "trace_context": trace_context,
                 "input_digest": cls._input_digest(config, task, skill),
             }
         )
@@ -332,6 +346,7 @@ class HarnessRuntime:
                 state_store=state_store,
                 approval_callback=approval_callback,
                 subagent_depth=subagent_depth,
+                trace_context=trace_context,
                 sleeper=sleeper,
             )
         except Exception as exc:
@@ -416,6 +431,13 @@ class HarnessRuntime:
         return runtime.execute()
 
     def execute(self) -> RunResult:
+        # One span for the whole run, so every model call, tool call and
+        # verification below it hangs off a single root -- and a sub-agent's
+        # root hangs off the tool span that asked for it.
+        with self.spans.span("run", {"task_id": self.state.task_id}):
+            return self._execute()
+
+    def _execute(self) -> RunResult:
         self.state.status = RunStatus.RUNNING
         self._emit("RUN_STARTED", {"turn": self.state.turn})
         self._checkpoint("run-start")
@@ -457,12 +479,13 @@ class HarnessRuntime:
                     },
                 )
             try:
-                response = self.router.call(
-                    context.request,
-                    self.state,
-                    event=self._emit,
-                    before_call=self.faults.before_model,
-                )
+                with self.spans.span("model", {"turn": self.state.turn}):
+                    response = self.router.call(
+                        context.request,
+                        self.state,
+                        event=self._emit,
+                        before_call=self.faults.before_model,
+                    )
             except ProviderExhausted as exc:
                 return self._terminate(RunStatus.FAILED, str(exc))
             action = response.action
@@ -515,7 +538,8 @@ class HarnessRuntime:
             return result
         self.state.tool_calls += 1
         self._emit("TOOL_REQUESTED", {"call_id": call_id, "tool": name, "arguments": arguments})
-        result = self.registry.execute(call_id, name, arguments)
+        with self.spans.span("tool", {"tool": name, "call_id": call_id}):
+            result = self.registry.execute(call_id, name, arguments)
         self.state.completed_tool_calls[call_id] = asdict(result)
         observation = result.as_observation()
         self.state.observations.append(observation)
@@ -541,7 +565,8 @@ class HarnessRuntime:
         attempt = self.state.verification_attempts
         self._emit("VERIFICATION_STARTED", {"attempt": attempt, "claim": summary})
         self._checkpoint("verification-start")
-        result = self.verifier.verify(self.task, self.workspace)
+        with self.spans.span("verification", {"attempt": attempt}):
+            result = self.verifier.verify(self.task, self.workspace)
         reference = self.artifacts.write_verification(attempt, result)
         payload = {
             "attempt": attempt,

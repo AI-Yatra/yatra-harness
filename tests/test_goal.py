@@ -37,6 +37,7 @@ class GoalTestCase(unittest.TestCase):
         self.seed = self.base / "seed"
         self.seed.mkdir()
         self.runs: list[Path] = []
+        self.traces: list[str] = []
         self.clock = [0.0]
 
     def request(self, **kwargs) -> GoalRequest:
@@ -56,8 +57,9 @@ class GoalTestCase(unittest.TestCase):
     def runner(self, *results):
         remaining = list(results)
 
-        def run(task_path: Path, attempt: int):
+        def run(task_path: Path, attempt: int, trace_context: str = ""):
             self.runs.append(task_path)
+            self.traces.append(trace_context)
             self.clock[0] += 10.0
             return remaining.pop(0) if remaining else FakeRun(RunStatus.FAILED, "no more")
 
@@ -131,6 +133,24 @@ class StoppingTests(GoalTestCase):
     def test_at_least_one_attempt_always_runs(self) -> None:
         result = self.pursue(FakeRun(RunStatus.COMPLETED, "done"), max_seconds=0.0)
         self.assertEqual(len(result.attempts), 1)
+
+
+class TraceTests(GoalTestCase):
+    def test_every_attempt_joins_one_trace(self) -> None:
+        # A pursuit should read as a single story rather than as N unrelated
+        # runs that happen to share a directory.
+        self.pursue(
+            FakeRun(RunStatus.FAILED, "a"), FakeRun(RunStatus.COMPLETED, "done")
+        )
+        self.assertEqual(len(set(self.traces)), 1)
+        self.assertTrue(self.traces[0])
+
+    def test_two_goals_do_not_share_a_trace(self) -> None:
+        self.pursue(FakeRun(RunStatus.COMPLETED, "done"))
+        first = self.traces[0]
+        self.traces.clear()
+        self.pursue(FakeRun(RunStatus.COMPLETED, "done"))
+        self.assertNotEqual(first, self.traces[0])
 
 
 class CarryForwardTests(GoalTestCase):

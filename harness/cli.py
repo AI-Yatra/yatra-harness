@@ -26,6 +26,7 @@ from .replay import replay_run
 from .runtime import HarnessRuntime
 from .state import StateStore
 from .tools import build_registry
+from .tracing import root_context, trace_id_for
 from .workspace import Workspace
 
 ROUTE_PRIORITY_KEYS = ("privacy", "quality", "cost", "latency", "context")
@@ -233,6 +234,11 @@ def main(argv: list[str] | None = None) -> int:
                 require_local=arguments.require_local,
                 max_cost_per_1m=arguments.max_cost,
                 session_id=arguments.session,
+                # Runs in one session share a trace derived from its id, so a
+                # conversation resumed days later still joins the same story.
+                trace_context=(
+                    root_context(trace_id_for(arguments.session)) if arguments.session else ""
+                ),
                 approval_callback=approval,
             )
             code = _print_result(result)
@@ -576,12 +582,13 @@ def _goal(arguments: Any) -> int:
     config = load_config(arguments.config)
     approval = _resolve_approval(arguments)
 
-    def runner(task_path: Path, attempt: int) -> Any:
+    def runner(task_path: Path, attempt: int, trace_context: str = "") -> Any:
         print(f"\n== attempt {attempt} ==")
         result = HarnessRuntime.start(
             config_path=arguments.config,
             task_path=task_path,
             skill_path=arguments.skill,
+            trace_context=trace_context,
             profile=arguments.profile,
             priorities=tuple(arguments.priorities),
             require_local=arguments.require_local,

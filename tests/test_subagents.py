@@ -232,6 +232,33 @@ class DelegationRunTests(unittest.TestCase):
         self.assertNotEqual(parent / "workspace", child / "workspace")
         self.assertTrue((child / "workspace" / "counter.py").is_file())
 
+    def test_the_sub_agent_run_joins_its_parent_trace(self) -> None:
+        # This is what makes a delegation readable afterwards: one trace, and
+        # the sub-run hanging off the very tool span that asked for it.
+        import json as json_module
+
+        self.run_harness()
+        parent = next(p for p in self.bundles() if p.name.startswith("repair-counter"))
+        child = next(p for p in self.bundles() if p.name.startswith("subagent-explore"))
+        parent_spans = [
+            json_module.loads(line)
+            for line in (parent / "spans.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        child_spans = [
+            json_module.loads(line)
+            for line in (child / "spans.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertEqual(
+            {span["trace_id"] for span in parent_spans + child_spans},
+            {parent_spans[0]["trace_id"]},
+        )
+        delegate_span = next(
+            span for span in parent_spans
+            if span["name"] == "tool" and span["attributes"].get("tool") == "delegate"
+        )
+        child_root = next(span for span in child_spans if span["name"] == "run")
+        self.assertEqual(child_root["parent_span_id"], delegate_span["span_id"])
+
     def test_delegate_is_absent_when_no_agents_are_configured(self) -> None:
         import subprocess
         import sys

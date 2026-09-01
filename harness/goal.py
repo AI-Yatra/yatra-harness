@@ -31,6 +31,7 @@ import yaml
 
 from .contracts import RunStatus
 from .errors import HarnessError
+from .tracing import root_context, trace_id_for
 from .util import atomic_write_json, atomic_write_text, safe_slug, utc_now
 
 # A failed verification is worth another attempt: the model gets the reason
@@ -75,7 +76,8 @@ class GoalResult:
     last_run_id: str = ""
 
 
-Runner = Callable[[Path, int], Any]
+# (task_path, attempt_index, trace_context) -> RunResult
+Runner = Callable[[Path, int, str], Any]
 
 
 def pursue(
@@ -111,7 +113,9 @@ def pursue(
             break
         task_path = directory / f"attempt-{index:02d}.yaml"
         atomic_write_text(task_path, _task_yaml(request, index, history), mode=0o600)
-        run = runner(task_path, index)
+        # Every attempt joins one trace, so a pursuit reads as a single story
+        # rather than as N unrelated runs that happen to share a directory.
+        run = runner(task_path, index, root_context(trace_id_for(goal_id)))
         attempts.append(GoalAttempt(index, run.run_id, run.status, run.terminal_reason))
         if run.status is RunStatus.COMPLETED:
             achieved, reason = True, run.terminal_reason or "acceptance criteria passed"
