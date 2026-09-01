@@ -42,6 +42,18 @@ of the pipeline already exists.
 - Nothing is pushed anywhere without an explicit operator decision.
 - Every new behaviour gets a failing test first.
 
+## Found while building, and fixed
+
+6. **A full context deleted the run's own objective.** The dynamic context
+   was one sorted-key JSON document truncated from the end, which put `task`
+   last. Caught by a live run, not by a test.
+
+7. **A skill for plain edits.** `bugfix` sends the model hunting for a defect
+   that a plain edit request does not contain.
+
+8. **`--yes` must not authorise publishing.** It already meant "approve the
+   model's tool calls", and `ay` passes it on every run.
+
 ## Out of scope, and why
 
 Docker sandboxing, RAG, streaming and graph orchestration are on the backlog

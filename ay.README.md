@@ -46,7 +46,7 @@ lands on a `harness/<run-id>` branch with the repository's history and its
 remote, which is what makes a pull request possible at the end.
 
 ```
-ay --repo . --accept "python -m unittest discover -s tests" --deliver pr
+ay --repo . --skill skills/repo-edit.yaml --accept "./init.sh" --deliver pr
 ```
 
 | Flag | Meaning |

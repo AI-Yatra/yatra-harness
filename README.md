@@ -182,7 +182,7 @@ Point a run at a real repository and it works on a clone of it, on its own
 branch, with the repository's history and remote intact.
 
 ```
-ay --repo . --accept "python -m unittest discover -s tests" --deliver pr
+ay --repo . --skill skills/repo-edit.yaml --accept "./init.sh" --deliver pr
 ```
 
 ```
@@ -193,6 +193,10 @@ The agent edits the clone. The verifier runs the acceptance command itself.
 Only if that passes does delivery start: commit the diff, ask before pushing
 the branch, ask again before opening the pull request. The body is built from
 the run's verification record, not from the model's description of its work.
+
+Use `skills/repo-edit.yaml` for this rather than `skills/bugfix.yaml`.
+`bugfix` tells the model to find and repair a defect, so given a plain edit
+request it goes looking for a bug that is not there.
 
 `--deliver commit` stops after the local commit and `--deliver branch` stops
 after the push, so you can watch each step before allowing the next. Nothing
@@ -207,7 +211,7 @@ so tool calls are not gated mid-conversation, push without being asked.
 The same thing from the CLI, or afterwards from a finished run:
 
 ```
-uv run harness run tasks/fix_typo.yaml --config configs/remote-qwen.yaml --skill skills/bugfix.yaml --deliver pr --deliver-yes
+uv run harness run tasks/fix_typo.yaml --config configs/remote-qwen.yaml --skill skills/repo-edit.yaml --deliver pr --deliver-yes
 uv run harness deliver <run-id> --mode pr
 ```
 
