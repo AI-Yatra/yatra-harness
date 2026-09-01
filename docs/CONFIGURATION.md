@@ -148,6 +148,9 @@ search backend would be a trap rather than a control.
 | `recent_observations` | 6 | observations kept verbatim |
 | `repo_entries` | 120 | repo map entry cap |
 | `instruction_files` | `[AGENTS.md, CLAUDE.md]` | repository instruction files read from the workspace root |
+| `compaction.kind` | `truncate` | `truncate` or `summarize` |
+| `compaction.max_chars` | 240 | size of a compacted entry |
+| `compaction.prompt_chars` | 8000 | cap on what the summarizer is shown |
 | `max_instruction_chars` | 4000 | cap on that text |
 
 `instruction_files` are read from the run workspace, in the order listed, and
@@ -181,6 +184,28 @@ whether or not it did anything.
 The session's memory (`session.json`) sits beside the workspace, not inside
 it. Written into the workspace it would appear as an untracked file and the
 verifier would count the harness's own bookkeeping as the run's diff.
+
+### Compaction
+
+An observation that leaves the recent window is folded down. `truncate` keeps
+the first `max_chars` of it -- which tool ran, whether it worked, the first
+line of what it returned. `summarize` spends one model call to fold the whole
+batch into a digest that keeps the facts instead of the shape.
+
+```yaml
+context:
+  compaction:
+    kind: summarize
+```
+
+Summarization degrades to truncation whenever it cannot run: a provider
+failure, an empty answer, or a config asking for it with no route able to do
+it. Compaction is a context optimisation, and taking a run down because the
+summarizer is unwell trades a smaller context for no run at all. A summarized
+entry is labelled `tool: compaction`, so a model reading its own context can
+tell a recorded observation from a paraphrase of several.
+
+`CONTEXT_COMPACTED` records which strategy ran.
 
 ### Environment overrides
 

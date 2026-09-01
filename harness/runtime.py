@@ -14,11 +14,13 @@ import yaml
 
 from . import auth
 from .artifacts import ArtifactStore
+from .compaction import build_compactor
 from .config import HarnessConfig, load_config, load_skill, load_task
 from .context import ContextEngine
 from .contracts import (
     SCHEMA_VERSION,
     ActionKind,
+    ModelRequest,
     RunResult,
     RunState,
     RunStatus,
@@ -87,7 +89,9 @@ class HarnessRuntime:
         self.state_store = state_store
         self._elapsed_base = state.elapsed_seconds
         self._active_started = time.monotonic()
-        self.context_engine = ContextEngine(config)
+        self.context_engine = ContextEngine(config, build_compactor(
+            config.compaction, summarize=self._summarizer()
+        ))
         self.router = ModelRouter(
             config.router,
             sleeper=sleeper,
@@ -111,6 +115,36 @@ class HarnessRuntime:
             persist=lambda: self._checkpoint("fault-injection"),
             event=self._emit,
         )
+
+    def _summarizer(self) -> Any:
+        """A callable that asks a model to digest text, or None.
+
+        Returned only when the config actually asks for summarizing
+        compaction, so a harness configured to truncate never constructs a
+        path that could make an extra provider call.
+
+        The request reuses the ordinary action protocol -- the model is asked
+        for a `finish` action and its summary is the digest -- rather than
+        adding a raw-completion path to every adapter for one caller.
+        """
+        if self.config.compaction.kind != "summarize":
+            return None
+
+        def summarize(prompt: str) -> str:
+            request = ModelRequest(
+                run_id=self.state.run_id,
+                turn=self.state.turn,
+                messages=(
+                    {"role": "system", "content": "You summarize. You do not act."},
+                    {"role": "user", "content": prompt},
+                ),
+                tools=(),
+                max_output_chars=self.config.budgets.max_output_chars,
+            )
+            response = self.router.call(request, self.state, event=self._emit)
+            return response.action.summary or response.raw_summary
+
+        return summarize
 
     @classmethod
     def start(
@@ -341,7 +375,10 @@ class HarnessRuntime:
             if context.compacted_observations:
                 self._emit(
                     "CONTEXT_COMPACTED",
-                    {"observations": context.compacted_observations},
+                    {
+                        "observations": context.compacted_observations,
+                        "strategy": self.config.compaction.kind,
+                    },
                 )
             try:
                 response = self.router.call(

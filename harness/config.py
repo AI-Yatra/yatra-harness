@@ -11,6 +11,7 @@ from typing import Any
 import yaml
 
 from . import schema
+from .compaction import CompactionConfig, compaction_config_from_dict
 from .contracts import BudgetSpec, SkillContract, TaskContract, VerificationSpec
 from .errors import ConfigurationError
 from .llm_light import (
@@ -100,6 +101,7 @@ class HarnessConfig:
     context_instruction_files: tuple[str, ...] = ("AGENTS.md", "CLAUDE.md")
     context_max_instruction_chars: int = 4_000
     search: SearchConfig = field(default_factory=SearchConfig)
+    compaction: CompactionConfig = field(default_factory=CompactionConfig)
     llm_light: LLMLightConfig = field(default_factory=LLMLightConfig)
     fault: str = ""
     selected_model: str = ""
@@ -335,6 +337,7 @@ def load_config(path: str | Path) -> HarnessConfig:
             "repo_entries",
             "instruction_files",
             "max_instruction_chars",
+            "compaction",
         },
         "context",
     )
@@ -357,6 +360,7 @@ def load_config(path: str | Path) -> HarnessConfig:
             context_raw.get("repo_entries", 120), "context.repo_entries", minimum=10
         ),
         search=search_config_from_dict(raw.get("search"), "search"),
+        compaction=compaction_config_from_dict(context_raw.get("compaction")),
         context_instruction_files=instruction_files,
         context_max_instruction_chars=schema.integer(
             context_raw.get("max_instruction_chars", 4_000),

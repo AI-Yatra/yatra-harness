@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
+from .compaction import Compactor, TruncatingCompactor
 from .config import HarnessConfig
 from .contracts import ModelRequest, RunState, SkillContract, TaskContract, ToolSpec
 from .errors import ConfigurationError
@@ -24,8 +25,11 @@ class ContextBuild:
 
 
 class ContextEngine:
-    def __init__(self, config: HarnessConfig) -> None:
+    def __init__(self, config: HarnessConfig, compactor: Compactor | None = None) -> None:
         self.config = config
+        # Defaulted rather than required so every existing caller -- and every
+        # test that only cares about budgets -- keeps working unchanged.
+        self.compactor = compactor or TruncatingCompactor()
 
     def build(
         self,
@@ -41,7 +45,7 @@ class ContextEngine:
         recent_count = self.config.context_recent_observations
         old = state.observations[:-recent_count] if len(state.observations) > recent_count else []
         recent = list(state.observations[-recent_count:])
-        compacted = [self._compact_observation(item) for item in old]
+        compacted = self.compactor.compact(old) if old else []
         essential = {
             "task": {
                 "id": task.task_id,
@@ -219,15 +223,4 @@ class ContextEngine:
                 break
         return entries, len(entries)
 
-    @staticmethod
-    def _compact_observation(item: dict) -> dict:
-        content = str(item.get("content", ""))
-        compact, _ = truncate(content.replace("\n", " "), 240)
-        return {
-            "call_id": item.get("call_id"),
-            "tool": item.get("tool"),
-            "ok": item.get("ok"),
-            "summary": compact,
-            "artifact_ref": (item.get("metadata") or {}).get("artifact_ref"),
-        }
 
