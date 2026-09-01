@@ -18,6 +18,7 @@ from .delivery import DeliveryRequest, deliver
 from .doctor import run_doctor
 from .errors import HarnessError, InjectedCrash
 from .events import EventLog
+from .goal import GoalRequest, pursue
 from .model_router import build_llm_light, profile_from_route
 from .policy import PolicyEngine
 from .replay import replay_run
@@ -135,6 +136,26 @@ def parser() -> argparse.ArgumentParser:
     remove_cmd.add_argument("provider")
     auth_sub.add_parser("providers", help="list known providers")
 
+    goal = commands.add_parser(
+        "goal", help="attempt a goal repeatedly until its acceptance command passes"
+    )
+    goal.add_argument("objective", help="what must become true")
+    goal.add_argument(
+        "--accept", action="append", default=[], metavar="CMD", required=True,
+        help="acceptance command, repeatable. This is the stopping condition",
+    )
+    goal.add_argument("--repo", type=Path, default=None, help="work on a clone of this repository")
+    goal.add_argument("--seed", type=Path, default=None, help="work on a copy of this directory")
+    goal.add_argument("--base-ref", default="", help="branch, tag or commit to start from")
+    goal.add_argument("--protect", action="append", default=[], metavar="GLOB")
+    goal.add_argument("--config", type=Path, default=Path("configs/teaching.yaml"))
+    goal.add_argument("--skill", type=Path, default=Path("skills/repo-edit.yaml"))
+    goal.add_argument("--max-attempts", type=int, default=3)
+    goal.add_argument("--max-seconds", type=float, default=1800.0)
+    goal.add_argument("--yes", action="store_true", help="approve policy-gated actions")
+    _add_delivery_arguments(goal)
+    _add_routing_arguments(goal)
+
     deliver_cmd = commands.add_parser(
         "deliver", help="commit, push and open a pull request for a completed run"
     )
@@ -215,6 +236,8 @@ def main(argv: list[str] | None = None) -> int:
             return _inspect(arguments)
         if arguments.command == "replay":
             return _replay(arguments)
+        if arguments.command == "goal":
+            return _goal(arguments)
         if arguments.command == "deliver":
             run_dir = arguments.runs_dir.expanduser().resolve() / arguments.run_id
             return _deliver(
@@ -522,6 +545,62 @@ def _auth(arguments: Any) -> int:
         return 0
     print("usage: harness auth {add,status,verify,remove,providers}", file=sys.stderr)
     return 2
+
+
+def _goal(arguments: Any) -> int:
+    """Pursue a goal, then deliver it if it was reached and delivery was asked for."""
+    if (arguments.repo is None) == (arguments.seed is None):
+        print("error: goal needs exactly one of --repo or --seed", file=sys.stderr)
+        return 2
+    config = load_config(arguments.config)
+    approval = _resolve_approval(arguments)
+
+    def runner(task_path: Path, attempt: int) -> Any:
+        print(f"\n== attempt {attempt} ==")
+        result = HarnessRuntime.start(
+            config_path=arguments.config,
+            task_path=task_path,
+            skill_path=arguments.skill,
+            profile=arguments.profile,
+            priorities=tuple(arguments.priorities),
+            require_local=arguments.require_local,
+            max_cost_per_1m=arguments.max_cost,
+            approval_callback=approval,
+        )
+        print(f"   {result.status.value}: {result.terminal_reason}")
+        return result
+
+    result = pursue(
+        GoalRequest(
+            objective=arguments.objective,
+            acceptance=tuple(arguments.accept),
+            config_path=arguments.config,
+            skill_path=arguments.skill,
+            runs_dir=config.runs_dir,
+            seed=arguments.seed,
+            repository=arguments.repo,
+            base_ref=arguments.base_ref,
+            protect=tuple(arguments.protect),
+            max_attempts=arguments.max_attempts,
+            max_seconds=arguments.max_seconds,
+        ),
+        runner=runner,
+    )
+    print()
+    print(f"goal: {'ACHIEVED' if result.achieved else 'NOT ACHIEVED'}")
+    print(f"reason: {result.reason}")
+    print(f"attempts: {len(result.attempts)}")
+    print(f"record: {result.record_path}")
+    if not result.achieved:
+        return 2
+    if arguments.deliver != "none":
+        return _deliver(
+            config.runs_dir / result.last_run_id,
+            mode=arguments.deliver,
+            base=arguments.base,
+            yes=arguments.deliver_yes,
+        )
+    return 0
 
 
 def _add_delivery_arguments(command: Any) -> None:

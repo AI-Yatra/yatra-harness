@@ -256,12 +256,41 @@ harness explain     resolve a task into its contracts without running it
 harness tools       list registered tools with risk classes and provenance
 harness routes      show the resolved route plan and what was excluded
 harness run         execute a task
+harness goal        attempt a goal until its acceptance command passes
 harness deliver     commit, push and open a pull request for a completed run
 harness resume      continue a run from its last checkpoint
 harness inspect     terminal state plus the recent event timeline
 harness replay      rebuild a run from its ledger and hash it
 harness list-runs   list run bundles
 ```
+
+## Goal mode
+
+A run is one attempt. A goal is "keep attempting until this is true".
+
+```
+uv run harness goal "make the counter tests pass" --seed fixtures/buggy_counter --accept "python -m unittest discover -s tests" --config configs/teaching.yaml --skill skills/bugfix.yaml
+```
+
+```
+== attempt 1 ==
+   COMPLETED: acceptance criteria passed
+
+goal: ACHIEVED
+reason: acceptance criteria passed
+attempts: 1
+record: .runs/goal-make-the-counter-tests-pass-c39270/goal.json
+```
+
+`--accept` is required and is the whole point: it is the stopping condition,
+and it is not the model's opinion. A failed attempt is retried with the
+reason carried into the next one's constraints, so attempt two is told what
+attempt one hit. A `BLOCKED` run stops the pursuit instead — the model asked
+a question, and asking it again unchanged cannot produce a different answer.
+
+`--max-attempts` and `--max-seconds` bound the whole pursuit rather than each
+try. Add `--repo` and `--deliver pr` to end an achieved goal with a pull
+request.
 
 ## Breaking it on purpose
 
