@@ -11,7 +11,7 @@ it does not claim to protect against.
 |---|---|---|
 | Skill gate | The model may only request tools the skill enables | Low (config is operator-owned) |
 | Tool registry | Only registered, typed tools exist; schemas validated | Low |
-| Policy engine | Risk classes, command allowlist, network toggle, approvals | Medium (allowlist is prefix-based) |
+| Policy engine | Risk classes, command allow/deny lists, network toggle, approvals | Medium (allowlist is prefix-based) |
 | Workspace | Canonical-path containment; all paths resolve inside the run copy | Low (symlink resolution is explicit) |
 | Protected paths | Glob patterns for immutable files (e.g. `tests/**`) | Low |
 | Subprocess | `shell=False`, no shell interpolation, process-group kill on timeout | Low |
@@ -66,9 +66,13 @@ it does not claim to protect against.
 - **No kernel sandbox.** A malicious model that gets an allowlisted command
   (e.g. a test runner with a clever argument) could in principle escape the
   workspace. The harness confines *the model's interface*, not the OS.
-- **Prefix allowlist.** `allowed_commands` matches command prefixes; a
-  pathological model could construct an argument that slips past a prefix
-  check. Production deployments should run the harness in a container.
+- **Prefix allowlist.** `allowed_commands` matches command prefixes, so a
+  pathological model can reach a dangerous form as an argument to a command
+  that is legitimately allowed. `denied_commands` closes the specific holes
+  you can name -- it matches anywhere in the command, is checked first, and
+  is never overridden by an approver -- but a deny-list only refuses what it
+  has been told about. Production deployments should still run the harness in
+  a container.
 - **Best-effort redaction.** The redactor recognizes common secret shapes;
   it cannot guarantee no leakage from arbitrary model output, and it does not
   cover `state.json` or `patch.diff` (see above).

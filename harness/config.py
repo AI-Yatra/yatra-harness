@@ -66,6 +66,9 @@ class ModelRouterConfig:
 class PolicyConfig:
     approval_mode: str
     allowed_commands: tuple[tuple[str, ...], ...]
+    # Checked before the allowlist and never overridden by it. See
+    # PolicyEngine._command_denied for why both lists are needed.
+    denied_commands: tuple[tuple[str, ...], ...]
     network_enabled: bool
     allowed_domains: tuple[str, ...]
     command_timeout_seconds: float
@@ -265,6 +268,7 @@ def load_config(path: str | Path) -> HarnessConfig:
         {
             "approval_mode",
             "allowed_commands",
+            "denied_commands",
             "network_enabled",
             "allowed_domains",
             "command_timeout_seconds",
@@ -278,6 +282,9 @@ def load_config(path: str | Path) -> HarnessConfig:
     policy = PolicyConfig(
         approval_mode=approval_mode,
         allowed_commands=schema.command_list(policy_raw.get("allowed_commands", []), "policy.allowed_commands"),
+        denied_commands=schema.command_list(
+            policy_raw.get("denied_commands", []), "policy.denied_commands"
+        ),
         network_enabled=schema.boolean(
             policy_raw.get("network_enabled", False), "policy.network_enabled"
         ),

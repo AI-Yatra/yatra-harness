@@ -61,10 +61,37 @@ without LLM Light.
 |---|---|---|
 | `approval_mode` | `mutations` | `never`, `mutations`, or `always` |
 | `allowed_commands` | `[]` | exact command prefixes for `run_command` |
+| `denied_commands` | `[]` | patterns refused wherever they appear |
 | `network_enabled` | `false` | allow `browser_fetch` |
 | `allowed_domains` | `[]` | host allowlist for `browser_fetch` |
 | `command_timeout_seconds` | 30 | per-command cap |
 | `browser_timeout_seconds` | 10 | per-fetch cap |
+
+`allowed_commands` matches a **prefix**: it answers "may a command of this
+shape run at all". `denied_commands` matches a **contiguous subsequence
+anywhere** in the command, and is checked first.
+
+Both are needed, and the asymmetry is the point. The dangerous forms are
+reachable as arguments to a command that is legitimately allowed -- `python`
+has to be on the allowlist for the tests to run, and `python -c "..."` is
+arbitrary code. A prefix-only deny rule is dodged by one inserted flag, and a
+rule that is trivially dodged is worse than none, because it reads like a
+control and is not one.
+
+A denied command is refused before any approver is consulted. A human
+clicking yes on a prompt is exactly the mistake the deny-list exists to
+prevent.
+
+```yaml
+policy:
+  allowed_commands:
+    - [python, -m, unittest]
+    - [git, diff]
+  denied_commands:
+    - [git, push]     # delivery is the harness's job, not the model's
+    - [pip, install]
+    - [curl]
+```
 
 ### mcp
 
