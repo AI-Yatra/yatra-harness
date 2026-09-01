@@ -304,7 +304,7 @@ uv run python -m unittest discover -s tests -v
 uv run ruff check harness tests ay.py
 ```
 
-227 tests cover the runtime, the tool registry, provider adapters, routing,
+247 tests cover the runtime, the tool registry, provider adapters, routing,
 repository workspaces, delivery and the REPL. CI runs them on three Python versions along with `harness doctor` and
 a full deterministic run.
 
