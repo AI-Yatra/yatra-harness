@@ -16,6 +16,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from . import auth
 from .artifacts import ArtifactStore
 from .config import HarnessConfig, MCPServerConfig
 from .contracts import RiskLevel, SkillContract, ToolResult, ToolSpec
@@ -23,6 +24,7 @@ from .errors import MCPError, ToolError, WorkspaceError
 from .mcp import MCPStdioClient
 from .policy import PolicyEngine
 from .process import run_process
+from .search import build_request, parse_results, render
 from .util import truncate
 from .workspace import Workspace
 
@@ -276,6 +278,15 @@ def _register_native(registry: ToolRegistry, config: HarnessConfig, workspace: W
             RiskLevel.NETWORK,
         ),
         lambda args: _browser_fetch(args, config),
+    )
+    registry.register(
+        ToolSpec(
+            "web_search",
+            "Search the public web and return titles, URLs and snippets.",
+            object_schema({"query": {"type": "string"}}, ("query",)),
+            RiskLevel.NETWORK,
+        ),
+        lambda args: _web_search(args, config),
     )
     registry.register(
         ToolSpec(
@@ -754,6 +765,49 @@ def _browser_fetch(arguments: dict[str, Any], config: HarnessConfig) -> tuple[st
         raise ToolError(f"HTTP request failed with status {exc.code}") from exc
     except urllib.error.URLError as exc:
         raise ToolError(f"HTTP request failed: {exc.reason}") from exc
+
+
+def _web_search(arguments: dict[str, Any], config: HarnessConfig) -> tuple[str, dict[str, Any]]:
+    """Run one search through the configured backend.
+
+    The search endpoint is reached under the same SSRF and allowlist rules as
+    browser_fetch, with one addition: the backend's own host is allowlisted
+    implicitly. Requiring an operator to also list `api.search.brave.com` in
+    allowed_domains after configuring it as their search backend would be a
+    trap, not a control -- they have already said where search goes.
+    """
+    settings = config.search
+    key = ""
+    if settings.api_key_env:
+        key = auth.resolve_env(settings.api_key_env).key
+    request = build_request(settings, str(arguments["query"]), key=key)
+    domains = (*config.policy.allowed_domains, settings.host) if settings.host else config.policy.allowed_domains
+    _validate_public_url(request.url, domains)
+    opener = urllib.request.build_opener(_NoRedirect())
+    http_request = urllib.request.Request(
+        request.url,
+        data=request.body.encode("utf-8") if request.body else None,
+        headers={"User-Agent": "yatra-harness/1.0", **request.headers},
+        method=request.method,
+    )
+    try:
+        with opener.open(http_request, timeout=config.policy.browser_timeout_seconds) as response:
+            raw = response.read(config.budgets.max_output_chars * 4)
+            charset = response.headers.get_content_charset() or "utf-8"
+            payload = raw.decode(charset, errors="replace")
+    except urllib.error.HTTPError as exc:
+        # The status is the useful part; the body of a failed search request
+        # can echo the key back and must not reach an observation.
+        raise ToolError(f"search request failed with status {exc.code}") from exc
+    except urllib.error.URLError as exc:
+        raise ToolError(f"search request failed: {exc.reason}") from exc
+    results = parse_results(settings, payload)
+    return render(results), {
+        "backend": settings.kind,
+        "query": " ".join(str(arguments["query"]).split()),
+        "results": len(results),
+        "urls": [result.url for result in results],
+    }
 
 
 def _expanded_mcp_command(command: tuple[str, ...]) -> tuple[str, ...]:

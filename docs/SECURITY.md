@@ -26,7 +26,7 @@ it does not claim to protect against.
 - Execute arbitrary commands: only allowlisted command prefixes pass the
   policy gate, and there is no shell involved.
 - Modify protected paths (e.g. the test suite).
-- Make network requests: `browser_fetch` is disabled unless
+- Make network requests: `browser_fetch` and `web_search` are disabled unless
   `network_enabled: true`, and even then only allowlisted domains are
   reachable, with SSRF guards against private/loopback/link-local addresses.
 - Claim completion: `finish` always triggers the independent verifier.

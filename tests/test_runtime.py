@@ -250,7 +250,8 @@ class RedactionCoverageTests(unittest.TestCase):
     """
 
     NAMES = ("YATRA_HARNESS_AUTH_FILE", "YATRA_HARNESS_ENV_FILE",
-             "DASHSCOPE_API_KEY", "HARNESS_REMOTE_API_KEY", "OPENAI_API_KEY")
+             "DASHSCOPE_API_KEY", "HARNESS_REMOTE_API_KEY", "OPENAI_API_KEY",
+             "BRAVE_API_KEY")
 
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
@@ -279,6 +280,28 @@ class RedactionCoverageTests(unittest.TestCase):
         auth.add(secret)
         config = load_config(ROOT / "configs" / "teaching.yaml")
         self.assertIn(secret, route_secrets(config))
+
+    def test_the_search_backend_key_is_collected_too(self) -> None:
+        # web_search sends a credential the model router knows nothing about.
+        # Collected anywhere but here, it would reach the ledger in the clear.
+        from dataclasses import replace  # noqa: PLC0415
+
+        from harness.runtime import route_secrets  # noqa: PLC0415
+        from harness.search import SearchConfig  # noqa: PLC0415
+
+        secret = "brave-" + "q" * 24
+        os.environ["BRAVE_API_KEY"] = secret
+        config = replace(
+            load_config(ROOT / "configs" / "teaching.yaml"),
+            search=SearchConfig(kind="brave", api_key_env="BRAVE_API_KEY"),
+        )
+        self.assertIn(secret, route_secrets(config))
+
+    def test_a_search_backend_without_a_key_adds_nothing(self) -> None:
+        from harness.runtime import route_secrets  # noqa: PLC0415
+
+        config = load_config(ROOT / "configs" / "teaching.yaml")
+        self.assertNotIn("", route_secrets(config))
 
     def test_an_exported_key_is_still_collected(self) -> None:
         from harness.runtime import route_secrets  # noqa: PLC0415

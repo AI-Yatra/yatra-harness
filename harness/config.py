@@ -20,6 +20,7 @@ from .llm_light import (
     RoutingPolicy,
     validate_priorities,
 )
+from .search import SearchConfig, search_config_from_dict
 
 ENV_PATTERN = re.compile(r"^\$\{([A-Z][A-Z0-9_]*)\}$")
 
@@ -98,6 +99,7 @@ class HarnessConfig:
     # tuple switches the behaviour off entirely.
     context_instruction_files: tuple[str, ...] = ("AGENTS.md", "CLAUDE.md")
     context_max_instruction_chars: int = 4_000
+    search: SearchConfig = field(default_factory=SearchConfig)
     llm_light: LLMLightConfig = field(default_factory=LLMLightConfig)
     fault: str = ""
     selected_model: str = ""
@@ -186,6 +188,7 @@ def load_config(path: str | Path) -> HarnessConfig:
             "policy",
             "mcp",
             "context",
+            "search",
             "llm_light",
             # Written by the runtime so a resumed run routes identically; not
             # part of the operator-facing hand-authored schema.
@@ -353,6 +356,7 @@ def load_config(path: str | Path) -> HarnessConfig:
         context_repo_entries=schema.integer(
             context_raw.get("repo_entries", 120), "context.repo_entries", minimum=10
         ),
+        search=search_config_from_dict(raw.get("search"), "search"),
         context_instruction_files=instruction_files,
         context_max_instruction_chars=schema.integer(
             context_raw.get("max_instruction_chars", 4_000),

@@ -39,7 +39,7 @@ from .workspace import Workspace, WorkspaceManager
 
 
 def route_secrets(config: HarnessConfig) -> list[str]:
-    """Every credential the configured routes could actually send.
+    """Every credential a run could actually send.
 
     Resolution has to match `providers._secret` exactly. When the two
     disagree the run sends a key the redactor never learned about, and it
@@ -47,11 +47,19 @@ def route_secrets(config: HarnessConfig) -> list[str]:
     as by variable name, and both start and resume build the list here
     rather than each writing their own copy.
     """
-    return [
+    secrets = [
         auth.resolve_route(route.api_key_env, route.base_url).key
         for route in config.router.routes.values()
         if route.api_key_env
     ]
+    # The search backend sends a credential the model router knows nothing
+    # about. Collected anywhere but here it would reach the ledger in the
+    # clear, which is the same bug this function was written to close.
+    if config.search.api_key_env:
+        secrets.append(auth.resolve_env(config.search.api_key_env).key)
+    # An unresolved credential is the empty string. The Redactor drops values
+    # under four characters, but returning them invites a caller that does not.
+    return [secret for secret in secrets if secret]
 
 
 class HarnessRuntime:

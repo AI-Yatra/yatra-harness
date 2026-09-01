@@ -106,6 +106,41 @@ mcp:
     enabled: true
 ```
 
+### search
+
+Backs the `web_search` tool. The tool is `RiskLevel.NETWORK`, so it needs
+`network_enabled: true` **and** the skill has to list it; a search backend on
+its own enables nothing.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `kind` | `duckduckgo` | `brave`, `tavily` or `duckduckgo` |
+| `endpoint` | the backend's own | override the URL |
+| `api_key_env` | `""` | variable holding the backend's key |
+| `max_results` | 5 | results returned to the model |
+
+```yaml
+search:
+  kind: brave
+  api_key_env: BRAVE_API_KEY
+policy:
+  network_enabled: true
+```
+
+`brave` and `tavily` need a key; `duckduckgo` parses the HTML endpoint and
+needs none, so search works on a workshop laptop without anyone signing up
+for anything. It is also the backend most likely to break without notice,
+because it depends on a page layout rather than an API.
+
+The key is carried in a header or a request body, never in the URL: a query
+string reaches proxy logs and any redirect target, and redaction cannot
+follow it there. It is also registered with the `Redactor` alongside the
+route credentials, so it is scrubbed from the ledger like any other.
+
+The backend's own host is allowlisted implicitly. Making an operator list
+`api.search.brave.com` in `allowed_domains` after configuring it as their
+search backend would be a trap rather than a control.
+
 ### context
 
 | Key | Default | Meaning |
