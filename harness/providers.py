@@ -19,6 +19,7 @@ from . import auth
 from .config import RouteConfig
 from .contracts import ActionKind, ActionProposal, ModelRequest, ModelResponse
 from .errors import ConfigurationError, PermanentProviderError, TransientProviderError
+from .streaming import StreamAccumulator, iter_sse_data
 
 
 class Provider(Protocol):
@@ -95,18 +96,28 @@ class _HTTPProvider:
     name = "http"
     default_api_key_env = ""
 
+    #: Set by the router when the operator wants to watch a turn arrive.
+    on_delta: Any = None
+
     def complete(self, request: ModelRequest, cursor: int = 0) -> ModelResponse:
         del cursor
         secret = self._secret()
+        streaming = bool(getattr(self.route, "stream", False)) and self.supports_streaming
+        body = self._body(request)
+        if streaming:
+            body = {**body, "stream": True}
         http_request = urllib.request.Request(
             self._endpoint(),
-            data=json.dumps(self._body(request)).encode("utf-8"),
+            data=json.dumps(body).encode("utf-8"),
             headers=self._headers(secret),
             method="POST",
         )
         try:
             with urllib.request.urlopen(http_request, timeout=self.route.timeout_seconds) as response:
-                payload = json.loads(response.read().decode("utf-8"))
+                if streaming:
+                    payload = self._read_stream(response)
+                else:
+                    payload = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             detail = exc.read(2_000).decode("utf-8", errors="replace")
             # 408/429 and 5xx are worth another attempt; 4xx means the request
@@ -121,6 +132,29 @@ class _HTTPProvider:
         if not isinstance(payload, dict):
             raise PermanentProviderError("provider response was not a JSON object")
         return self._normalize(payload, request)
+
+    #: Only the OpenAI-compatible wire format is reassembled here.
+    supports_streaming = False
+
+    def _read_stream(self, response: Any) -> dict[str, Any]:
+        """Fold a server-sent event stream back into a normal completion.
+
+        The result goes to the same `_normalize` a blocking response does, so
+        nothing downstream can tell which transport was used. A malformed
+        chunk is skipped rather than fatal: one bad frame in a long stream
+        should cost a fragment, not the turn.
+        """
+        accumulator = StreamAccumulator(on_delta=self.on_delta)
+        for raw in iter_sse_data(
+            line.decode("utf-8", errors="replace") for line in response
+        ):
+            try:
+                chunk = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(chunk, dict):
+                accumulator.feed(chunk)
+        return accumulator.as_payload()
 
     def _secret(self) -> str:
         """Resolve the credential, tolerating providers that need none.
@@ -234,6 +268,7 @@ def _extract_json_object(text: str) -> dict[str, Any] | None:
 
 class OpenAICompatibleProvider(_HTTPProvider):
     name = "openai_compatible"
+    supports_streaming = True
 
     def __init__(self, route: RouteConfig) -> None:
         if not route.base_url:

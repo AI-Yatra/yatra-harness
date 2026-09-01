@@ -45,9 +45,22 @@ model_router:
       tool_support: true
 ```
 
-Transport keys: `kind`, `model`, `base_url`, `api_key_env`, `script`,
+Transport keys: `kind`, `model`, `base_url`, `api_key_env`, `script`, `stream`,
 `timeout_seconds`. Routing keys: `local`, `latency`, `quality`,
 `context_window`, `cost_per_1m_input`, `cost_per_1m_output`, `tool_support`.
+
+`stream: true` on an `openai_compatible` route shows the turn arriving
+instead of after it finishes. A blocking turn against a remote model shows
+nothing for however long it takes and then everything at once, which reads as
+a hang — and a run that looks hung is a run someone kills, often just before
+it would have succeeded.
+
+Streaming changes the transport and nothing else. The chunks are reassembled
+into exactly the shape a blocking response has, so the normalizer, the
+verifier and every recorded artifact are identical either way. Deltas go to
+stdout and not to the ledger: the whole turn is already recorded once in
+`MODEL_RESPONSE`, and an append-and-fsync per token would make the ledger the
+slowest part of a run.
 
 ### llm_light
 

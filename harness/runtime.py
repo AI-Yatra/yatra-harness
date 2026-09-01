@@ -103,6 +103,8 @@ class HarnessRuntime:
             routes=config.router.routes,
             pinned=config.selected_model,
         )
+        self._streamed = False
+        self.router.on_delta = self._model_delta
         self.verifier = Verifier(config)
         self.policy = PolicyEngine(config.policy, skill.allowed_tools, approval_callback)
         self.subagent_depth = subagent_depth
@@ -129,6 +131,25 @@ class HarnessRuntime:
             persist=lambda: self._checkpoint("fault-injection"),
             event=self._emit,
         )
+
+    def _model_delta(self, text: str) -> None:
+        """Show a streamed turn arriving.
+
+        Straight to stdout and deliberately not to the ledger: this is tens of
+        fragments a second, the whole of it is already recorded once in
+        MODEL_RESPONSE, and an append-and-fsync per token would make the
+        ledger the slowest part of a run.
+        """
+        self._streamed = True
+        sys.stdout.write(text)
+        sys.stdout.flush()
+
+    def _end_stream(self) -> None:
+        """Close the streamed line so the next output starts on its own."""
+        if self._streamed:
+            self._streamed = False
+            sys.stdout.write("\n")
+            sys.stdout.flush()
 
     def _delegate(self, agent: str, objective: str) -> tuple[str, dict[str, Any]]:
         """Run one sub-agent and hand its report back as an observation.
@@ -487,7 +508,9 @@ class HarnessRuntime:
                         before_call=self.faults.before_model,
                     )
             except ProviderExhausted as exc:
+                self._end_stream()
                 return self._terminate(RunStatus.FAILED, str(exc))
+            self._end_stream()
             action = response.action
             self.state.last_action = {
                 "kind": action.kind.value,

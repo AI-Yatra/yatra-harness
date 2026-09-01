@@ -29,6 +29,8 @@ model_router:
       base_url: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
       api_key_env: DASHSCOPE_API_KEY
       timeout_seconds: 120
+      # Show the turn arriving instead of after it finishes.
+      stream: true
       local: false
       cost_per_1m_input: 0.0
       cost_per_1m_output: 0.0

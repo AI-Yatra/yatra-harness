@@ -48,6 +48,10 @@ class RouteConfig:
     script: Path | None = None
     timeout_seconds: float = 45.0
     local: bool = True
+    # Streaming is a transport choice, so it belongs to the route rather than
+    # to the harness: one config can stream from a remote model and not from
+    # a scripted one.
+    stream: bool = False
     # LLM Light decision attributes. Credentials and endpoints are never here.
     cost_per_1m_input: float = 0.0
     cost_per_1m_output: float = 0.0
@@ -245,6 +249,7 @@ def load_config(path: str | Path) -> HarnessConfig:
                 item.get("api_key_env", ""), f"routes.{name}.api_key_env", allow_empty=True
             ),
             script=script,
+            stream=schema.boolean(item.get("stream", False), f"routes.{name}.stream"),
             timeout_seconds=schema.number(
                 item.get("timeout_seconds", 45), f"routes.{name}.timeout_seconds", minimum=0.1
             ),
@@ -391,6 +396,7 @@ ROUTE_BASE_KEYS = {
     "script",
     "timeout_seconds",
     "local",
+    "stream",
 }
 ROUTE_ROUTING_KEYS = {
     "cost_per_1m_input",
