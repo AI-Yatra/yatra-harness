@@ -135,7 +135,12 @@ def docker_command(
     Pure, so every containment rule below is asserted by tests that run
     everywhere rather than only where docker happens to be installed.
     """
-    user = config.user or f"{os.getuid()}:{os.getgid()}" if hasattr(os, "getuid") else config.user
+    if config.user:
+        user = config.user
+    elif hasattr(os, "getuid"):
+        user = f"{os.getuid()}:{os.getgid()}"
+    else:
+        user = ""
     argv = [
         config.docker, "run", "--rm",
         # No network unless the operator asked for one. An allowlist cannot

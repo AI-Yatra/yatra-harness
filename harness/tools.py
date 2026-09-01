@@ -824,6 +824,21 @@ def _browser_fetch(arguments: dict[str, Any], config: HarnessConfig) -> tuple[st
 # tree. The agent patches files as it works, so an index built on turn two is
 # wrong by turn four.
 _INDEX_CACHE: dict[tuple[str, str], tuple[tuple[int, int], Any]] = {}
+# Bounded because the process outlives the run. `harness loop` and
+# `harness goal` create a workspace per feature or per attempt, and an
+# unbounded cache would hold every one of their chunk sets -- with the
+# embedding backend, every one of their vector sets -- until the process
+# exited. A run only ever queries its own workspace, so a handful is plenty.
+_INDEX_CACHE_LIMIT = 4
+
+
+def _remember_index(
+    key: tuple[str, str], signature: tuple[int, int], index: Any
+) -> None:
+    _INDEX_CACHE[key] = (signature, index)
+    while len(_INDEX_CACHE) > _INDEX_CACHE_LIMIT:
+        # Insertion-ordered, so the oldest workspace leaves first.
+        _INDEX_CACHE.pop(next(iter(_INDEX_CACHE)))
 
 
 def _retrieve(
@@ -847,7 +862,7 @@ def _retrieve(
             index = EmbeddingIndex(chunks, lambda texts: _embed(texts, config))
         else:
             index = BM25Index(chunks)
-        _INDEX_CACHE[key] = (signature, index)
+        _remember_index(key, signature, index)
     limit = int(arguments.get("limit") or settings.limit)
     hits = index.search(str(arguments["query"]), limit=max(1, min(limit, 20)))
     return render_hits(hits), {

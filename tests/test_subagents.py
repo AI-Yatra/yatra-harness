@@ -139,6 +139,58 @@ class TaskTests(unittest.TestCase):
         self.assertIn("report", " ".join(self.task()["constraints"]).lower())
 
 
+class ReadOnlyEnforcementTests(unittest.TestCase):
+    """"Read-only" has to be a property of the harness, not of a convention.
+
+    The guarantee was carried entirely by whoever wrote the sub-agent skill.
+    Under `approval_mode: never` -- which the teaching config ships and the
+    delegation demo inherits -- a skill that enabled apply_patch would simply
+    have been allowed to write, and nothing would have said otherwise.
+    """
+
+    def test_a_writing_sub_agent_skill_is_refused_at_load(self) -> None:
+        with self.assertRaises(ConfigurationError) as caught:
+            subagent_config_from_dict(
+                {"agents": {"edit": "skills/repo-edit.yaml"}}, ROOT
+            )
+        self.assertIn("apply_patch", str(caught.exception))
+
+    def test_the_error_says_why(self) -> None:
+        with self.assertRaises(ConfigurationError) as caught:
+            subagent_config_from_dict({"agents": {"edit": "skills/repo-edit.yaml"}}, ROOT)
+        self.assertIn("read-only", str(caught.exception).lower())
+
+    def test_the_shipped_read_only_skills_are_accepted(self) -> None:
+        config = subagent_config_from_dict(
+            {"agents": {"explore": "skills/explore.yaml", "review": "skills/review.yaml"}},
+            ROOT,
+        )
+        self.assertEqual(sorted(config.agents), ["explore", "review"])
+
+    def test_a_sub_agent_may_not_reach_the_network(self) -> None:
+        skill = ROOT / "skills" / "net-subagent.yaml"
+        skill.write_text(
+            "version: 1\nid: net\ninstructions: fetch things\n"
+            "allowed_tools:\n  - read_file\n  - browser_fetch\n  - finish\n",
+            encoding="utf-8",
+        )
+        self.addCleanup(skill.unlink, True)
+        with self.assertRaises(ConfigurationError) as caught:
+            subagent_config_from_dict({"agents": {"net": "skills/net-subagent.yaml"}}, ROOT)
+        self.assertIn("browser_fetch", str(caught.exception))
+
+    def test_a_sub_agent_may_not_delegate_onward_by_skill_either(self) -> None:
+        skill = ROOT / "skills" / "deep-subagent.yaml"
+        skill.write_text(
+            "version: 1\nid: deep\ninstructions: delegate more\n"
+            "allowed_tools:\n  - read_file\n  - delegate\n  - finish\n",
+            encoding="utf-8",
+        )
+        self.addCleanup(skill.unlink, True)
+        with self.assertRaises(ConfigurationError):
+            subagent_config_from_dict({"agents": {"deep": "skills/deep-subagent.yaml"}}, ROOT)
+
+
 class ShippedSkillTests(unittest.TestCase):
     def test_the_explore_skill_cannot_write(self) -> None:
         # A read-only sub-agent is only read-only if its skill says so.

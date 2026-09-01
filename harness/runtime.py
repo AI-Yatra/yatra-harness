@@ -21,6 +21,7 @@ from .contracts import (
     SCHEMA_VERSION,
     ActionKind,
     ModelRequest,
+    RiskLevel,
     RunResult,
     RunState,
     RunStatus,
@@ -40,6 +41,31 @@ from .tracing import SpanRecorder, new_trace_id, parse_trace_context
 from .util import atomic_write_text, content_hash, safe_slug, truncate, utc_now
 from .verifier import Verifier
 from .workspace import Workspace, WorkspaceManager
+
+
+def subagent_approval() -> ApprovalCallback:
+    """The approver a delegated sub-agent runs under.
+
+    Giving a sub-agent no approver at all was the obvious choice and the wrong
+    one. It is true that a read-only agent needs no authorisation to read, and
+    false that it needs none to execute: under `approval_mode: mutations` --
+    which every remote config ships -- run_command is approval-gated, so a
+    reviewing sub-agent was silently refused the test run its own skill had
+    just told it to perform.
+
+    So reading and executing are approved and writing and network are not.
+    The invariant being protected is that a sub-agent cannot change anything
+    or reach outside the machine; it was never that a sub-agent cannot run the
+    repository's own checks inside a throwaway copy. The command allowlist and
+    the deny-list still apply, because those are decided before an approver is
+    ever consulted.
+    """
+
+    def decide(tool: Any, arguments: dict[str, Any], reason: str) -> bool:
+        del arguments, reason
+        return tool.risk in {RiskLevel.READ, RiskLevel.EXECUTE, RiskLevel.CONTROL}
+
+    return decide
 
 
 def route_secrets(config: HarnessConfig) -> list[str]:
@@ -189,10 +215,11 @@ class HarnessRuntime:
             max_turns=self.config.subagents.max_turns,
             max_seconds=self.config.subagents.max_seconds,
             subagent_depth=self.subagent_depth + 1,
-            # A sub-agent inherits no approver. It cannot write, so nothing it
-            # does needs authorising, and an inherited one would let a nested
-            # run consume the operator's yes for something they never saw.
-            approval_callback=None,
+            # Not the parent's approver: an inherited one would let a nested
+            # run spend the operator's yes on something they never saw. This
+            # one permits reading and running and refuses writing and network,
+            # which is the guarantee a sub-agent actually makes.
+            approval_callback=subagent_approval(),
         )
         report = self._subagent_report(result)
         self._emit(

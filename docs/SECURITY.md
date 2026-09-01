@@ -62,6 +62,19 @@ it does not claim to protect against.
   it must stay byte-exact to remain appliable. Treat a run directory as
   sensitive: share `summary.md`, not the whole bundle.
 
+## Sub-agents
+
+A delegated sub-agent is read-only, and the harness enforces it in two
+places rather than trusting the skill author. A sub-agent skill enabling a
+writing, executing-outside-the-allowlist or network tool is refused at config
+load; and at run time a sub-agent runs under an approver that permits reading
+and allowlisted commands and refuses writing and network. It works from a
+copy of the parent workspace whose git remotes have been stripped, so it can
+neither change the parent's tree nor publish from its own.
+
+It inherits nothing from the operator's approval decisions. A nested run must
+not be able to spend a yes given for something the operator never saw.
+
 ## Known limitations (stated honestly)
 
 - **No kernel sandbox by default.** With `sandbox.kind: local`, a malicious

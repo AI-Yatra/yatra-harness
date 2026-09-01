@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from .backlog import Feature, load_backlog, mark_feature, next_unfinished
+from .errors import HarnessError
 from .goal import GoalRequest
 from .util import atomic_write_json, utc_now
 
@@ -98,7 +99,14 @@ def run_loop(request: LoopRequest, *, pursue: Pursuer) -> LoopResult:
         if len(outcomes) >= request.max_features:
             reason = f"feature budget of {request.max_features} reached"
             break
-        features = load_backlog(request.backlog)
+        try:
+            features = load_backlog(request.backlog)
+        except HarnessError as exc:
+            # The backlog is the loop's only durable state. Losing it stops
+            # the loop, but the record of what was already finished has been
+            # earned and must still be written.
+            reason = f"stopped: the backlog could not be read: {exc}"
+            break
         feature = next_unfinished(features, skip=failed)
         if feature is None:
             remaining = [item for item in features if not item.passes]
@@ -120,9 +128,16 @@ def run_loop(request: LoopRequest, *, pursue: Pursuer) -> LoopResult:
             reason = f"stopped after an error on {feature.feature_id}: {type(exc).__name__}: {exc}"
             break
         evidence = f"{result.last_run_id}: {result.reason}".strip(": ")
-        mark_feature(
-            request.backlog, feature.feature_id, passes=result.achieved, evidence=evidence
-        )
+        try:
+            mark_feature(
+                request.backlog, feature.feature_id, passes=result.achieved, evidence=evidence
+            )
+        except HarnessError as exc:
+            reason = f"stopped: the backlog could not be updated: {exc}"
+            outcomes.append(
+                FeatureOutcome(feature.feature_id, result.achieved, result.reason, result.last_run_id)
+            )
+            break
         outcomes.append(
             FeatureOutcome(
                 feature_id=feature.feature_id,

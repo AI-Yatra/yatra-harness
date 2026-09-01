@@ -423,7 +423,7 @@ Goal mode still needs you to say what the goal is. `harness loop` reads the
 goals from a file.
 
 ```
-uv run harness loop feature_list.json --repo . --skill skills/repo-edit.yaml
+uv run harness loop examples/feature_list.json --seed fixtures/buggy_counter --config configs/teaching.yaml --skill skills/bugfix.yaml
 ```
 
 ```
@@ -445,6 +445,10 @@ forgets its failures sends the loop round the same wall until the budget runs
 out. A failed feature is skipped rather than retried immediately: goal mode
 already retried it, and going straight round again would let one hard feature
 eat the whole run while the rest of the backlog stayed untouched.
+
+Running that example **edits the file**: the feature is marked passing with
+the run id that earned it. That is the point of a backlog, and it also means
+`git checkout examples/feature_list.json` is how you run it twice.
 
 Three endings, each named: the backlog is finished, the feature budget is
 spent, or everything left has already failed. A loop that cannot say why it

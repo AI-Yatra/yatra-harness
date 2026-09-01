@@ -19,7 +19,7 @@ from .config import load_config, load_skill, load_task
 from .contracts import RunStatus
 from .delivery import DeliveryRequest, deliver
 from .doctor import run_doctor
-from .errors import HarnessError, InjectedCrash
+from .errors import HarnessError, InjectedCrash, WorkspaceError
 from .evals import load_suite, run_suite
 from .events import EventLog
 from .goal import GoalRequest, pursue
@@ -36,6 +36,24 @@ from .util import atomic_write_json, atomic_write_text
 from .workspace import Workspace
 
 ROUTE_PRIORITY_KEYS = ("privacy", "quality", "cost", "latency", "context")
+
+
+def run_directory(runs_dir: Path, run_id: str) -> Path:
+    """Resolve a run bundle, refusing a run id that leaves the runs directory.
+
+    `resume` and the workspace manager both guard this and the commands added
+    later did not. It matters most for `deliver`, which pushes: a run id that
+    resolved somewhere else would publish from a directory nobody chose.
+    """
+    root = Path(runs_dir).expanduser().resolve()
+    candidate = (root / run_id).resolve()
+    if not run_id or candidate == root:
+        raise WorkspaceError("a run id is required")
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise WorkspaceError(f"run id resolves outside the runs directory: {run_id!r}") from exc
+    return candidate
 
 
 def _add_routing_arguments(command: Any) -> None:
@@ -220,8 +238,6 @@ def parser() -> argparse.ArgumentParser:
     evals.add_argument("--report-dir", type=Path, default=Path(".evals"))
     evals.add_argument("--min-pass-rate", type=float, default=None,
                        help="override the suite's own threshold")
-    evals.add_argument("--yes", action="store_true", default=True,
-                       help=argparse.SUPPRESS)
 
     listing = commands.add_parser("list-runs", help="list durable run checkpoints")
     listing.add_argument("--runs-dir", type=Path, default=Path(".runs"))
@@ -295,7 +311,7 @@ def main(argv: list[str] | None = None) -> int:
         if arguments.command == "goal":
             return _goal(arguments)
         if arguments.command == "deliver":
-            run_dir = arguments.runs_dir.expanduser().resolve() / arguments.run_id
+            run_dir = run_directory(arguments.runs_dir, arguments.run_id)
             return _deliver(
                 run_dir, mode=arguments.mode, base=arguments.base, yes=arguments.deliver_yes
             )
@@ -674,7 +690,7 @@ def _review(arguments: Any) -> int:
     work. Both facts are the point: an author reviewing its own change is the
     failure the whole rubric exists to catch.
     """
-    run_dir = arguments.runs_dir.expanduser().resolve() / arguments.run_id
+    run_dir = run_directory(arguments.runs_dir, arguments.run_id)
     state = StateStore(run_dir / "state.json").load()
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     config_path = arguments.config or (run_dir / manifest["inputs"]["config"])
@@ -927,7 +943,7 @@ def _print_result(result: Any) -> int:
 
 
 def _inspect(arguments: Any) -> int:
-    run_dir = arguments.runs_dir.expanduser().resolve() / arguments.run_id
+    run_dir = run_directory(arguments.runs_dir, arguments.run_id)
     state = StateStore(run_dir / "state.json").load()
     events = list(EventLog(run_dir / "events.jsonl", arguments.run_id).read())
     print(
@@ -951,7 +967,7 @@ def _inspect(arguments: Any) -> int:
 
 
 def _replay(arguments: Any) -> int:
-    summary = replay_run(arguments.runs_dir.expanduser().resolve() / arguments.run_id)
+    summary = replay_run(run_directory(arguments.runs_dir, arguments.run_id))
     print(json.dumps({
         "run_id": summary.run_id,
         "events": summary.events,

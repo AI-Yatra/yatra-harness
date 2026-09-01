@@ -32,6 +32,18 @@ import yaml
 from .errors import ConfigurationError, ToolError
 from .util import atomic_write_text, safe_slug
 
+# Tools a sub-agent may never enable, whatever its skill says. The read-only
+# guarantee was carried entirely by whoever wrote the skill, and under
+# `approval_mode: never` -- which the teaching config ships -- a skill that
+# enabled apply_patch would simply have been allowed to write. A guarantee
+# the harness documents has to be one the harness enforces.
+FORBIDDEN_TOOLS = {
+    "apply_patch",   # writes
+    "python_run",    # executes workspace code outside the command allowlist
+    "browser_fetch",  # reaches the network
+    "web_search",
+    "delegate",      # onward delegation, which the depth cap already refuses
+}
 DEFAULT_MAX_DEPTH = 1
 DEFAULT_MAX_CALLS = 3
 
@@ -127,6 +139,23 @@ def subagent_task(
     return path
 
 
+def _reject_writing_skill(skill_path: Path, where: str) -> None:
+    """Refuse a sub-agent skill that can change anything or leave the machine.
+
+    Checked at load so it fails at `harness doctor`, before a delegation is
+    reached mid-run with a workspace and a run id already in existence.
+    """
+    from .config import load_skill  # noqa: PLC0415 - avoids a cycle at import time
+
+    enabled = set(load_skill(skill_path).allowed_tools)
+    forbidden = sorted(enabled & FORBIDDEN_TOOLS)
+    if forbidden:
+        raise ConfigurationError(
+            f"{where} enables {', '.join(forbidden)}: a sub-agent is read-only, "
+            "and its report is what the parent acts on"
+        )
+
+
 def _resolved_file(value: str, base: Path, where: str) -> Path:
     resolved = Path(value).expanduser()
     if not resolved.is_absolute():
@@ -162,8 +191,10 @@ def subagent_config_from_dict(
             config_value = (
                 schema.string(mapping["config"], f"{where}.config") if mapping.get("config") else ""
             )
+        skill_path = _resolved_file(skill_value, base, f"{where}.skill")
+        _reject_writing_skill(skill_path, f"{where}.skill")
         agents[str(name)] = Subagent(
-            skill=_resolved_file(skill_value, base, f"{where}.skill"),
+            skill=skill_path,
             config=_resolved_file(config_value, base, f"{where}.config") if config_value else None,
         )
     return SubagentConfig(

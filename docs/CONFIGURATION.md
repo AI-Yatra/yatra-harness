@@ -305,7 +305,8 @@ to run the harness, and a teaching tool that refuses to start teaches nothing.
 
 ## Backlog file
 
-`feature_list.json` is a JSON list. `harness loop` works it top to bottom, so
+`feature_list.json` is a JSON list; `examples/feature_list.json` is a runnable
+one. `harness loop` works it top to bottom, so
 file order is the priority order — the person who owns the backlog decides
 what comes next, not the loop.
 
@@ -343,7 +344,16 @@ subagents:
       config: configs/reviewer.yaml   # optional: its own model
 ```
 
-A sub-agent is **read-only**. Its deliverable is a report, not an edit, and a
+A sub-agent is **read-only**, and that is enforced rather than assumed: a
+sub-agent skill enabling `apply_patch`, `python_run`, `browser_fetch`,
+`web_search` or `delegate` is refused at config load. The guarantee used to
+rest entirely on whoever wrote the skill, and under `approval_mode: never` a
+skill that enabled `apply_patch` would simply have been allowed to write.
+
+A delegated sub-agent runs under its own approver, which permits reading and
+running and refuses writing and network. Giving it none at all -- the first
+attempt -- meant that under `approval_mode: mutations`, the shipped reviewer
+was silently refused the test run its own skill had just told it to make. Its deliverable is a report, not an edit, and a
 report needs no verifier because it changes nothing — so the completion gate
 stays exactly where it was: one agent makes changes, one verifier decides
 whether they worked. It works from a *copy* of the parent's workspace, so a
