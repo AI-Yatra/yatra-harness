@@ -40,9 +40,9 @@ class ContextEngine:
         repo_map, repo_entries = self._repo_map(workspace)
         recent_count = self.config.context_recent_observations
         old = state.observations[:-recent_count] if len(state.observations) > recent_count else []
-        recent = state.observations[-recent_count:]
+        recent = list(state.observations[-recent_count:])
         compacted = [self._compact_observation(item) for item in old]
-        dynamic = {
+        essential = {
             "task": {
                 "id": task.task_id,
                 "objective": task.objective,
@@ -57,18 +57,12 @@ class ContextEngine:
                 "remaining_turns": self.config.budgets.max_turns - state.turn,
                 "remaining_tool_calls": self.config.budgets.max_tool_calls - state.tool_calls,
             },
-            "repository_map": repo_map,
-            "compacted_history": compacted,
-            "recent_observations": recent,
         }
-        user = json.dumps(dynamic, indent=2, sort_keys=True, ensure_ascii=False)
         tools_size = len(json.dumps([tool.as_model_tool() for tool in tools], ensure_ascii=False))
         available = self.config.budgets.max_context_chars - len(system) - tools_size
         if available < 1_000:
             raise ConfigurationError("context budget is too small for frozen instructions and tool schemas")
-        bounded_user, user_truncated = truncate(user, available)
-        if user_truncated:
-            compacted = [*compacted, {"notice": "dynamic context tail was bounded by max_context_chars"}]
+        bounded_user, dropped = self._fit(essential, repo_map, compacted, recent, available)
         messages = (
             {"role": "system", "content": system},
             {"role": "user", "content": bounded_user},
@@ -82,11 +76,84 @@ class ContextEngine:
                 max_output_chars=self.config.budgets.max_output_chars,
             ),
             character_count=len(system) + len(bounded_user) + tools_size,
-            compacted_observations=len(old) + (1 if user_truncated else 0),
+            compacted_observations=len(old) + dropped,
             repo_entries=repo_entries,
             instruction_sources=instructions.sources,
             instructions_truncated=instructions.truncated,
         )
+
+    @staticmethod
+    def _fit(
+        essential: dict,
+        repo_map: list[str],
+        compacted: list[dict],
+        recent: list[dict],
+        available: int,
+    ) -> tuple[str, int]:
+        """Serialize the dynamic context so it fits, dropping the cheapest parts first.
+
+        This used to be one JSON document truncated from the end, with sorted
+        keys -- which put `task` last and made the objective the first thing a
+        full context lost. A model that cannot see what it was asked to do
+        invents something, so the run's own contract is now built first and
+        never dropped; only the elastic parts give way, in order of how
+        replaceable they are, and the result stays parseable JSON rather than
+        a string cut through the middle of a token.
+        """
+        def render(
+            entries: list[str], history: list[dict], observations: list[dict], notes: list[str]
+        ) -> str:
+            payload = {
+                **essential,
+                "repository_map": entries,
+                "compacted_history": history,
+                "recent_observations": observations,
+            }
+            if notes:
+                payload["context_notes"] = notes
+            return json.dumps(payload, indent=2, ensure_ascii=False)
+
+        entries, history, observations, notes = list(repo_map), list(compacted), list(recent), []
+        dropped = 0
+        candidate = render(entries, history, observations, notes)
+        if len(candidate) <= available:
+            return candidate, 0
+
+        # 1. The repository map is the most replaceable: the model can rebuild
+        #    it with repo_tree whenever it needs it.
+        while entries and len(candidate) > available:
+            entries = entries[: len(entries) // 2]
+            notes = [f"repository_map was reduced to {len(entries)} entries; use repo_tree"]
+            candidate = render(entries, history, observations, notes)
+        # 2. Then the already-summarized older history.
+        while history and len(candidate) > available:
+            history.pop(0)
+            dropped += 1
+            notes = [*notes[:1], f"{dropped} older observation(s) were dropped"]
+            candidate = render(entries, history, observations, notes)
+        # 3. Then the oldest full observations, newest kept last.
+        while len(observations) > 1 and len(candidate) > available:
+            observations.pop(0)
+            dropped += 1
+            notes = [*notes[:1], f"{dropped} older observation(s) were dropped"]
+            candidate = render(entries, history, observations, notes)
+        # 4. A single observation larger than the whole budget is shortened
+        #    rather than removed: the model still has to know the call happened.
+        if observations and len(candidate) > available:
+            headroom = available - len(render(entries, history, [], notes))
+            shrunk = dict(observations[-1])
+            shortened, _ = truncate(str(shrunk.get("content", "")), max(headroom - 400, 200))
+            shrunk["content"] = shortened
+            observations = [shrunk]
+            notes = [*notes[:1], "the last observation was shortened to fit the context budget"]
+            candidate = render(entries, history, observations, notes)
+        if len(candidate) > available:
+            # Nothing elastic is left. Truncating here would produce invalid
+            # JSON, so the observations go entirely and the contract stays.
+            notes = ["all observations were dropped to fit the context budget"]
+            candidate = render([], [], [], notes)
+            dropped += len(observations)
+        return candidate, dropped
 
     def _repository_instructions(self, workspace: Workspace) -> RepositoryInstructions:
         """The repository's own conventions, hard-capped against the budget.
