@@ -332,6 +332,25 @@ uninterrupted run, so nothing is executed twice.
 prints a SHA-256 of the ledger. Edit one event and the hash changes. Delete one
 and the sequence check names the gap.
 
+## Sub-agents
+
+The agent can ask a second agent a question instead of reading its way to the
+answer.
+
+```
+uv run harness run tasks/repair_counter.yaml --config configs/delegation.yaml --skill skills/bugfix-delegating.yaml
+```
+
+That run delegates "where is the clamp lower bound handled?", gets a report
+back, and applies the repair the sub-agent pointed at. Both sides are replay
+scripts, so it needs no key.
+
+A sub-agent is read-only and works from a copy of the workspace: its
+deliverable is findings, not an edit. It gets its own run bundle, so it is as
+inspectable as its parent, and it can be given its own config — a reviewer
+running the same model as the writer shares its blind spots. See
+[Configuration](docs/CONFIGURATION.md).
+
 ## Providers
 
 | kind | adapter | wire |

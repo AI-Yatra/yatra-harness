@@ -34,6 +34,7 @@ from .model_router import ModelRouter, build_llm_light
 from .policy import ApprovalCallback, PolicyEngine
 from .redaction import Redactor
 from .state import StateStore
+from .subagents import check_delegation_allowed, subagent_task
 from .tools import ToolRegistry, build_registry
 from .util import atomic_write_text, content_hash, safe_slug, truncate, utc_now
 from .verifier import Verifier
@@ -77,6 +78,7 @@ class HarnessRuntime:
         events: EventLog,
         state_store: StateStore,
         approval_callback: ApprovalCallback | None = None,
+        subagent_depth: int = 0,
         sleeper: Any = time.sleep,
     ) -> None:
         self.config = config
@@ -101,6 +103,8 @@ class HarnessRuntime:
         )
         self.verifier = Verifier(config)
         self.policy = PolicyEngine(config.policy, skill.allowed_tools, approval_callback)
+        self.subagent_depth = subagent_depth
+        self.subagent_calls = 0
         self.registry: ToolRegistry = build_registry(
             config,
             skill,
@@ -108,12 +112,82 @@ class HarnessRuntime:
             artifacts,
             self.policy,
             event_callback=self._emit,
+            dispatcher=self._delegate,
         )
         self.faults = FaultInjector(
             config.fault,
             state,
             persist=lambda: self._checkpoint("fault-injection"),
             event=self._emit,
+        )
+
+    def _delegate(self, agent: str, objective: str) -> tuple[str, dict[str, Any]]:
+        """Run one sub-agent and hand its report back as an observation.
+
+        The sub-run goes through `HarnessRuntime.start` like any other, so it
+        gets its own bundle, ledger and checkpoints. A sub-agent that
+        misbehaves is then exactly as inspectable and replayable as the parent
+        -- which is the reason for reusing this machinery rather than writing
+        a second, quieter path for delegated work.
+        """
+        subagent = check_delegation_allowed(
+            self.config.subagents, agent, depth=self.subagent_depth, calls=self.subagent_calls
+        )
+        self.subagent_calls += 1
+        index = self.subagent_calls
+        task_path = subagent_task(
+            self.artifacts.run_dir / "subagents",
+            agent,
+            objective,
+            self.workspace.root,
+            index=index,
+        )
+        self._emit(
+            "SUBAGENT_STARTED",
+            {"agent": agent, "objective": objective, "index": index, "depth": self.subagent_depth},
+        )
+        result = HarnessRuntime.start(
+            # A sub-agent may run on its own config, and therefore its own
+            # model. A reviewer sharing the writer's model shares its blind
+            # spots, which is the failure the second opinion exists to catch.
+            config_path=subagent.config or self.config.config_path,
+            task_path=task_path,
+            skill_path=subagent.skill,
+            max_turns=self.config.subagents.max_turns,
+            max_seconds=self.config.subagents.max_seconds,
+            subagent_depth=self.subagent_depth + 1,
+            # A sub-agent inherits no approver. It cannot write, so nothing it
+            # does needs authorising, and an inherited one would let a nested
+            # run consume the operator's yes for something they never saw.
+            approval_callback=None,
+        )
+        report = self._subagent_report(result)
+        self._emit(
+            "SUBAGENT_FINISHED",
+            {"agent": agent, "index": index, "run_id": result.run_id, "status": result.status.value},
+        )
+        return report, {
+            "agent": agent,
+            "run_id": result.run_id,
+            "status": result.status.value,
+            "run_dir": str(result.run_dir),
+        }
+
+    @staticmethod
+    def _subagent_report(result: RunResult) -> str:
+        """The sub-agent's findings, or an honest account of why there are none."""
+        try:
+            state = json.loads((result.run_dir / "state.json").read_text(encoding="utf-8"))
+            summary = str(state.get("finish_summary") or "").strip()
+        except (OSError, json.JSONDecodeError, ValueError):
+            summary = ""
+        if result.status is RunStatus.COMPLETED and summary:
+            return summary
+        if summary:
+            return f"[sub-agent ended {result.status.value}] {summary}"
+        return (
+            f"[sub-agent ended {result.status.value} with no report] "
+            f"{result.terminal_reason}"
         )
 
     def _summarizer(self) -> Any:
@@ -163,6 +237,7 @@ class HarnessRuntime:
         require_local: bool = False,
         max_cost_per_1m: float | None = None,
         session_id: str = "",
+        subagent_depth: int = 0,
         approval_callback: ApprovalCallback | None = None,
         sleeper: Any = time.sleep,
     ) -> RunResult:
@@ -256,6 +331,7 @@ class HarnessRuntime:
                 events=events,
                 state_store=state_store,
                 approval_callback=approval_callback,
+                subagent_depth=subagent_depth,
                 sleeper=sleeper,
             )
         except Exception as exc:

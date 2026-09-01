@@ -207,6 +207,44 @@ tell a recorded observation from a paraphrase of several.
 
 `CONTEXT_COMPACTED` records which strategy ran.
 
+## Sub-agents
+
+Delegation is off unless `subagents.agents` names at least one agent. When it
+is on, a `delegate` tool appears in the registry and a skill can enable it.
+
+```yaml
+subagents:
+  max_depth: 1        # a sub-agent may not delegate further
+  max_calls: 3        # per parent run
+  max_turns: 6        # each sub-agent's own turn budget
+  agents:
+    explore: skills/explore.yaml
+    review:
+      skill: skills/review.yaml
+      config: configs/reviewer.yaml   # optional: its own model
+```
+
+A sub-agent is **read-only**. Its deliverable is a report, not an edit, and a
+report needs no verifier because it changes nothing — so the completion gate
+stays exactly where it was: one agent makes changes, one verifier decides
+whether they worked. It works from a *copy* of the parent's workspace, so a
+reviewer that runs the test suite cannot leave artifacts the parent is then
+judged on.
+
+Giving a sub-agent its own `config` is the point rather than a convenience.
+The argument the verifier embodies — the author of a piece of work is the
+worst judge of it — applies again one level down: a reviewer running the same
+model as the writer shares its blind spots.
+
+Every delegation is a full run with its own bundle, ledger and checkpoints,
+so a sub-agent that misbehaves is as inspectable as its parent.
+`SUBAGENT_STARTED` and `SUBAGENT_FINISHED` appear in the parent's ledger.
+
+The depth cap is the guard that matters: without it a delegating agent can
+spawn a delegating agent and the per-run budget stops bounding anything. A
+sub-agent also inherits no approver, so a nested run cannot spend an
+operator's yes on something they never saw.
+
 ### Environment overrides
 
 - `HARNESS_RUNS_DIR` overrides `runs_dir` (used by tests and CI).

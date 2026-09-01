@@ -154,6 +154,30 @@ def validate_json_schema(value: Any, spec: dict[str, Any], path: str) -> None:
         raise ToolError(f"{path} must be one of {spec['enum']!r}")
 
 
+def _register_delegate(
+    registry: ToolRegistry,
+    config: HarnessConfig,
+    workspace: Workspace,
+    dispatcher: Any,
+) -> None:
+    agents = ", ".join(sorted(config.subagents.agents))
+    registry.register(
+        ToolSpec(
+            "delegate",
+            "Ask a read-only sub-agent a question about this workspace and get "
+            f"its report back. Available agents: {agents}.",
+            _object_schema(
+                {"agent": {"type": "string"}, "objective": {"type": "string"}},
+                ("agent", "objective"),
+            ),
+            # CONTROL rather than EXECUTE: delegation spends budget and starts
+            # another run, but it cannot itself change the workspace.
+            RiskLevel.CONTROL,
+        ),
+        lambda args: dispatcher(str(args["agent"]), str(args["objective"])),
+    )
+
+
 def build_registry(
     config: HarnessConfig,
     skill: SkillContract,
@@ -161,6 +185,7 @@ def build_registry(
     artifacts: ArtifactStore,
     policy: PolicyEngine,
     event_callback: EventCallback | None = None,
+    dispatcher: Any = None,
 ) -> ToolRegistry:
     registry = ToolRegistry(
         policy,
@@ -169,6 +194,8 @@ def build_registry(
         event_callback=event_callback,
     )
     _register_native(registry, config, workspace)
+    if config.subagents.enabled and dispatcher is not None:
+        _register_delegate(registry, config, workspace, dispatcher)
     for server in config.mcp_servers:
         if server.enabled:
             _register_mcp(registry, server, workspace)
