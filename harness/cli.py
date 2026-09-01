@@ -14,6 +14,7 @@ from . import __version__, auth
 from .artifacts import ArtifactStore
 from .config import load_config, load_skill, load_task
 from .contracts import RunStatus
+from .delivery import DeliveryRequest, deliver
 from .doctor import run_doctor
 from .errors import HarnessError, InjectedCrash
 from .events import EventLog
@@ -98,6 +99,7 @@ def parser() -> argparse.ArgumentParser:
         choices=("prompt", "auto", "never"),
         help="override policy.approval_mode (workshop compatibility)",
     )
+    _add_delivery_arguments(run)
     _add_routing_arguments(run)
 
     routes = commands.add_parser("routes", help="show the LLM Light route plan without running")
@@ -132,6 +134,20 @@ def parser() -> argparse.ArgumentParser:
     remove_cmd = auth_sub.add_parser("remove", help="delete a stored key")
     remove_cmd.add_argument("provider")
     auth_sub.add_parser("providers", help="list known providers")
+
+    deliver_cmd = commands.add_parser(
+        "deliver", help="commit, push and open a pull request for a completed run"
+    )
+    deliver_cmd.add_argument("run_id")
+    deliver_cmd.add_argument("--runs-dir", type=Path, default=Path(".runs"))
+    deliver_cmd.add_argument(
+        "--mode", choices=("commit", "branch", "pr"), default="pr",
+        help="how far to go: local commit, pushed branch, or pull request",
+    )
+    deliver_cmd.add_argument("--base", default="", help="pull request target branch")
+    deliver_cmd.add_argument(
+        "--yes", action="store_true", help="approve the push and the pull request non-interactively"
+    )
 
     listing = commands.add_parser("list-runs", help="list durable run checkpoints")
     listing.add_argument("--runs-dir", type=Path, default=Path(".runs"))
@@ -176,7 +192,15 @@ def main(argv: list[str] | None = None) -> int:
                 max_cost_per_1m=arguments.max_cost,
                 approval_callback=approval,
             )
-            return _print_result(result)
+            code = _print_result(result)
+            if arguments.deliver != "none" and code == 0:
+                code = _deliver(
+                    result.run_dir,
+                    mode=arguments.deliver,
+                    base=arguments.base,
+                    yes=arguments.yes,
+                )
+            return code
         if arguments.command == "resume":
             result = HarnessRuntime.resume(
                 arguments.run_id,
@@ -188,6 +212,11 @@ def main(argv: list[str] | None = None) -> int:
             return _inspect(arguments)
         if arguments.command == "replay":
             return _replay(arguments)
+        if arguments.command == "deliver":
+            run_dir = arguments.runs_dir.expanduser().resolve() / arguments.run_id
+            return _deliver(
+                run_dir, mode=arguments.mode, base=arguments.base, yes=arguments.yes
+            )
         if arguments.command == "list-runs":
             return _list_runs(arguments)
     except InjectedCrash as exc:
@@ -490,6 +519,70 @@ def _auth(arguments: Any) -> int:
         return 0
     print("usage: harness auth {add,status,verify,remove,providers}", file=sys.stderr)
     return 2
+
+
+def _add_delivery_arguments(command: Any) -> None:
+    group = command.add_argument_group("delivery")
+    group.add_argument(
+        "--deliver",
+        choices=("none", "commit", "branch", "pr"),
+        default="none",
+        help="what to do with a run that passes verification (default: nothing)",
+    )
+    group.add_argument("--base", default="", help="pull request target branch")
+
+
+def _deliver(run_dir: Path, *, mode: str, base: str, yes: bool) -> int:
+    """Deliver a finished run from its bundle.
+
+    The bundle is the only input, so `harness run --deliver` and
+    `harness deliver <run-id>` cannot drift apart: both read the run's own
+    frozen task and durable state rather than whatever the caller has to hand.
+    """
+    state = StateStore(run_dir / "state.json").load()
+    manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    task = load_task(run_dir / manifest["inputs"]["task"])
+    request = DeliveryRequest(
+        mode=mode,
+        run_id=state.run_id,
+        run_dir=run_dir,
+        workspace=Path(state.workspace),
+        objective=task.objective,
+        status=state.status,
+        summary=state.finish_summary,
+        base=base,
+    )
+    result = deliver(request, approve=_delivery_approval(yes))
+    print(f"delivered: {result.mode}")
+    print(f"branch: {result.branch}")
+    print(f"commit: {result.commit}")
+    if result.pushed:
+        print(f"pushed: {result.branch} -> origin")
+    if result.pull_request_url:
+        print(f"pull request: {result.pull_request_url}")
+    return 0
+
+
+def _delivery_approval(yes: bool):
+    """Confirm an outward-facing delivery step.
+
+    Deliberately separate from the policy approver: that one authorises what
+    the model asked to do inside the workspace, this one authorises what the
+    operator is about to publish. Without a terminal and without --yes the
+    answer is no, so an unattended run never pushes by accident.
+    """
+    def decide(description: str) -> bool:
+        if yes:
+            return True
+        if not sys.stdin.isatty():
+            return False
+        try:
+            answer = input(f"{description}? [y/N] ").strip().lower()
+        except EOFError:
+            return False
+        return answer in {"y", "yes"}
+
+    return decide
 
 
 def _print_result(result: Any) -> int:

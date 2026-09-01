@@ -11,6 +11,7 @@ Commands:
   /resume <run_id>        resume a non-terminal run from its checkpoint
   /config                 show the active config path + model
   /model <name>           switch the configured model (qwen-plus, qwen-max, ...)
+  /pr [run_id]            open a pull request for a completed run (--repo only)
   /help                   this help
   /exit, /quit            leave
 
@@ -49,6 +50,7 @@ Commands:
   /resume <run_id>        resume a non-terminal run from its checkpoint
   /config                 show the active config path + model
   /model <name>           switch the configured model (qwen-plus, qwen-max, ...)
+  /pr [run_id]            open a pull request for a completed run (--repo only)
   /help                   this help
   /exit, /quit            leave
 """
@@ -96,6 +98,10 @@ class ChatApp:
         seed: Path | None = None,
         accept: list[str] | None = None,
         protect: list[str] | None = None,
+        repository: Path | None = None,
+        base_ref: str = "",
+        deliver: str = "none",
+        base: str = "",
     ) -> None:
         self.config_path = config_path
         self.skill_path = skill_path
@@ -108,6 +114,13 @@ class ChatApp:
         # Without it a chat run cannot fail, so its verdict is not evidence.
         self.accept = list(accept or [])
         self.protect = list(protect or [])
+        # --repo replaces the seed entirely: the run works on a clone of a
+        # real repository, which is what makes a pull request possible.
+        self.repository = Path(repository).resolve() if repository else None
+        self.base_ref = base_ref or ""
+        self.deliver = deliver or "none"
+        self.base = base or ""
+        self.last_run_id: str | None = None
         self.model = self._detect_model()
 
     # ---------------------------------------------------------------- setup
@@ -247,21 +260,34 @@ class ChatApp:
         if self.accept:
             commands = [shlex.split(command) for command in self.accept]
             require_diff = True
+        elif self.repository is not None:
+            # Against a real repository "the agent did nothing" must not read
+            # as success. There is still no acceptance command to run -- the
+            # operator has to supply one with --accept -- but an empty diff
+            # now fails, which is the weakest honest gate available here.
+            commands = [["python", "-c", "print('repo acceptance ok')"]]
+            require_diff = True
         else:
             commands = [["python", "-c", "print('chat acceptance ok')"]]
             require_diff = False
         # Prefer a path relative to the task file so run bundles stay
         # relocatable; fall back to absolute (e.g. a seed on another drive).
-        try:
-            seed_value = os.path.relpath(self.seed, TASKS_DIR).replace(os.sep, "/")
-        except ValueError:
-            seed_value = self.seed.as_posix()
+        if self.repository is not None:
+            origin = f"repository: {json.dumps(self.repository.as_posix())}\n"
+            if self.base_ref:
+                origin += f"base_ref: {json.dumps(self.base_ref)}\n"
+        else:
+            try:
+                seed_value = os.path.relpath(self.seed, TASKS_DIR).replace(os.sep, "/")
+            except ValueError:
+                seed_value = self.seed.as_posix()
+            origin = f"workspace_seed: {json.dumps(seed_value)}\n"
         content = f"""\
 version: 1
 id: {task_id}
 objective: >-
   {message}
-workspace_seed: {json.dumps(seed_value)}
+{origin}\
 constraints:
   - Work in the workspace; create files there if the task needs artifacts.
   - Keep responses concise and factual.
@@ -281,10 +307,13 @@ metadata:
 
     # ------------------------------------------------------------- exec
 
-    def _run_harness(self, task_path: Path) -> int:
-        """Run the harness as a subprocess and stream events live."""
-        self._load_env()
-        cmd = [
+    def _harness_command(self, task_path: Path) -> list[str]:
+        """The exact `harness run` invocation for a task.
+
+        Split out from `_run_harness` so the flags can be asserted without
+        starting a subprocess and a model call.
+        """
+        command = [
             sys.executable,
             "-m",
             "harness",
@@ -296,6 +325,23 @@ metadata:
             str(self.skill_path),
             "--yes",
         ]
+        if self.deliver != "none":
+            command += ["--deliver", self.deliver]
+            if self.base:
+                command += ["--base", self.base]
+        return command
+
+    def _note_run_id(self, line: str) -> None:
+        """Remember the run id the harness printed, so /pr needs no argument."""
+        if line.startswith("run_id: "):
+            candidate = line[len("run_id: "):].strip()
+            if candidate:
+                self.last_run_id = candidate
+
+    def _run_harness(self, task_path: Path) -> int:
+        """Run the harness as a subprocess and stream events live."""
+        self._load_env()
+        cmd = self._harness_command(task_path)
         print(f"\n==> {self.model} | {task_path.stem}\n")
         process = subprocess.Popen(
             cmd,
@@ -312,6 +358,7 @@ metadata:
         assert process.stdout is not None
         # Stream lines live (flush per line so the user sees progress).
         for line in process.stdout:
+            self._note_run_id(line)
             sys.stdout.write(line)
             sys.stdout.flush()
         process.wait()
@@ -328,6 +375,9 @@ metadata:
             return False
         if command == "/help" or command == "/?":
             print(HELP_TEXT)
+            return True
+        if command == "/pr":
+            self._pull_request(parts[1] if len(parts) > 1 else None)
             return True
         if command == "/runs":
             self._list_runs()
@@ -402,6 +452,7 @@ metadata:
         )
         assert process.stdout is not None
         for line in process.stdout:
+            self._note_run_id(line)
             sys.stdout.write(line)
             sys.stdout.flush()
         process.wait()
@@ -437,6 +488,25 @@ metadata:
 
     # ------------------------------------------------------------- main
 
+    def _pull_request(self, run_id: str | None) -> None:
+        """Deliver a completed run as a pull request.
+
+        Delegates to `harness deliver` rather than importing the delivery
+        module, for the same reason `ay auth` delegates: one code path for
+        both entry points, so they cannot disagree about what delivery means.
+        """
+        target = run_id or self.last_run_id
+        if not target:
+            print("no run to deliver yet; send a message first, or /pr <run_id>")
+            return
+        if self.repository is None and run_id is None:
+            print("this session is not attached to a repository; start ay with --repo <path>")
+            return
+        argv = ["deliver", target, "--runs-dir", str(RUNS_DIR), "--mode", "pr"]
+        if self.base:
+            argv += ["--base", self.base]
+        _delegate_to_cli(argv)
+
     def _print_banner(self) -> None:
         try:
             from harness import __version__ as version
@@ -444,6 +514,8 @@ metadata:
             version = "?"
         if self.accept:
             contract = "verified (" + "; ".join(self.accept) + ")"
+        elif self.repository is not None:
+            contract = "diff-only (no acceptance command; pass --accept)"
         else:
             contract = "unverified (acceptance always passes)"
         print()
@@ -455,7 +527,13 @@ metadata:
             print(_tint(ASCII_BANNER, "36"))
         print(_tint(f"# Yatra Harness v{version} · ay REPL", "1"))
         print(_tint(f"# model: {self.model} · config: {self.config_path.name}", "2"))
-        print(_tint(f"# seed: {self.seed.name} · contract: {contract}", "2"))
+        if self.repository is not None:
+            origin = f"repo: {self.repository.name} ({self.base_ref or 'HEAD'})"
+        else:
+            origin = f"seed: {self.seed.name}"
+        print(_tint(f"# {origin} · contract: {contract}", "2"))
+        if self.deliver != "none":
+            print(_tint(f"# deliver: {self.deliver} · base: {self.base or 'default'}", "2"))
         print(_tint(f"# {_short_path(ROOT)}", "2"))
         print()
         print("Type a message to run the agent, or /help for commands." + chr(10))
@@ -507,7 +585,11 @@ def main() -> int:
             stream.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, ValueError):
             pass
-    argv = sys.argv[1:]
+    return main_with_argv(sys.argv[1:])
+
+
+def main_with_argv(argv: list[str]) -> int:
+    """`main` without the console setup, so the argument rules are testable."""
     if argv and argv[0] == "auth":
         return _delegate_to_cli(argv)
 
@@ -524,13 +606,37 @@ def main() -> int:
                              "verification and requires a non-empty diff")
     parser.add_argument("--protect", action="append", default=[], metavar="GLOB",
                         help="protected path glob, repeatable")
-    arguments = parser.parse_args()
+    parser.add_argument("--repo", type=Path, default=None, metavar="PATH",
+                        help="work on a clone of this git repository instead of a seed; "
+                             "required to open a pull request")
+    parser.add_argument("--base-ref", default="", metavar="REF",
+                        help="branch, tag or commit the work starts from (--repo only)")
+    parser.add_argument("--deliver", choices=("none", "commit", "branch", "pr"),
+                        default="none",
+                        help="what to do with a run that passes verification")
+    parser.add_argument("--base", default="", metavar="BRANCH",
+                        help="pull request target branch")
+    arguments = parser.parse_args(argv)
+    if arguments.repo is not None and arguments.seed is not None:
+        parser.error("--repo and --seed name two different workspaces; choose one")
     if arguments.seed is not None and not arguments.seed.is_dir():
         print(f"error: --seed is not a directory: {arguments.seed}")
         return 2
+    if arguments.repo is not None:
+        if not arguments.repo.is_dir():
+            print(f"error: --repo is not a directory: {arguments.repo}")
+            return 2
+        if not (arguments.repo / ".git").exists():
+            print(f"error: --repo is not a git repository: {arguments.repo}")
+            return 2
+    if arguments.deliver != "none" and arguments.repo is None:
+        print("error: --deliver needs --repo; a seed workspace has no remote to push to")
+        return 2
     app = ChatApp(arguments.config, arguments.skill, arguments.verbose,
                   seed=arguments.seed, accept=arguments.accept,
-                  protect=arguments.protect)
+                  protect=arguments.protect, repository=arguments.repo,
+                  base_ref=arguments.base_ref, deliver=arguments.deliver,
+                  base=arguments.base)
     return app.run()
 
 

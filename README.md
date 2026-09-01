@@ -176,6 +176,41 @@ its endpoint. That way a route naming a non-standard variable -- as
 key stored for the provider that endpoint belongs to. A stored key is only
 ever offered to its own provider's endpoint.
 
+## From a repository to a pull request
+
+Point a run at a real repository and it works on a clone of it, on its own
+branch, with the repository's history and remote intact.
+
+```
+ay --repo . --accept "python -m unittest discover -s tests" --deliver pr
+```
+
+```
+you> fix the typo in the installation section of README.md
+```
+
+The agent edits the clone. The verifier runs the acceptance command itself.
+Only if that passes does delivery start: commit the diff, ask before pushing
+the branch, ask again before opening the pull request. The body is built from
+the run's verification record, not from the model's description of its work.
+
+`--deliver commit` stops after the local commit and `--deliver branch` stops
+after the push, so you can watch each step before allowing the next. Nothing
+leaves the machine without an explicit yes -- an unattended run with no
+terminal denies the push rather than performing it.
+
+The same thing from the CLI, or afterwards from a finished run:
+
+```
+uv run harness run tasks/fix_typo.yaml --config configs/remote-qwen.yaml --skill skills/bugfix.yaml --deliver pr --yes
+uv run harness deliver <run-id> --mode pr
+```
+
+Opening a pull request needs the [GitHub CLI](https://cli.github.com/)
+authenticated (`gh auth login`). The branch is pushed before `gh` is called,
+so if that step fails the work is still on the remote and the pull request
+can be opened by hand.
+
 ## Running against a live model
 
 ```
@@ -212,6 +247,7 @@ harness explain     resolve a task into its contracts without running it
 harness tools       list registered tools with risk classes and provenance
 harness routes      show the resolved route plan and what was excluded
 harness run         execute a task
+harness deliver     commit, push and open a pull request for a completed run
 harness resume      continue a run from its last checkpoint
 harness inspect     terminal state plus the recent event timeline
 harness replay      rebuild a run from its ledger and hash it
@@ -259,8 +295,8 @@ uv run python -m unittest discover -s tests -v
 uv run ruff check harness tests ay.py
 ```
 
-84 tests cover the runtime, the tool registry, provider adapters, routing and
-the REPL. CI runs them on three Python versions along with `harness doctor` and
+227 tests cover the runtime, the tool registry, provider adapters, routing,
+repository workspaces, delivery and the REPL. CI runs them on three Python versions along with `harness doctor` and
 a full deterministic run.
 
 ## Layout
