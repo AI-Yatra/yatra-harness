@@ -146,7 +146,10 @@ def parser() -> argparse.ArgumentParser:
     )
     deliver_cmd.add_argument("--base", default="", help="pull request target branch")
     deliver_cmd.add_argument(
-        "--yes", action="store_true", help="approve the push and the pull request non-interactively"
+        "--yes",
+        dest="deliver_yes",
+        action="store_true",
+        help="approve the push and the pull request non-interactively",
     )
 
     listing = commands.add_parser("list-runs", help="list durable run checkpoints")
@@ -198,7 +201,7 @@ def main(argv: list[str] | None = None) -> int:
                     result.run_dir,
                     mode=arguments.deliver,
                     base=arguments.base,
-                    yes=arguments.yes,
+                    yes=arguments.deliver_yes,
                 )
             return code
         if arguments.command == "resume":
@@ -215,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
         if arguments.command == "deliver":
             run_dir = arguments.runs_dir.expanduser().resolve() / arguments.run_id
             return _deliver(
-                run_dir, mode=arguments.mode, base=arguments.base, yes=arguments.yes
+                run_dir, mode=arguments.mode, base=arguments.base, yes=arguments.deliver_yes
             )
         if arguments.command == "list-runs":
             return _list_runs(arguments)
@@ -530,6 +533,13 @@ def _add_delivery_arguments(command: Any) -> None:
         help="what to do with a run that passes verification (default: nothing)",
     )
     group.add_argument("--base", default="", help="pull request target branch")
+    group.add_argument(
+        "--deliver-yes",
+        action="store_true",
+        help="approve pushing and opening the pull request without prompting. "
+        "Deliberately separate from --yes: that approves what the model may do "
+        "inside the workspace, this approves publishing the result",
+    )
 
 
 def _deliver(run_dir: Path, *, mode: str, base: str, yes: bool) -> int:

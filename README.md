@@ -199,10 +199,15 @@ after the push, so you can watch each step before allowing the next. Nothing
 leaves the machine without an explicit yes -- an unattended run with no
 terminal denies the push rather than performing it.
 
+Publishing has its own flag. `--yes` approves what the model may do inside
+the workspace; `--deliver-yes` approves sending the result somewhere other
+people can see. Conflating them would make `ay`, which always passes `--yes`
+so tool calls are not gated mid-conversation, push without being asked.
+
 The same thing from the CLI, or afterwards from a finished run:
 
 ```
-uv run harness run tasks/fix_typo.yaml --config configs/remote-qwen.yaml --skill skills/bugfix.yaml --deliver pr --yes
+uv run harness run tasks/fix_typo.yaml --config configs/remote-qwen.yaml --skill skills/bugfix.yaml --deliver pr --deliver-yes
 uv run harness deliver <run-id> --mode pr
 ```
 

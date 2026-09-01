@@ -113,6 +113,13 @@ class DeliverCommandTests(unittest.TestCase):
         self.assertFalse(record["pushed"])
         self.assertEqual(git("branch", "--list", "harness/*", cwd=self.upstream), "")
 
+    def test_policy_yes_does_not_authorise_publishing(self) -> None:
+        # --yes approves what the model may do inside the workspace. It must
+        # not also mean "push this to a shared remote".
+        result = self.run_task("--deliver", "pr", "--yes")
+        self.assertIn("declined", result.stdout + result.stderr)
+        self.assertEqual(git("branch", "--list", "harness/*", cwd=self.upstream), "")
+
     def test_deliver_pr_needs_yes_to_push_unattended(self) -> None:
         # No terminal, no --yes: the approval gate denies and delivery stops
         # with the commit intact rather than pushing silently.
@@ -122,7 +129,7 @@ class DeliverCommandTests(unittest.TestCase):
 
     def test_deliver_pr_with_yes_pushes_and_opens(self) -> None:
         self.stub_gh()
-        result = self.run_task("--deliver", "pr", "--yes")
+        result = self.run_task("--deliver", "pr", "--deliver-yes")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("https://example.invalid/pr/7", result.stdout)
         self.assertIn("harness/", git("branch", "--list", "harness/*", cwd=self.upstream))
@@ -160,7 +167,7 @@ class DeliverCommandTests(unittest.TestCase):
 
     def test_an_explicit_base_reaches_gh(self) -> None:
         self.stub_gh()
-        self.run_task("--deliver", "pr", "--yes", "--base", "develop")
+        self.run_task("--deliver", "pr", "--deliver-yes", "--base", "develop")
         self.assertIn("--base develop", self.gh_calls.read_text(encoding="utf-8"))
 
     def test_a_seed_mode_run_cannot_be_delivered_as_a_pull_request(self) -> None:
@@ -170,7 +177,7 @@ class DeliverCommandTests(unittest.TestCase):
             "run", "tasks/repair_counter.yaml",
             "--config", "configs/teaching.yaml",
             "--skill", "skills/bugfix.yaml",
-            "--deliver", "pr", "--yes",
+            "--deliver", "pr", "--deliver-yes",
         )
         self.assertIn("remote", result.stdout + result.stderr)
 

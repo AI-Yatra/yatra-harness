@@ -55,12 +55,16 @@ ay --repo . --accept "python -m unittest discover -s tests" --deliver pr
 | `--base-ref REF` | branch, tag or commit the work starts from |
 | `--deliver MODE` | `none`, `commit`, `branch` or `pr` after verification |
 | `--base BRANCH` | pull request target; defaults to the remote's own default |
+| `--deliver-yes` | push and open without prompting |
 
 `--deliver` needs `--repo`, because a seed workspace has no remote to push
 to. Your own checkout is only ever read, and a clone starts from a commit, so
 uncommitted work in it is not carried into the run.
 
-The pushing and the opening are approved separately, and both default to no.
+The pushing and the opening are approved separately, and both prompt at the
+terminal unless `--deliver-yes` is given. `ay` always passes `--yes` to the
+harness so the model's tool calls are not gated mid-conversation; that flag
+deliberately does not authorise publishing.
 `/pr [run_id]` delivers a finished run afterwards without rerunning it.
 
 An `AGENTS.md` at the repository root is read into the model's system prompt,

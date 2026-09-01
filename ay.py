@@ -102,6 +102,7 @@ class ChatApp:
         base_ref: str = "",
         deliver: str = "none",
         base: str = "",
+        deliver_yes: bool = False,
     ) -> None:
         self.config_path = config_path
         self.skill_path = skill_path
@@ -120,6 +121,10 @@ class ChatApp:
         self.base_ref = base_ref or ""
         self.deliver = deliver or "none"
         self.base = base or ""
+        # The REPL always passes --yes so the model's tool calls are not
+        # gated mid-conversation. Publishing is a different kind of consent,
+        # so it needs its own flag and asks at the terminal by default.
+        self.deliver_yes = bool(deliver_yes)
         self.last_run_id: str | None = None
         self.model = self._detect_model()
 
@@ -329,6 +334,8 @@ metadata:
             command += ["--deliver", self.deliver]
             if self.base:
                 command += ["--base", self.base]
+            if self.deliver_yes:
+                command += ["--deliver-yes"]
         return command
 
     def _note_run_id(self, line: str) -> None:
@@ -616,6 +623,8 @@ def main_with_argv(argv: list[str]) -> int:
                         help="what to do with a run that passes verification")
     parser.add_argument("--base", default="", metavar="BRANCH",
                         help="pull request target branch")
+    parser.add_argument("--deliver-yes", action="store_true",
+                        help="push and open without prompting")
     arguments = parser.parse_args(argv)
     if arguments.repo is not None and arguments.seed is not None:
         parser.error("--repo and --seed name two different workspaces; choose one")
@@ -636,7 +645,7 @@ def main_with_argv(argv: list[str]) -> int:
                   seed=arguments.seed, accept=arguments.accept,
                   protect=arguments.protect, repository=arguments.repo,
                   base_ref=arguments.base_ref, deliver=arguments.deliver,
-                  base=arguments.base)
+                  base=arguments.base, deliver_yes=arguments.deliver_yes)
     return app.run()
 
 

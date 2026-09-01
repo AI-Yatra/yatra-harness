@@ -110,6 +110,21 @@ class RepoModeTests(unittest.TestCase):
         self.assertIn("--base", command)
         self.assertIn("develop", command)
 
+    def test_the_repl_does_not_authorise_publishing_with_its_policy_yes(self) -> None:
+        # ay always passes --yes so tool calls are not gated mid-conversation.
+        # That must not silently become permission to push.
+        command = self.app(repository=self.repository, deliver="pr")._harness_command(
+            Path("task.yaml")
+        )
+        self.assertIn("--yes", command)
+        self.assertNotIn("--deliver-yes", command)
+
+    def test_deliver_yes_is_passed_through_when_asked_for(self) -> None:
+        command = self.app(
+            repository=self.repository, deliver="pr", deliver_yes=True
+        )._harness_command(Path("task.yaml"))
+        self.assertIn("--deliver-yes", command)
+
     def test_no_delivery_flag_is_passed_when_delivery_is_off(self) -> None:
         command = self.app(repository=self.repository)._harness_command(Path("task.yaml"))
         self.assertNotIn("--deliver", command)
