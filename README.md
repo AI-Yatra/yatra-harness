@@ -411,8 +411,10 @@ uv run python -m unittest discover -s tests -v
 uv run ruff check harness tests ay.py
 ```
 
-247 tests cover the runtime, the tool registry, provider adapters, routing,
-repository workspaces, delivery and the REPL. CI runs them on three Python versions along with `harness doctor` and
+540 tests cover the runtime, the tool registry, provider adapters, routing,
+repository workspaces, delivery, sessions, sub-agents, retrieval, streaming,
+the sandbox and the REPL. Tests that need docker skip themselves where it is
+absent. CI runs them on three Python versions along with `harness doctor` and
 a full deterministic run.
 
 ## Working a backlog on its own
@@ -506,7 +508,9 @@ too. That case is the one that notices.
 ```text
 yatra-harness/
 ├── harness/            runtime: contracts, context, routing, tools, policy,
-│                       workspace, verifier, events, checkpoints, replay
+│                       workspace, verifier, events, checkpoints, replay,
+│                       sandbox, sessions, sub-agents, delivery, goal, loop,
+│                       retrieval, search, tracing, evals, rubric
 ├── ay.py               the ay REPL
 ├── configs/            teaching, local, remote, llm_light
 ├── tasks/              task contracts
@@ -514,6 +518,7 @@ yatra-harness/
 ├── scenarios/          deterministic replay scripts
 ├── fixtures/           seeded repositories the agent works on
 ├── tests/              unit and end-to-end suite
+├── evals/              eval suites run in CI
 ├── docs/               architecture and workshop guides
 └── .runs/              one evidence bundle per run
 ```

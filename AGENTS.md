@@ -51,6 +51,9 @@ the MCP demo server subprocess cannot import `harness` outside the venv.
 - **Config schemas are strict.** Unknown keys are rejected on purpose, so a
   typo fails loudly. Adding a key means adding it to the `reject_unknown` set
   and to `docs/CONFIGURATION.md`.
+- **Never make a run fail for an observability or convenience feature.**
+  Tracing, compaction, session memory and retrieval all degrade rather than
+  raise. Losing the record of a job must never cost you the job.
 - **A test comes before the fix.** Every behaviour change starts with a test
   that fails for the reason being fixed.
 - **Do not edit `tests/**` to make an implementation pass.** If a test is
@@ -66,6 +69,12 @@ the MCP demo server subprocess cannot import `harness` outside the venv.
 | `harness/workspace.py` | seed and repository workspaces, path containment |
 | `harness/verifier.py` | the independent completion gate |
 | `harness/delivery.py` | commit, push, pull request |
+| `harness/sandbox.py` | local or container execution |
+| `harness/session.py` | one workspace and memory across messages |
+| `harness/subagents.py` | read-only delegation |
+| `harness/goal.py`, `loop.py` | attempt-until-true, and the backlog loop |
+| `harness/retrieval.py`, `search.py` | ranked workspace search, web search |
+| `harness/tracing.py`, `evals.py`, `rubric.py` | spans, eval gate, scored review |
 | `harness/context.py` | context budget, compaction, instruction injection |
 | `harness/auth.py` | credentials; the only module holding a raw key |
 | `configs/`, `tasks/`, `skills/` | strict versioned YAML contracts |

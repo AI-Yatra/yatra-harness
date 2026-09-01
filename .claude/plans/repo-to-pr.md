@@ -54,7 +54,24 @@ of the pipeline already exists.
 8. **`--yes` must not authorise publishing.** It already meant "approve the
    model's tool calls", and `ay` passes it on every run.
 
+## Second pass: the rest of the backlog
+
+9.  Command deny-list, checked before the allowlist and never overridden.
+10. `web_search` with a configurable backend.
+11. `harness goal`: attempt until the acceptance command passes.
+12. Sessions: one workspace and one memory across messages.
+13. Pluggable compaction, including a summarizing strategy.
+14. Read-only sub-agent delegation, with its own optional model.
+15. Container sandbox for tool and acceptance commands.
+16. `harness eval`: a benchmark gate, wired into CI.
+17. Spans, linking runs in a goal, a session or a delegation.
+18. Ranked retrieval with lexical and embedding backends.
+19. Streaming.
+20. `feature_list.json` and `harness loop` over it.
+21. `harness review`: a scored rubric with a verdict.
+
 ## Out of scope, and why
 
-Docker sandboxing, RAG, streaming and graph orchestration are on the backlog
-but none of them are on the path from "edit a repo" to "open a PR".
+Graph orchestration. Lecture 14 of the walkinglabs course says plainly not to
+build one before the loops it is meant to coordinate exist and are understood,
+and `harness loop` has run exactly once.
