@@ -91,6 +91,10 @@ class HarnessConfig:
     mcp_servers: tuple[MCPServerConfig, ...]
     context_recent_observations: int = 6
     context_repo_entries: int = 120
+    # The repository's own conventions, read from the run workspace. An empty
+    # tuple switches the behaviour off entirely.
+    context_instruction_files: tuple[str, ...] = ("AGENTS.md", "CLAUDE.md")
+    context_max_instruction_chars: int = 4_000
     llm_light: LLMLightConfig = field(default_factory=LLMLightConfig)
     fault: str = ""
     selected_model: str = ""
@@ -314,7 +318,21 @@ def load_config(path: str | Path) -> HarnessConfig:
             )
         )
     context_raw = schema.mapping(raw.get("context", {}), "context")
-    schema.reject_unknown(context_raw, {"recent_observations", "repo_entries"}, "context")
+    schema.reject_unknown(
+        context_raw,
+        {
+            "recent_observations",
+            "repo_entries",
+            "instruction_files",
+            "max_instruction_chars",
+        },
+        "context",
+    )
+    instruction_files = (
+        schema.string_list(context_raw["instruction_files"], "context.instruction_files")
+        if context_raw.get("instruction_files") is not None
+        else ("AGENTS.md", "CLAUDE.md")
+    )
     return HarnessConfig(
         config_path=config_path,
         runs_dir=_resolve(base, str(runs_dir)),
@@ -327,6 +345,12 @@ def load_config(path: str | Path) -> HarnessConfig:
         ),
         context_repo_entries=schema.integer(
             context_raw.get("repo_entries", 120), "context.repo_entries", minimum=10
+        ),
+        context_instruction_files=instruction_files,
+        context_max_instruction_chars=schema.integer(
+            context_raw.get("max_instruction_chars", 4_000),
+            "context.max_instruction_chars",
+            minimum=0,
         ),
         llm_light=_load_llm_light(raw.get("llm_light"), router),
     )

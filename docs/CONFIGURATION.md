@@ -85,6 +85,24 @@ mcp:
 |---|---|---|
 | `recent_observations` | 6 | observations kept verbatim |
 | `repo_entries` | 120 | repo map entry cap |
+| `instruction_files` | `[AGENTS.md, CLAUDE.md]` | repository instruction files read from the workspace root |
+| `max_instruction_chars` | 4000 | cap on that text |
+
+`instruction_files` are read from the run workspace, in the order listed, and
+appended to the system prompt labelled with the file each section came from.
+A missing, empty or unreadable file is skipped rather than fatal, and an empty
+list switches the behaviour off.
+
+The text is capped at `max_instruction_chars` **or** a quarter of
+`budgets.max_context_chars`, whichever is smaller, so an oversized `AGENTS.md`
+degrades to a truncated one instead of starving the task of context.
+
+This text describes conventions. It is appended after the harness's own
+instructions, never before them, and it cannot enable a tool, widen
+`allowed_commands`, or satisfy the verifier -- the authority boundary in
+[ARCHITECTURE.md](ARCHITECTURE.md) is unchanged by anything a repository
+writes about itself. `CONTEXT_BUILT` records which files were used on every
+turn.
 
 ### Environment overrides
 

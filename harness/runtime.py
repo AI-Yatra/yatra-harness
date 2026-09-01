@@ -311,6 +311,11 @@ class HarnessRuntime:
                     "character_count": context.character_count,
                     "repo_entries": context.repo_entries,
                     "compacted_observations": context.compacted_observations,
+                    # Which of the repository's own instruction files the model
+                    # was shown. Recorded every turn so a run's behaviour can
+                    # be explained by what it was actually told.
+                    "instruction_sources": list(context.instruction_sources),
+                    "instructions_truncated": context.instructions_truncated,
                 },
             )
             if context.compacted_observations:
