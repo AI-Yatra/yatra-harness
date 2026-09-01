@@ -160,6 +160,37 @@ class RecordTests(LoopTestCase):
         self.assertFalse(value["outcomes"][1]["achieved"])
 
 
+class AccumulationTests(LoopTestCase):
+    """The loop's work has to end up somewhere.
+
+    Every feature ran in a workspace built fresh from the seed, so feature two
+    never saw feature one's change and nothing survived the run. The loop
+    marked a backlog complete and left no artifact behind.
+    """
+
+    def test_the_loop_has_a_session_so_work_accumulates(self) -> None:
+        self.assertTrue(self.request().session_id)
+
+    def test_every_feature_shares_that_session(self) -> None:
+        from harness.loop import goal_for
+
+        request = self.request()
+        first = goal_for(
+            Feature(feature_id="f0", description="d", acceptance=("c",)), request
+        )
+        second = goal_for(
+            Feature(feature_id="f1", description="e", acceptance=("c",)), request
+        )
+        self.assertEqual(first.session_id, second.session_id)
+        self.assertTrue(first.session_id)
+
+    def test_two_loops_do_not_share_one(self) -> None:
+        self.assertNotEqual(self.request().session_id, self.request().session_id)
+
+    def test_an_explicit_session_is_used_as_given(self) -> None:
+        self.assertEqual(self.request(session_id="monday").session_id, "monday")
+
+
 class GoalShapeTests(LoopTestCase):
     def test_a_feature_becomes_a_goal_with_its_own_acceptance(self) -> None:
         from harness.loop import goal_for

@@ -1,0 +1,59 @@
+version: 1
+runs_dir: ../.runs
+
+# The demo's own config. Two things differ from configs/remote-qwen.yaml and
+# both matter for a demo you run in front of people.
+#
+# The budgets are larger. Adding best_move is a dozen tests' worth of work,
+# and the 8-turn budget cut a run off mid-repair -- the model was making
+# progress and simply ran out of room, which demonstrates nothing except a
+# badly chosen budget.
+#
+# There is no fallback route. Everywhere else a fallback is a good idea; here
+# it is a trap. Falling back to a replay script written for a different task
+# would produce a COMPLETED run that did unrelated work, which is a far worse
+# thing to watch than an honest failure.
+budgets:
+  max_turns: 20
+  max_tool_calls: 40
+  max_seconds: 900
+  max_context_chars: 32000
+  max_output_chars: 12000
+  max_verification_attempts: 3
+
+model_router:
+  primary: remote-qwen
+  fallbacks: []
+  retries_per_route: 2
+  backoff_seconds: 1.0
+  circuit_breaker_failures: 3
+  routes:
+    remote-qwen:
+      kind: openai_compatible
+      model: qwen3-coder-plus
+      base_url: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+      api_key_env: DASHSCOPE_API_KEY
+      timeout_seconds: 120
+      # Show the turn arriving; a silent minute reads as a hang.
+      stream: true
+      local: false
+      latency: medium
+      quality: 3.5
+      context_window: 131072
+
+policy:
+  approval_mode: mutations
+  allowed_commands:
+    - [python, -m, unittest]
+    - [git, diff]
+    - [git, status]
+  denied_commands:
+    - [git, push]
+    - [git, remote]
+    - [pip, install]
+    - [curl]
+    - [wget]
+  network_enabled: false
+  allowed_domains: []
+  command_timeout_seconds: 60
+  browser_timeout_seconds: 10

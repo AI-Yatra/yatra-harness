@@ -612,6 +612,13 @@ def _apply_patch(
         patch_file.write(patch)
         patch_file.close()
         patch_path = patch_file.name
+        # `git apply --3way` writes conflict markers into the file and leaves
+        # unmerged entries in the index *before* exiting non-zero. Reporting
+        # that failure honestly is not enough: the workspace is damaged, every
+        # later `git diff` is misleading, and the next turn reads a file full
+        # of `<<<<<<< ours`. So take a snapshot first and put it back unless
+        # the merge came out clean.
+        snapshot = _snapshot(workspace, paths)
         try:
             three_way = run_process(
                 ["git", "apply", "--check", "--3way", "--whitespace=nowarn", patch_path],
@@ -632,7 +639,22 @@ def _apply_patch(
                 os.unlink(patch_path)
             except OSError:
                 pass
-        if three_way.returncode == 0 and applied_3way is not None and applied_3way.returncode == 0:
+        merged_cleanly = (
+            three_way.returncode == 0
+            and applied_3way is not None
+            and applied_3way.returncode == 0
+            and not _unmerged_paths(workspace)
+        )
+        if not merged_cleanly:
+            conflicted = bool(_unmerged_paths(workspace))
+            _restore(workspace, snapshot)
+            if conflicted:
+                raise ToolError(
+                    "patch conflicts with the current contents and was not applied; "
+                    "the workspace is unchanged. Read the file as it is now and "
+                    "write a patch against that."
+                )
+        if merged_cleanly:
             return (
                 f"applied patch to {len(paths)} path(s) via 3-way merge: "
                 f"{', '.join(paths)}"
@@ -674,6 +696,65 @@ def _apply_patch(
         "paths": list(paths),
         "already_applied": False,
     }
+
+
+def _snapshot(workspace: Workspace, paths: tuple[str, ...]) -> dict[str, bytes | None]:
+    """The exact bytes of each path, or None where the path does not exist.
+
+    Bytes rather than a git operation on purpose. Restoring from HEAD would
+    discard whatever the agent had already done and not committed, which in a
+    normal run is everything it has done.
+    """
+    captured: dict[str, bytes | None] = {}
+    for relative in paths:
+        try:
+            path = workspace.resolve(relative)
+        except WorkspaceError:
+            continue
+        try:
+            captured[relative] = path.read_bytes()
+        except (OSError, ValueError):
+            captured[relative] = None
+    return captured
+
+
+def _unmerged_paths(workspace: Workspace) -> tuple[str, ...]:
+    """Paths git considers conflicted, which a `--3way` failure leaves behind."""
+    result = run_process(
+        ["git", "ls-files", "--unmerged", "--"],
+        cwd=workspace.root,
+        timeout=20,
+        max_output_chars=8_000,
+    )
+    if result.returncode != 0:
+        return ()
+    return tuple({line.split("\t")[-1] for line in result.output.splitlines() if line})
+
+
+def _restore(workspace: Workspace, snapshot: dict[str, bytes | None]) -> None:
+    """Put the snapshotted paths back and clear the conflicted index."""
+    for relative, content in snapshot.items():
+        try:
+            path = workspace.resolve(relative)
+        except WorkspaceError:
+            continue
+        try:
+            if content is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+        except OSError:
+            continue
+    if snapshot:
+        # `git reset` on the paths drops the unmerged stage entries; without
+        # it the index stays conflicted even though the files are correct.
+        run_process(
+            ["git", "reset", "-q", "--", *snapshot],
+            cwd=workspace.root,
+            timeout=20,
+            max_output_chars=4_000,
+        )
 
 
 def _normalize_command(command: list[str], config: HarnessConfig) -> list[str]:

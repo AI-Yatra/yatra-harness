@@ -1,0 +1,26 @@
+[
+  {
+    "id": "anti-diagonal-wins",
+    "description": "winner() reports a win on the anti-diagonal, from the top-right cell to the bottom-left, exactly as it does for every other line.",
+    "acceptance": [
+      "python -m unittest tests.test_winner"
+    ],
+    "passes": false,
+    "category": "correctness",
+    "protect": [
+      "tests/**"
+    ]
+  },
+  {
+    "id": "best-move",
+    "description": "Add best_move(board, player) to game.py. tests/test_best_move.py is the specification: read it first. It returns a cell that wins the game for player if one exists, otherwise a cell that would win for the opponent, otherwise the first free cell in board order. It raises ValueError for a full board or an unknown player, and leaves the board it was given unchanged.",
+    "acceptance": [
+      "python -m unittest tests.test_best_move"
+    ],
+    "passes": false,
+    "category": "feature",
+    "protect": [
+      "tests/**"
+    ]
+  }
+]

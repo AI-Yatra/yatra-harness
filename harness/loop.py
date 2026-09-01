@@ -42,6 +42,11 @@ class LoopRequest:
     max_features: int = 10
     max_attempts: int = 2
     max_seconds_per_feature: float = 1800.0
+    # One session for the whole loop, so a feature builds on the ones before
+    # it and the finished work exists somewhere when the loop stops. Without
+    # this every feature ran in a workspace built fresh from the seed: the
+    # backlog got marked complete and nothing survived to show for it.
+    session_id: str = field(default_factory=lambda: f"loop-{uuid.uuid4().hex[:10]}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +85,7 @@ def goal_for(feature: Feature, request: LoopRequest) -> GoalRequest:
         repository=request.repository,
         base_ref=request.base_ref,
         protect=feature.protect,
+        session_id=request.session_id,
         max_attempts=request.max_attempts,
         max_seconds=request.max_seconds_per_feature,
     )
@@ -87,7 +93,7 @@ def goal_for(feature: Feature, request: LoopRequest) -> GoalRequest:
 
 def run_loop(request: LoopRequest, *, pursue: Pursuer) -> LoopResult:
     """Work the backlog, recording every outcome as it happens."""
-    loop_id = f"loop-{uuid.uuid4().hex[:10]}"
+    loop_id = request.session_id
     directory = Path(request.runs_dir) / loop_id
     directory.mkdir(parents=True, exist_ok=True)
     outcomes: list[FeatureOutcome] = []

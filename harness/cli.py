@@ -228,6 +228,9 @@ def parser() -> argparse.ArgumentParser:
     loop.add_argument("--max-features", type=int, default=10)
     loop.add_argument("--max-attempts", type=int, default=2,
                       help="goal attempts per feature")
+    loop.add_argument("--session", default="", metavar="ID",
+                      help="reuse a named session, so a second run continues where "
+                           "the first stopped instead of starting from the seed")
     loop.add_argument("--yes", action="store_true")
     _add_routing_arguments(loop)
 
@@ -529,14 +532,22 @@ def _resolve_approval(arguments: Any):
     ``--approval auto`` (and the compatibility ``--yes``) auto-approve every
     policy-gated action. ``--approval never`` denies anything that requires
     approval -- the strictest setting. ``--approval prompt`` asks interactively
-    when stdin is a terminal and denies otherwise.
+    when stdin is a terminal, and returns no approver at all when it is not,
+    so the model is told the capability is unavailable rather than refused.
     """
     choice = getattr(arguments, "approval", None)
     if choice == "auto" or (choice is None and arguments.yes):
         return _approval(True)
     if choice == "never":
+        # An operator who said no is an answer, and a different one from an
+        # operator who is not there. Keep an approver so it reads as a refusal.
         return _approval(False)
-    return _approval(False)  # prompt: interactive when tty, deny otherwise
+    if sys.stdin.isatty():
+        return _approval(False)  # prompt at the terminal
+    # Nothing can grant approval here. Returning no approver at all lets the
+    # policy engine say so, instead of the model reading a refusal it will
+    # keep retrying.
+    return None
 
 
 def _approval(yes: bool):
@@ -780,6 +791,7 @@ def _loop(arguments: Any) -> int:
     config = load_config(arguments.config)
     approval = _resolve_approval(arguments)
     request = LoopRequest(
+        **({"session_id": arguments.session} if arguments.session else {}),
         backlog=arguments.backlog,
         config_path=arguments.config,
         skill_path=arguments.skill,
@@ -801,6 +813,9 @@ def _loop(arguments: Any) -> int:
                 task_path=task_path,
                 skill_path=arguments.skill,
                 trace_context=trace_context,
+                # Every feature works in the loop's own workspace, so the
+                # finished work is in one place when the loop stops.
+                session_id=loop_request.session_id,
                 profile=arguments.profile,
                 priorities=tuple(arguments.priorities),
                 require_local=arguments.require_local,
@@ -814,6 +829,7 @@ def _loop(arguments: Any) -> int:
 
     total = len(load_backlog(arguments.backlog))
     print(f"backlog: {arguments.backlog} ({total} feature(s))")
+    print(f"session: {request.session_id}")
     result = run_loop(request, pursue=pursue_feature)
     print()
     print(f"loop: {'COMPLETE' if result.completed else 'STOPPED'}")
@@ -822,6 +838,7 @@ def _loop(arguments: Any) -> int:
         marker = "done" if outcome.achieved else "left"
         print(f"  {marker}  {outcome.feature_id}")
     print(f"record: {result.record_path}")
+    print(f"workspace: {config.runs_dir / 'sessions' / request.session_id / 'workspace'}")
     return 0 if result.completed else 2
 
 

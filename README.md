@@ -481,6 +481,12 @@ saying less — and the verdict uses a floor per dimension rather than an
 average, because an average lets a perfect score somewhere hide a total
 failure somewhere else.
 
+## The demo
+
+[`demo/`](demo/) is a small game repository with two things wrong with it — a
+logic flaw and a missing feature — and the commands that put the harness to
+work on them, up to and including a pull request.
+
 ## Evals
 
 ```
@@ -522,6 +528,7 @@ yatra-harness/
 ├── scenarios/          deterministic replay scripts
 ├── fixtures/           seeded repositories the agent works on
 ├── tests/              unit and end-to-end suite
+├── demo/               a game repo with a bug and a gap, for demonstrations
 ├── evals/              eval suites run in CI
 ├── docs/               architecture and workshop guides
 └── .runs/              one evidence bundle per run
