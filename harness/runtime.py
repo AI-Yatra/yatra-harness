@@ -138,7 +138,12 @@ class HarnessRuntime:
         skill = load_skill(skill_path)
         run_id = cls._new_run_id(task.task_id)
         manager = WorkspaceManager(config.runs_dir)
-        workspace = manager.create(run_id, task.workspace_seed, task.protected_paths)
+        if task.repository is not None:
+            workspace = manager.create_from_repository(
+                run_id, task.repository, task.protected_paths, base_ref=task.base_ref
+            )
+        else:
+            workspace = manager.create(run_id, task.workspace_seed, task.protected_paths)
         run_dir = config.runs_dir / run_id
         redactor = Redactor(route_secrets(config))
         artifacts = ArtifactStore(run_dir, redactor)
@@ -605,7 +610,19 @@ class HarnessRuntime:
             "version": 1,
             "id": task.task_id,
             "objective": task.objective,
-            "workspace_seed": str(task.workspace_seed),
+            # Only the mode this task actually uses is written, so the frozen
+            # copy reloads through the same "exactly one of" check the
+            # original did rather than becoming a task no loader would accept.
+            **(
+                {
+                    "repository": str(task.repository),
+                    # An empty base_ref means "the repository's default", and
+                    # writing it out as "" would be rejected on reload.
+                    **({"base_ref": task.base_ref} if task.base_ref else {}),
+                }
+                if task.repository is not None
+                else {"workspace_seed": str(task.workspace_seed)}
+            ),
             "constraints": list(task.constraints),
             "protected_paths": list(task.protected_paths),
             "acceptance": {

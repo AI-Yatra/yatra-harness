@@ -489,6 +489,8 @@ def load_task(path: str | Path) -> TaskContract:
             "id",
             "objective",
             "workspace_seed",
+            "repository",
+            "base_ref",
             "constraints",
             "protected_paths",
             "acceptance",
@@ -498,16 +500,13 @@ def load_task(path: str | Path) -> TaskContract:
     )
     if schema.integer(schema.require(raw, "version", "task"), "task.version") != 1:
         raise ConfigurationError("task.version must be 1")
-    seed = _resolve(
-        task_path.parent,
-        schema.string(schema.require(raw, "workspace_seed", "task"), "task.workspace_seed"),
-    )
-    if not seed.is_dir():
-        raise ConfigurationError(f"task workspace seed is not a directory: {seed}")
+    seed, repository, base_ref = _task_origin(task_path, raw)
     return TaskContract(
         task_id=schema.string(schema.require(raw, "id", "task"), "task.id"),
         objective=schema.string(schema.require(raw, "objective", "task"), "task.objective"),
         workspace_seed=seed,
+        repository=repository,
+        base_ref=base_ref,
         constraints=schema.string_list(raw.get("constraints", []), "task.constraints"),
         protected_paths=schema.string_list(raw.get("protected_paths", []), "task.protected_paths"),
         acceptance=VerificationSpec.from_dict(
@@ -516,6 +515,48 @@ def load_task(path: str | Path) -> TaskContract:
         ),
         metadata=schema.mapping(raw.get("metadata", {}), "task.metadata"),
     )
+
+
+def _task_origin(
+    task_path: Path, raw: dict[str, Any]
+) -> tuple[Path | None, Path | None, str]:
+    """Resolve where a task's workspace comes from, and refuse ambiguity.
+
+    A task that names both a seed and a repository has two answers to one
+    question, and picking either silently would make the run's provenance a
+    guess. Naming neither is the same problem with no answers.
+    """
+    has_seed = raw.get("workspace_seed") is not None
+    has_repository = raw.get("repository") is not None
+    if has_seed == has_repository:
+        raise ConfigurationError(
+            "task must name exactly one of workspace_seed or repository"
+        )
+    base_ref = (
+        schema.string(raw["base_ref"], "task.base_ref")
+        if raw.get("base_ref") is not None
+        else ""
+    )
+    if has_seed:
+        if base_ref:
+            raise ConfigurationError("task.base_ref only applies to a repository task")
+        seed = _resolve(
+            task_path.parent,
+            schema.string(raw["workspace_seed"], "task.workspace_seed"),
+        )
+        if not seed.is_dir():
+            raise ConfigurationError(f"task workspace seed is not a directory: {seed}")
+        return seed, None, ""
+    repository = _resolve(
+        task_path.parent, schema.string(raw["repository"], "task.repository")
+    )
+    if not repository.is_dir():
+        raise ConfigurationError(f"task repository is not a directory: {repository}")
+    # Checked here rather than at workspace creation so `harness explain` and
+    # `harness doctor` fail on a bad path before a run id exists.
+    if not (repository / ".git").exists():
+        raise ConfigurationError(f"task repository is not a git repository: {repository}")
+    return None, repository, base_ref
 
 
 def load_skill(path: str | Path) -> SkillContract:

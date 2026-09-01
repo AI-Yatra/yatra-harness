@@ -113,11 +113,24 @@ class VerificationSpec:
 class TaskContract:
     task_id: str
     objective: str
-    workspace_seed: Path
+    # Exactly one of these is set. A seed is copied into a fresh history and
+    # suits a fixture; a repository is cloned with its history and remote,
+    # which is what a run has to have to end in a pull request.
+    workspace_seed: Path | None
     constraints: tuple[str, ...]
     protected_paths: tuple[str, ...]
     acceptance: VerificationSpec
     metadata: dict[str, Any] = field(default_factory=dict)
+    repository: Path | None = None
+    base_ref: str = ""
+
+    @property
+    def origin(self) -> Path:
+        """Where the workspace comes from, whichever mode this task is in."""
+        source = self.repository if self.repository is not None else self.workspace_seed
+        if source is None:  # pragma: no cover - load_task rejects this first
+            raise ValueError("task names neither a repository nor a workspace seed")
+        return source
 
 
 @dataclass(frozen=True, slots=True)

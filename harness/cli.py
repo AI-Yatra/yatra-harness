@@ -215,7 +215,9 @@ def _explain(arguments: Any) -> int:
         "task": {
             "id": task.task_id,
             "objective": task.objective,
-            "workspace_seed": str(task.workspace_seed),
+            "workspace_mode": "repository" if task.repository else "seed",
+            "workspace_origin": str(task.origin),
+            "base_ref": task.base_ref,
             "constraints": list(task.constraints),
             "protected_paths": list(task.protected_paths),
             "acceptance": [list(command) for command in task.acceptance.commands],

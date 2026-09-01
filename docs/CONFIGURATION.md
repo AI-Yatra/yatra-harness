@@ -118,6 +118,36 @@ metadata: {}
 modified. `protected_paths` are glob patterns; any change to them fails
 verification.
 
+### Seed mode and repository mode
+
+A task names **exactly one** of `workspace_seed` or `repository`. Naming both
+is an error, because a run would have two answers to the question of where it
+came from.
+
+| | `workspace_seed` | `repository` |
+|---|---|---|
+| Workspace is | a copy of the directory | a clone of the repository |
+| History | one `harness baseline` commit | the repository's real history |
+| Branch | `master`/`main`, fresh | `harness/<run-id>` |
+| Remote | none | the source's own `origin` |
+| Can end in a pull request | no | yes |
+
+```yaml
+repository: ../some-checkout
+base_ref: main          # optional; defaults to the repository's HEAD
+```
+
+`base_ref` accepts a branch, a tag or a commit sha, and only applies in
+repository mode. It is resolved inside the clone, so a branch name is read
+through `origin/<name>`.
+
+Repository mode reads the source checkout and never writes to it. Because a
+clone starts from a commit, uncommitted work in the source is not carried
+into the run. The clone's `origin` is repointed from the local path git would
+otherwise use at the source repository's own upstream, so a later push
+targets the remote the pull request needs rather than the operator's
+checkout.
+
 ## Skill file
 
 ```yaml
