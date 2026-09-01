@@ -274,6 +274,46 @@ class PullRequestBodyTests(DeliveryTestCase):
         self.assertIn("counter.py", self.body())
 
 
+class SubjectTests(unittest.TestCase):
+    """The commit subject is a git subject line, so it has to read like one."""
+
+    def subject(self, text: str) -> str:
+        from harness.delivery import subject
+
+        return subject(text)
+
+    def test_a_short_objective_is_used_as_is(self) -> None:
+        self.assertEqual(self.subject("Fix the clamp lower bound"), "Fix the clamp lower bound")
+
+    def test_a_trailing_period_is_dropped(self) -> None:
+        self.assertEqual(self.subject("Fix the clamp."), "Fix the clamp")
+
+    def test_only_the_first_sentence_is_used(self) -> None:
+        self.assertEqual(
+            self.subject("Fix the clamp. Then update the docs."), "Fix the clamp"
+        )
+
+    def test_folded_whitespace_is_collapsed(self) -> None:
+        self.assertEqual(self.subject("Fix\n  the   clamp"), "Fix the clamp")
+
+    def test_a_long_objective_is_cut_at_a_word_boundary(self) -> None:
+        line = self.subject(
+            "Add a short entry to the Troubleshooting section of docs/OPERATIONS.md "
+            "explaining that the suite must run through uv run"
+        )
+        self.assertLessEqual(len(line), 72)
+        self.assertFalse(line.endswith("…"))
+        self.assertFalse(line.endswith("."))
+        self.assertTrue(line.endswith(("d", "e", "f", "g", "n", "o", "s", "t", "y")), line)
+        self.assertNotIn("  ", line)
+
+    def test_a_single_enormous_word_is_still_bounded(self) -> None:
+        self.assertLessEqual(len(self.subject("x" * 300)), 72)
+
+    def test_an_empty_objective_still_produces_a_subject(self) -> None:
+        self.assertTrue(self.subject("   "))
+
+
 class DeliveryRecordTests(DeliveryTestCase):
     def test_the_run_bundle_records_what_was_delivered(self) -> None:
         self.stub_gh()

@@ -180,12 +180,20 @@ def commit_message(request: DeliveryRequest) -> str:
 
 
 def subject(objective: str) -> str:
-    """One line, from what the operator asked for rather than what the model said."""
+    """One line, from what the operator asked for rather than what the model said.
+
+    Cut at a word boundary and left without an ellipsis, because this is a git
+    subject line: the full request is in the body directly below it, so a
+    trailing marker adds nothing and reads badly in a log.
+    """
     text = " ".join(objective.split())
     sentence = text.split(". ", 1)[0].rstrip(".") or "Harness change"
     if len(sentence) <= SUBJECT_LIMIT:
         return sentence
-    return sentence[: SUBJECT_LIMIT - 1].rstrip() + "…"
+    head = sentence[: SUBJECT_LIMIT + 1]
+    cut = head.rfind(" ")
+    trimmed = (head[:cut] if cut > SUBJECT_LIMIT // 2 else sentence[:SUBJECT_LIMIT]).rstrip()
+    return trimmed.rstrip(",;:-") or "Harness change"
 
 
 def _write_body(request: DeliveryRequest, workspace: Path, base: str) -> Path:
