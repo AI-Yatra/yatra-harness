@@ -15,6 +15,7 @@ it does not claim to protect against.
 | Workspace | Canonical-path containment; all paths resolve inside the run copy | Low (symlink resolution is explicit) |
 | Protected paths | Glob patterns for immutable files (e.g. `tests/**`) | Low |
 | Subprocess | `shell=False`, no shell interpolation, process-group kill on timeout | Low |
+| Sandbox | optional container: no network, no new privileges, capabilities dropped, non-root, bounded memory/CPU/pids, only the workspace mounted | Low when enabled |
 | Output caps | Every tool result is truncated; oversized output goes to artifact store | Low |
 | Redaction | Secrets scrubbed from events and artifacts | Medium (best-effort patterns) |
 | Verifier | Acceptance commands + non-empty diff + protected-path integrity | Low |
@@ -63,9 +64,15 @@ it does not claim to protect against.
 
 ## Known limitations (stated honestly)
 
-- **No kernel sandbox.** A malicious model that gets an allowlisted command
-  (e.g. a test runner with a clever argument) could in principle escape the
-  workspace. The harness confines *the model's interface*, not the OS.
+- **No kernel sandbox by default.** With `sandbox.kind: local`, a malicious
+  model that gets an allowlisted command (e.g. a test runner with a clever
+  argument) could in principle escape the workspace: the harness confines
+  *the model's interface*, not the OS. Setting `sandbox.kind: docker` closes
+  this — tool commands and acceptance commands then run in a throwaway
+  container with no network, no new privileges, all capabilities dropped, a
+  non-root uid, bounded memory/CPU/pids, and only the run workspace mounted.
+  Local stays the default because a workshop laptop without docker must still
+  be able to run the harness.
 - **Prefix allowlist.** `allowed_commands` matches command prefixes, so a
   pathological model can reach a dangerous form as an argument to a command
   that is legitimately allowed. `denied_commands` closes the specific holes
@@ -81,8 +88,8 @@ it does not claim to protect against.
 
 ## Recommended production hardening
 
-1. Run inside a container with a read-only root filesystem and no
-   `--privileged`.
+1. Set `sandbox.kind: docker` with the shipped `Dockerfile`, and run the
+   harness itself inside a container too.
 2. Restrict egress with a firewall or network policy.
 3. Replace the prefix allowlist with exact command hashes.
 4. Use `approval_mode: always` with a human approver for write/execute tools.

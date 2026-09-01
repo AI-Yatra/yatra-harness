@@ -24,6 +24,7 @@ from .errors import MCPError, ToolError, WorkspaceError
 from .mcp import MCPStdioClient
 from .policy import PolicyEngine
 from .process import run_process
+from .sandbox import build_sandbox
 from .search import build_request, parse_results, render
 from .util import truncate
 from .workspace import Workspace
@@ -654,28 +655,30 @@ def _apply_patch(
     }
 
 
-def _normalize_command(command: list[str]) -> list[str]:
+def _normalize_command(command: list[str], config: HarnessConfig) -> list[str]:
+    """Point `python` at the interpreter that will actually be used.
+
+    On the host that is this venv's interpreter, so a command reaches the same
+    Python the harness runs under. Inside a container it is emphatically not:
+    the host's absolute venv path does not exist there, and substituting it
+    produces a "no such file" that looks nothing like its cause.
+    """
+    if config.sandbox.kind != "local":
+        return list(command)
     if command and command[0] in {"python", "python3"}:
         return [sys.executable, *command[1:]]
-    return command
+    return list(command)
 
 
 def _run_command(
     workspace: Workspace, arguments: dict[str, Any], config: HarnessConfig
 ) -> tuple[str, dict[str, Any]]:
-    command = _normalize_command(arguments["command"])
-    result = run_process(
+    command = _normalize_command(arguments["command"], config)
+    result = build_sandbox(config.sandbox).run(
         command,
-        cwd=workspace.root,
+        workspace=workspace.root,
         timeout=config.policy.command_timeout_seconds,
         max_output_chars=config.budgets.max_output_chars,
-        environment={
-            "PATH": os.environ.get("PATH", ""),
-            "LANG": os.environ.get("LANG", "C.UTF-8"),
-            "PYTHONNOUSERSITE": "1",
-            "GIT_CONFIG_NOSYSTEM": "1",
-            "GIT_CONFIG_GLOBAL": os.devnull,
-        },
     )
     metadata = {
         "command": list(arguments["command"]),
@@ -697,16 +700,18 @@ def _python_run(
     if script.suffix != ".py" or script.is_symlink() or not script.is_file():
         raise ToolError("python_run requires a regular workspace-relative .py file")
     extra = arguments.get("arguments", [])
-    result = run_process(
-        [sys.executable, "-I", str(script), *extra],
-        cwd=workspace.root,
+    # Inside a container the script is addressed by its workspace-relative
+    # path and run by the image's own `python`; the host's interpreter path
+    # and the host's absolute script path both mean nothing there.
+    if config.sandbox.kind == "local":
+        argv = [sys.executable, "-I", str(script), *extra]
+    else:
+        argv = ["python", "-I", workspace.relative(script), *extra]
+    result = build_sandbox(config.sandbox).run(
+        argv,
+        workspace=workspace.root,
         timeout=config.policy.command_timeout_seconds,
         max_output_chars=config.budgets.max_output_chars,
-        environment={
-            "PATH": os.environ.get("PATH", ""),
-            "LANG": os.environ.get("LANG", "C.UTF-8"),
-            "PYTHONNOUSERSITE": "1",
-        },
     )
     if result.timed_out:
         raise ToolError("python script timed out")

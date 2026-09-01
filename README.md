@@ -332,6 +332,23 @@ uninterrupted run, so nothing is executed twice.
 prints a SHA-256 of the ledger. Edit one event and the hash changes. Delete one
 and the sequence check names the gap.
 
+## Running tools in a container
+
+```
+docker build -t yatra-harness-sandbox .
+uv run harness run tasks/repair_counter.yaml --config configs/sandboxed.yaml --skill skills/bugfix.yaml
+```
+
+Every `run_command`, `python_run` and acceptance command then runs in a
+throwaway container: no network, no new privileges, all capabilities dropped,
+a non-root uid, bounded memory and CPU, and only the run workspace mounted.
+
+The allowlist confines what the model may *ask* for. This confines what the
+resulting process can *reach*. `docs/SECURITY.md` has always said the harness
+had the first and not the second; `sandbox.kind: docker` is the second.
+
+Local execution stays the default, so a laptop without docker still works.
+
 ## Sub-agents
 
 The agent can ask a second agent a question instead of reading its way to the

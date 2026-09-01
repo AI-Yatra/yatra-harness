@@ -207,6 +207,47 @@ tell a recorded observation from a paraphrase of several.
 
 `CONTEXT_COMPACTED` records which strategy ran.
 
+## Sandbox
+
+Where `run_command`, `python_run` and the verifier's acceptance commands
+actually execute.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `kind` | `local` | `local` or `docker` |
+| `image` | — | required for docker |
+| `network` | `none` | container network mode |
+| `memory` | `2g` | container memory cap |
+| `cpus` | `2` | container CPU cap |
+| `user` | host uid:gid | who the container runs as |
+| `selinux_label` | `auto` | `auto`, `always`, `never` — appends `:Z` to the mount |
+
+```yaml
+sandbox:
+  kind: docker
+  image: yatra-harness-sandbox
+```
+
+Build the image with `docker build -t yatra-harness-sandbox .`.
+
+Path containment and the command allowlist confine the model's *interface*.
+They do not confine the operating system: an allowlisted test runner is still
+an ordinary process on the host, with the host's filesystem and network. The
+container is what makes that containment real.
+
+Acceptance commands run in the same sandbox the tools did. A change proved to
+work on the host and never tried in the environment it will actually run in
+has not been proved to work.
+
+`selinux_label` matters more than it looks. On an SELinux host an unlabelled
+bind mount is unreadable from inside the container, and the symptom — a
+permission error on a file the operator owns and can plainly see — points at
+everything except the cause. `auto` detects it; `never` exists because some
+non-Linux docker hosts reject the suffix outright.
+
+Local stays the default: a workshop laptop without docker must still be able
+to run the harness, and a teaching tool that refuses to start teaches nothing.
+
 ## Sub-agents
 
 Delegation is off unless `subagents.agents` names at least one agent. When it

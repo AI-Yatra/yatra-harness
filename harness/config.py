@@ -21,6 +21,7 @@ from .llm_light import (
     RoutingPolicy,
     validate_priorities,
 )
+from .sandbox import SandboxConfig, sandbox_config_from_dict
 from .search import SearchConfig, search_config_from_dict
 from .subagents import SubagentConfig, subagent_config_from_dict
 
@@ -104,6 +105,7 @@ class HarnessConfig:
     search: SearchConfig = field(default_factory=SearchConfig)
     compaction: CompactionConfig = field(default_factory=CompactionConfig)
     subagents: SubagentConfig = field(default_factory=SubagentConfig)
+    sandbox: SandboxConfig = field(default_factory=SandboxConfig)
     llm_light: LLMLightConfig = field(default_factory=LLMLightConfig)
     fault: str = ""
     selected_model: str = ""
@@ -194,6 +196,7 @@ def load_config(path: str | Path) -> HarnessConfig:
             "context",
             "search",
             "subagents",
+            "sandbox",
             "llm_light",
             # Written by the runtime so a resumed run routes identically; not
             # part of the operator-facing hand-authored schema.
@@ -364,6 +367,7 @@ def load_config(path: str | Path) -> HarnessConfig:
         ),
         search=search_config_from_dict(raw.get("search"), "search"),
         subagents=subagent_config_from_dict(raw.get("subagents"), base, "subagents"),
+        sandbox=sandbox_config_from_dict(raw.get("sandbox"), "sandbox"),
         compaction=compaction_config_from_dict(context_raw.get("compaction")),
         context_instruction_files=instruction_files,
         context_max_instruction_chars=schema.integer(
