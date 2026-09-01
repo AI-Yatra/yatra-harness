@@ -127,15 +127,71 @@ class WorkspaceManager:
             raise WorkspaceError(f"not a git repository: {source}")
         upstream = self._git(("remote", "get-url", "origin"), cwd=source) or str(source)
         workspace_dir = self._prepare_run_dir(run_id)
-        branch = self.branch_name(run_id)
+        self._clone_into(workspace_dir, source, base_ref, self.branch_name(run_id), upstream)
+        return Workspace(workspace_dir, protected_paths)
+
+    def _clone_into(
+        self,
+        workspace_dir: Path,
+        source: Path,
+        base_ref: str,
+        branch: str,
+        upstream: str = "",
+    ) -> None:
+        source = Path(source).expanduser().resolve()
+        if self._git(("rev-parse", "--git-dir"), cwd=source) is None:
+            raise WorkspaceError(f"not a git repository: {source}")
+        target = upstream or self._git(("remote", "get-url", "origin"), cwd=source) or str(source)
         if self._git(("clone", "--quiet", str(source), str(workspace_dir)), cwd=self.runs_dir) is None:
             raise WorkspaceError(f"could not clone repository: {source}")
         start = self._resolve_base(workspace_dir, base_ref)
         if self._git(("checkout", "-q", "-B", branch, start), cwd=workspace_dir) is None:
             raise WorkspaceError(f"could not create branch {branch} at {start}")
-        if self._git(("remote", "set-url", "origin", upstream), cwd=workspace_dir) is None:
-            raise WorkspaceError(f"could not point origin at {upstream}")
+        if self._git(("remote", "set-url", "origin", target), cwd=workspace_dir) is None:
+            raise WorkspaceError(f"could not point origin at {target}")
+
+    def create_for_session(
+        self,
+        session_id: str,
+        *,
+        protected_paths: tuple[str, ...],
+        seed: Path | None = None,
+        repository: Path | None = None,
+        base_ref: str = "",
+    ) -> Workspace:
+        """The workspace belonging to a session, created once and reused after.
+
+        Reuse alone would break the verifier: `git diff HEAD` for turn two
+        would still contain turn one's changes, so every later turn would
+        look productive whether or not it did anything. So outstanding work
+        is committed before the next turn begins. That keeps each run's diff
+        its own, and it makes the session's history a sequence of commits
+        rather than one undifferentiated blob.
+        """
+        from .session import session_directory  # noqa: PLC0415 - avoids a cycle
+
+        directory = session_directory(self.runs_dir, session_id)
+        workspace_dir = directory / "workspace"
+        if workspace_dir.is_dir():
+            self._commit_outstanding(workspace_dir)
+            return Workspace(workspace_dir, protected_paths)
+        directory.mkdir(parents=True, exist_ok=True)
+        if repository is not None:
+            self._clone_into(workspace_dir, repository, base_ref, self.branch_name(session_id))
+        elif seed is not None:
+            shutil.copytree(seed, workspace_dir, ignore=self._ignore)
+            self._initialize_git(workspace_dir)
+        else:
+            raise WorkspaceError("a session workspace needs either a seed or a repository")
         return Workspace(workspace_dir, protected_paths)
+
+    def _commit_outstanding(self, workspace: Path) -> None:
+        if self._git(("add", "-A"), cwd=workspace) is None:
+            raise WorkspaceError(f"could not stage session work in {workspace}")
+        if not self._git(("diff", "--cached", "--name-only"), cwd=workspace):
+            return  # nothing outstanding; an empty commit would be noise
+        if self._git(("commit", "-q", "-m", "harness session turn"), cwd=workspace) is None:
+            raise WorkspaceError(f"could not commit session work in {workspace}")
 
     @staticmethod
     def branch_name(run_id: str) -> str:

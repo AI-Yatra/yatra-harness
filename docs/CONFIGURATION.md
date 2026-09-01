@@ -166,6 +166,22 @@ instructions, never before them, and it cannot enable a tool, widen
 writes about itself. `CONTEXT_BUILT` records which files were used on every
 turn.
 
+## Sessions
+
+`harness run --session <id>` reuses one workspace across runs instead of
+building a fresh one, so a conversation accumulates. The workspace lives at
+`<runs_dir>/sessions/<id>/workspace`; each run still gets its own bundle,
+events and checkpoints under `<runs_dir>/<run-id>/`.
+
+Outstanding changes are committed as `harness session turn` before the next
+run starts. Without that, `git diff HEAD` for the second run would still
+contain the first run's changes and every later run would look productive
+whether or not it did anything.
+
+The session's memory (`session.json`) sits beside the workspace, not inside
+it. Written into the workspace it would appear as an untracked file and the
+verifier would count the harness's own bookkeeping as the run's diff.
+
 ### Environment overrides
 
 - `HARNESS_RUNS_DIR` overrides `runs_dir` (used by tests and CI).

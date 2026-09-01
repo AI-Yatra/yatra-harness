@@ -128,6 +128,7 @@ class HarnessRuntime:
         priorities: tuple[str, ...] = (),
         require_local: bool = False,
         max_cost_per_1m: float | None = None,
+        session_id: str = "",
         approval_callback: ApprovalCallback | None = None,
         sleeper: Any = time.sleep,
     ) -> RunResult:
@@ -146,7 +147,17 @@ class HarnessRuntime:
         skill = load_skill(skill_path)
         run_id = cls._new_run_id(task.task_id)
         manager = WorkspaceManager(config.runs_dir)
-        if task.repository is not None:
+        if session_id:
+            # A session's workspace outlives the run that created it, so the
+            # next message edits what this one wrote instead of starting over.
+            workspace = manager.create_for_session(
+                session_id,
+                protected_paths=task.protected_paths,
+                seed=task.workspace_seed,
+                repository=task.repository,
+                base_ref=task.base_ref,
+            )
+        elif task.repository is not None:
             workspace = manager.create_from_repository(
                 run_id, task.repository, task.protected_paths, base_ref=task.base_ref
             )
@@ -172,6 +183,7 @@ class HarnessRuntime:
                     "skill": str(Path(skill_path).resolve()),
                 },
                 "fault": config.fault,
+                "session_id": session_id,
                 "input_digest": cls._input_digest(config, task, skill),
             }
         )

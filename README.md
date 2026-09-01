@@ -102,6 +102,26 @@ you>
 Slash commands: `/runs`, `/inspect <id>`, `/resume <id>`, `/config`, `/model`,
 `/help`, `/exit`. Full usage lives in [ay.README.md](ay.README.md).
 
+### Messages in a session build on each other
+
+Every `ay` conversation gets a session: one workspace and one written memory,
+so the second message edits what the first one wrote and knows it happened.
+
+```
+you> create a file called SCRATCH.md containing the single word hello
+you> now create SCRATCH2.md containing the same word that is in SCRATCH.md
+```
+
+The workspace lives at `.runs/sessions/<id>/workspace` and the memory at
+`session.json` beside it. Outstanding work is committed before each new turn
+begins, so a turn's diff is its own and the session's history is a sequence
+of commits rather than one blob. Failures are remembered as well as
+successes, because a memory that only holds what worked teaches the next turn
+to repeat what did not.
+
+`--session <id>` resumes a named session later. `--stateless` restores the
+old behaviour of a fresh workspace per message.
+
 ### Read the contract line before you trust a verdict
 
 A plain chat message runs against an empty scratch workspace with an acceptance

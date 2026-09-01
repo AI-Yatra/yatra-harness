@@ -103,6 +103,8 @@ class ChatApp:
         deliver: str = "none",
         base: str = "",
         deliver_yes: bool = False,
+        session: str = "",
+        stateless: bool = False,
     ) -> None:
         self.config_path = config_path
         self.skill_path = skill_path
@@ -125,6 +127,11 @@ class ChatApp:
         # gated mid-conversation. Publishing is a different kind of consent,
         # so it needs its own flag and asks at the terminal by default.
         self.deliver_yes = bool(deliver_yes)
+        # A conversation gets one workspace and one memory. Without that,
+        # turn two cannot build on turn one and does not know it happened.
+        # Generated rather than fixed, so two REPLs never collide.
+        self.session_id = session or f"ay-{uuid.uuid4().hex[:10]}"
+        self.stateless = bool(stateless)
         self.last_run_id: str | None = None
         self.model = self._detect_model()
 
@@ -277,6 +284,14 @@ class ChatApp:
             require_diff = False
         # Prefer a path relative to the task file so run bundles stay
         # relocatable; fall back to absolute (e.g. a seed on another drive).
+        constraints = [
+            "  - Work in the workspace; create files there if the task needs artifacts.",
+            "  - Keep responses concise and factual.",
+        ]
+        for line in self._session_notes().splitlines():
+            if line.strip():
+                constraints.append(f"  - {json.dumps(line.strip())}")
+        constraints = "\n".join(constraints)
         if self.repository is not None:
             origin = f"repository: {json.dumps(self.repository.as_posix())}\n"
             if self.base_ref:
@@ -294,8 +309,7 @@ objective: >-
   {message}
 {origin}\
 constraints:
-  - Work in the workspace; create files there if the task needs artifacts.
-  - Keep responses concise and factual.
+{constraints}
 protected_paths: {json.dumps(self.protect)}
 acceptance:
   commands: {json.dumps(commands)}
@@ -330,6 +344,8 @@ metadata:
             str(self.skill_path),
             "--yes",
         ]
+        if not self.stateless:
+            command += ["--session", self.session_id]
         if self.deliver != "none":
             command += ["--deliver", self.deliver]
             if self.base:
@@ -344,6 +360,64 @@ metadata:
             candidate = line[len("run_id: "):].strip()
             if candidate:
                 self.last_run_id = candidate
+
+    def _session_notes(self) -> str:
+        """What earlier turns in this conversation did, for the next task.
+
+        Read from disk on every message rather than held in memory, so the
+        notes stay correct if a run is inspected or resumed out of band.
+        """
+        if self.stateless:
+            return ""
+        try:
+            from harness.session import SessionStore  # noqa: PLC0415
+
+            store = SessionStore(RUNS_DIR)
+            return store.notes(store.open(self.session_id))
+        except (OSError, ValueError, ImportError):
+            # Memory is a convenience; losing it must not end the conversation.
+            return ""
+
+    def _record_turn(self, message: str) -> None:
+        """Write what this turn did into the session's memory.
+
+        Read back from the run's own state rather than inferred from the exit
+        code, so the memory says what actually happened -- a run can end
+        BLOCKED or BUDGET_EXHAUSTED, and "it failed" is not enough for the
+        next turn to avoid repeating it.
+        """
+        if self.stateless or not self.last_run_id:
+            return
+        try:
+            from harness.contracts import RunStatus  # noqa: PLC0415
+            from harness.session import SessionStore  # noqa: PLC0415
+
+            state_path = RUNS_DIR / self.last_run_id / "state.json"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            store = SessionStore(RUNS_DIR)
+            session = store.open(self.session_id)
+            store.record(
+                session,
+                run_id=self.last_run_id,
+                message=message,
+                status=RunStatus(state.get("status", "FAILED")),
+                reason=str(state.get("terminal_reason", "")),
+                changed=tuple(self._changed_paths(RUNS_DIR / self.last_run_id)),
+            )
+        except (OSError, ValueError, KeyError, ImportError, json.JSONDecodeError):
+            # Memory is a convenience; failing to write it must not end the
+            # conversation or discard the work the run already did.
+            pass
+
+    @staticmethod
+    def _changed_paths(run_dir: Path) -> list[str]:
+        attempts = sorted((run_dir / "artifacts" / "verification").glob("attempt-*.json"))
+        if not attempts:
+            return []
+        try:
+            return list(json.loads(attempts[-1].read_text(encoding="utf-8")).get("changed_paths") or [])
+        except (OSError, json.JSONDecodeError, AttributeError):
+            return []
 
     def _run_harness(self, task_path: Path) -> int:
         """Run the harness as a subprocess and stream events live."""
@@ -539,6 +613,8 @@ metadata:
         else:
             origin = f"seed: {self.seed.name}"
         print(_tint(f"# {origin} · contract: {contract}", "2"))
+        if not self.stateless:
+            print(_tint(f"# session: {self.session_id} (workspace and memory persist)", "2"))
         if self.deliver != "none":
             print(_tint(f"# deliver: {self.deliver} · base: {self.base or 'default'}", "2"))
         print(_tint(f"# {_short_path(ROOT)}", "2"))
@@ -567,6 +643,7 @@ metadata:
             except KeyboardInterrupt:
                 print("\n(interrupted)")
                 code = 130
+            self._record_turn(line)
             if code == 0:
                 print("\n[done] acceptance passed")
             else:
@@ -625,6 +702,10 @@ def main_with_argv(argv: list[str]) -> int:
                         help="pull request target branch")
     parser.add_argument("--deliver-yes", action="store_true",
                         help="push and open without prompting")
+    parser.add_argument("--session", default="", metavar="ID",
+                        help="resume a named session's workspace and memory")
+    parser.add_argument("--stateless", action="store_true",
+                        help="give every message a fresh workspace, as before")
     arguments = parser.parse_args(argv)
     if arguments.repo is not None and arguments.seed is not None:
         parser.error("--repo and --seed name two different workspaces; choose one")
@@ -645,7 +726,8 @@ def main_with_argv(argv: list[str]) -> int:
                   seed=arguments.seed, accept=arguments.accept,
                   protect=arguments.protect, repository=arguments.repo,
                   base_ref=arguments.base_ref, deliver=arguments.deliver,
-                  base=arguments.base, deliver_yes=arguments.deliver_yes)
+                  base=arguments.base, deliver_yes=arguments.deliver_yes,
+                  session=arguments.session, stateless=arguments.stateless)
     return app.run()
 
 

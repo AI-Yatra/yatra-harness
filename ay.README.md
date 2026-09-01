@@ -56,6 +56,8 @@ ay --repo . --skill skills/repo-edit.yaml --accept "./init.sh" --deliver pr
 | `--deliver MODE` | `none`, `commit`, `branch` or `pr` after verification |
 | `--base BRANCH` | pull request target; defaults to the remote's own default |
 | `--deliver-yes` | push and open without prompting |
+| `--session ID` | resume a named session's workspace and memory |
+| `--stateless` | a fresh workspace per message, as before |
 
 `--deliver` needs `--repo`, because a seed workspace has no remote to push
 to. Your own checkout is only ever read, and a clone starts from a commit, so

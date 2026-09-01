@@ -89,6 +89,13 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--max-turns", type=int)
     run.add_argument("--max-seconds", type=float)
     run.add_argument("--fault", default="")
+    run.add_argument(
+        "--session",
+        default="",
+        metavar="ID",
+        help="reuse this session's workspace, so the run continues earlier work "
+        "instead of starting from the seed again",
+    )
     run.add_argument("--yes", action="store_true", help="approve policy-gated actions non-interactively")
     run.add_argument(
         "--scenario",
@@ -214,6 +221,7 @@ def main(argv: list[str] | None = None) -> int:
                 priorities=tuple(arguments.priorities),
                 require_local=arguments.require_local,
                 max_cost_per_1m=arguments.max_cost,
+                session_id=arguments.session,
                 approval_callback=approval,
             )
             code = _print_result(result)

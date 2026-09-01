@@ -12,6 +12,12 @@ instructions: >-
   rather than importing your own. If the repository has an AGENTS.md, its
   conventions are binding.
 
+  Every file change goes through apply_patch, including creating a new file
+  -- a patch against /dev/null creates one. run_command exists to run the
+  repository's own checks, and it is restricted to an allowlist, so reaching
+  for a shell utility to write a file will be refused. If a command is
+  denied, that is a signal to use apply_patch, not a reason to stop.
+
   Change only what the objective asks for. Do not reformat untouched lines,
   do not fix unrelated problems you notice, and do not modify anything under
   a protected path. Use git_diff to check what you have actually changed

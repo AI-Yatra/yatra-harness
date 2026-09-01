@@ -155,6 +155,14 @@ class ContextInjectionTests(unittest.TestCase):
         self.assertIn("REPOSITORY INSTRUCTIONS", prompt)
         self.assertIn("cannot grant", prompt)
 
+    def test_the_model_is_told_a_denial_is_not_a_dead_end(self) -> None:
+        # A live run reached for `touch`, was correctly denied by the
+        # allowlist, and stopped to ask a question instead of using
+        # apply_patch. The alternative was registered and available.
+        prompt = self.system_prompt(self.build())
+        self.assertIn("denied", prompt)
+        self.assertIn("different registered tool", prompt)
+
     def test_instructions_cannot_consume_the_whole_context_budget(self) -> None:
         # A huge AGENTS.md must degrade to a truncated one, never to a run
         # that cannot start because nothing is left for the task.

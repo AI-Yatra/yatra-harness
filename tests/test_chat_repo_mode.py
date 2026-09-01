@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -148,6 +149,112 @@ class RepoModeTests(unittest.TestCase):
         app = self.app(repository=self.repository)
         app._note_run_id("status: COMPLETED\n")
         self.assertIsNone(app.last_run_id)
+
+
+class SessionContinuityTests(unittest.TestCase):
+    """The REPL keeps one workspace and one memory across messages."""
+
+    def setUp(self) -> None:
+        self.chat = _import_chat()
+        self.config = ROOT / "configs" / "palimpsest-config.yaml"
+        self.skill = ROOT / "skills" / "palimpsest-skill.yaml"
+        self.temporary = tempfile.TemporaryDirectory(prefix="ay-session-")
+        self.addCleanup(self.temporary.cleanup)
+
+    def app(self, **kwargs):
+        return self.chat.ChatApp(self.config, self.skill, verbose=False, **kwargs)
+
+    def test_a_session_id_is_generated_for_every_repl(self) -> None:
+        self.assertTrue(self.app().session_id)
+
+    def test_two_repls_get_different_sessions(self) -> None:
+        self.assertNotEqual(self.app().session_id, self.app().session_id)
+
+    def test_an_explicit_session_id_is_used_as_given(self) -> None:
+        self.assertEqual(self.app(session="monday").session_id, "monday")
+
+    def test_the_session_reaches_the_harness_command(self) -> None:
+        command = self.app(session="monday")._harness_command(Path("task.yaml"))
+        self.assertIn("--session", command)
+        self.assertIn("monday", command)
+
+    def test_continuity_can_be_switched_off(self) -> None:
+        # One-shot messages against a scratch workspace are still the right
+        # default for an open question; continuity is opt-out, not mandatory.
+        command = self.app(session="monday", stateless=True)._harness_command(Path("t.yaml"))
+        self.assertNotIn("--session", command)
+
+    def test_the_first_message_carries_no_history(self) -> None:
+        app = self.app(session="monday")
+        path = app._write_task("do the first thing")
+        self.addCleanup(path.unlink, True)
+        self.assertNotIn("Turn 1:", path.read_text(encoding="utf-8"))
+
+    def test_a_later_message_carries_what_already_happened(self) -> None:
+        import yaml as yaml_module
+
+        from harness.contracts import RunStatus
+        from harness.session import SessionStore
+
+        app = self.app(session="monday")
+        store = SessionStore(self.chat.RUNS_DIR)
+        session = store.open("monday")
+        self.addCleanup(shutil.rmtree, session.directory, True)
+        store.record(session, run_id="r1", message="add a helper",
+                     status=RunStatus.COMPLETED, reason="passed", changed=("util.py",))
+        path = app._write_task("now use the helper")
+        self.addCleanup(path.unlink, True)
+        constraints = yaml_module.safe_load(path.read_text(encoding="utf-8"))["constraints"]
+        self.assertIn("add a helper", " ".join(constraints))
+
+    def test_a_finished_turn_is_written_to_the_session(self) -> None:
+        import json as json_module
+
+        from harness.session import SessionStore
+
+        app = self.app(session="tuesday")
+        store = SessionStore(self.chat.RUNS_DIR)
+        self.addCleanup(shutil.rmtree, store.open("tuesday").directory, True)
+        run_dir = self.chat.RUNS_DIR / "fake-run"
+        run_dir.mkdir(parents=True, exist_ok=True)
+        self.addCleanup(shutil.rmtree, run_dir, True)
+        (run_dir / "state.json").write_text(
+            json_module.dumps({"status": "COMPLETED", "terminal_reason": "acceptance criteria passed"}),
+            encoding="utf-8",
+        )
+        app.last_run_id = "fake-run"
+        app._record_turn("do the thing")
+        turns = store.open("tuesday").turns
+        self.assertEqual(len(turns), 1)
+        self.assertEqual(turns[0]["status"], "COMPLETED")
+        self.assertEqual(turns[0]["message"], "do the thing")
+
+    def test_a_turn_with_no_run_directory_is_not_recorded(self) -> None:
+        from harness.session import SessionStore
+
+        app = self.app(session="wednesday")
+        store = SessionStore(self.chat.RUNS_DIR)
+        self.addCleanup(shutil.rmtree, store.open("wednesday").directory, True)
+        app.last_run_id = "does-not-exist"
+        app._record_turn("a message")
+        self.assertEqual(store.open("wednesday").turns, ())
+
+    def test_recording_is_skipped_in_stateless_mode(self) -> None:
+        from harness.session import SessionStore
+
+        app = self.app(session="thursday", stateless=True)
+        store = SessionStore(self.chat.RUNS_DIR)
+        self.addCleanup(shutil.rmtree, store.open("thursday").directory, True)
+        app.last_run_id = "anything"
+        app._record_turn("a message")
+        self.assertEqual(store.open("thursday").turns, ())
+
+    def test_the_banner_names_the_session(self) -> None:
+        app = self.app(session="monday")
+        with io.StringIO() as sink, contextlib.redirect_stdout(sink):
+            app._print_banner()
+            output = sink.getvalue()
+        self.assertIn("monday", output)
 
 
 class RepoArgumentTests(unittest.TestCase):
