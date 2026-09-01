@@ -12,6 +12,7 @@ from typing import Any
 
 from . import __version__, auth
 from .artifacts import ArtifactStore
+from .backlog import load_backlog
 from .config import load_config, load_skill, load_task
 from .contracts import RunStatus
 from .delivery import DeliveryRequest, deliver
@@ -20,6 +21,7 @@ from .errors import HarnessError, InjectedCrash
 from .evals import load_suite, run_suite
 from .events import EventLog
 from .goal import GoalRequest, pursue
+from .loop import LoopRequest, goal_for, run_loop
 from .model_router import build_llm_light, profile_from_route
 from .policy import PolicyEngine
 from .replay import replay_run
@@ -182,6 +184,21 @@ def parser() -> argparse.ArgumentParser:
         help="approve the push and the pull request non-interactively",
     )
 
+    loop = commands.add_parser(
+        "loop", help="work a feature_list.json backlog until it is done or stuck"
+    )
+    loop.add_argument("backlog", type=Path, help="path to feature_list.json")
+    loop.add_argument("--repo", type=Path, default=None)
+    loop.add_argument("--seed", type=Path, default=None)
+    loop.add_argument("--base-ref", default="")
+    loop.add_argument("--config", type=Path, default=Path("configs/teaching.yaml"))
+    loop.add_argument("--skill", type=Path, default=Path("skills/repo-edit.yaml"))
+    loop.add_argument("--max-features", type=int, default=10)
+    loop.add_argument("--max-attempts", type=int, default=2,
+                      help="goal attempts per feature")
+    loop.add_argument("--yes", action="store_true")
+    _add_routing_arguments(loop)
+
     evals = commands.add_parser("eval", help="run an eval suite and gate on its pass rate")
     evals.add_argument("suite", type=Path)
     evals.add_argument("--runs-dir", type=Path, default=None,
@@ -268,6 +285,8 @@ def main(argv: list[str] | None = None) -> int:
             return _deliver(
                 run_dir, mode=arguments.mode, base=arguments.base, yes=arguments.deliver_yes
             )
+        if arguments.command == "loop":
+            return _loop(arguments)
         if arguments.command == "eval":
             return _eval(arguments)
         if arguments.command == "list-runs":
@@ -629,6 +648,59 @@ def _goal(arguments: Any) -> int:
             yes=arguments.deliver_yes,
         )
     return 0
+
+
+def _loop(arguments: Any) -> int:
+    """Work a backlog: pick, pursue, record, repeat."""
+    if (arguments.repo is None) == (arguments.seed is None):
+        print("error: loop needs exactly one of --repo or --seed", file=sys.stderr)
+        return 2
+    config = load_config(arguments.config)
+    approval = _resolve_approval(arguments)
+    request = LoopRequest(
+        backlog=arguments.backlog,
+        config_path=arguments.config,
+        skill_path=arguments.skill,
+        runs_dir=config.runs_dir,
+        seed=arguments.seed,
+        repository=arguments.repo,
+        base_ref=arguments.base_ref,
+        max_features=arguments.max_features,
+        max_attempts=arguments.max_attempts,
+    )
+
+    def pursue_feature(feature: Any, loop_request: LoopRequest) -> Any:
+        print(f"\n=== {feature.feature_id}: {feature.description}")
+
+        def runner(task_path: Path, attempt: int, trace_context: str = "") -> Any:
+            print(f"  attempt {attempt}")
+            return HarnessRuntime.start(
+                config_path=arguments.config,
+                task_path=task_path,
+                skill_path=arguments.skill,
+                trace_context=trace_context,
+                profile=arguments.profile,
+                priorities=tuple(arguments.priorities),
+                require_local=arguments.require_local,
+                max_cost_per_1m=arguments.max_cost,
+                approval_callback=approval,
+            )
+
+        result = pursue(goal_for(feature, loop_request), runner=runner)
+        print(f"  {'ACHIEVED' if result.achieved else 'NOT ACHIEVED'}: {result.reason}")
+        return result
+
+    total = len(load_backlog(arguments.backlog))
+    print(f"backlog: {arguments.backlog} ({total} feature(s))")
+    result = run_loop(request, pursue=pursue_feature)
+    print()
+    print(f"loop: {'COMPLETE' if result.completed else 'STOPPED'}")
+    print(f"reason: {result.reason}")
+    for outcome in result.outcomes:
+        marker = "done" if outcome.achieved else "left"
+        print(f"  {marker}  {outcome.feature_id}")
+    print(f"record: {result.record_path}")
+    return 0 if result.completed else 2
 
 
 def _eval(arguments: Any) -> int:

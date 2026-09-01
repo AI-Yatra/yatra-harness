@@ -279,6 +279,7 @@ harness run         execute a task
 harness goal        attempt a goal until its acceptance command passes
 harness deliver     commit, push and open a pull request for a completed run
 harness eval        run an eval suite and gate on its pass rate
+harness loop        work a feature_list.json backlog until it is done or stuck
 harness resume      continue a run from its last checkpoint
 harness inspect     terminal state plus the recent event timeline
 harness replay      rebuild a run from its ledger and hash it
@@ -412,6 +413,39 @@ uv run ruff check harness tests ay.py
 247 tests cover the runtime, the tool registry, provider adapters, routing,
 repository workspaces, delivery and the REPL. CI runs them on three Python versions along with `harness doctor` and
 a full deterministic run.
+
+## Working a backlog on its own
+
+Goal mode still needs you to say what the goal is. `harness loop` reads the
+goals from a file.
+
+```
+uv run harness loop feature_list.json --repo . --skill skills/repo-edit.yaml
+```
+
+```
+=== clamp-lower-bound: clamp() returns the lower bound for values below it.
+  attempt 1
+  ACHIEVED: acceptance criteria passed
+
+loop: COMPLETE
+reason: nothing left to do; every feature passes
+```
+
+Each feature in `feature_list.json` carries its own acceptance commands, and
+the loop is *refused* a feature that has none: without one there is nothing to
+stop on, and "done" falls back to whoever last read the diff.
+
+A completed feature is marked against evidence — the run id and the reason —
+and a failed one is written down rather than erased, because a backlog that
+forgets its failures sends the loop round the same wall until the budget runs
+out. A failed feature is skipped rather than retried immediately: goal mode
+already retried it, and going straight round again would let one hard feature
+eat the whole run while the rest of the backlog stayed untouched.
+
+Three endings, each named: the backlog is finished, the feature budget is
+spent, or everything left has already failed. A loop that cannot say why it
+stopped is not autonomous, it is unattended.
 
 ## Evals
 

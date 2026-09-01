@@ -303,6 +303,29 @@ non-Linux docker hosts reject the suffix outright.
 Local stays the default: a workshop laptop without docker must still be able
 to run the harness, and a teaching tool that refuses to start teaches nothing.
 
+## Backlog file
+
+`feature_list.json` is a JSON list. `harness loop` works it top to bottom, so
+file order is the priority order — the person who owns the backlog decides
+what comes next, not the loop.
+
+```json
+[
+  {
+    "id": "clamp-lower-bound",
+    "category": "correctness",
+    "description": "clamp() returns the lower bound for values below it.",
+    "acceptance": ["python -m unittest discover -s tests"],
+    "protect": ["tests/**"],
+    "passes": false
+  }
+]
+```
+
+`acceptance` is required and is the feature's stopping condition. `evidence`
+is written by the loop and holds the run id and outcome; do not hand-edit it,
+because it is the record that a pass was earned rather than declared.
+
 ## Sub-agents
 
 Delegation is off unless `subagents.agents` names at least one agent. When it
