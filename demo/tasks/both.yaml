@@ -1,0 +1,19 @@
+version: 1
+id: demo-tictactoe-complete
+objective: >-
+  Make the whole test suite pass. Two things are wrong: winner() does not
+  report a win on the anti-diagonal, and best_move(board, player) does not
+  exist. tests/test_best_move.py specifies what best_move must do.
+workspace_seed: ../tictactoe
+constraints:
+  - The tests are the specification; read them before writing code.
+  - Change implementation code only.
+protected_paths:
+  - tests/**
+acceptance:
+  commands:
+    - [python, -m, unittest, discover, -s, tests]
+  require_non_empty_diff: true
+  timeout_seconds: 60
+metadata:
+  demo: both

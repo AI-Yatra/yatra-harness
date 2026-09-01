@@ -54,7 +54,18 @@ class PolicyEngine:
         if not requires_approval:
             return PolicyDecision(True, False, "allowed by policy")
         if self.approval_callback is None:
-            return PolicyDecision(False, True, "approval is required but no approver is available")
+            # Deliberately different wording from a refusal. "Denied" reads as
+            # a decision that might go the other way, and a model that
+            # believes that asks again every turn -- one live run spent its
+            # whole budget on twelve denied patches. Nobody is there to ask,
+            # so say that, and say that asking again will not help.
+            return PolicyDecision(
+                False,
+                True,
+                f"{tool.name} needs approval and no approver is available in this run, so it "
+                "cannot be used; asking again will not succeed. Use a different registered "
+                "tool, or finish and report what is blocked.",
+            )
         if self.approval_callback(tool, arguments, f"authorize {tool.risk.value} capability"):
             return PolicyDecision(True, True, "approved by operator")
         return PolicyDecision(False, True, "operator denied approval")

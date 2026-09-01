@@ -1,0 +1,22 @@
+version: 1
+id: demo-add-best-move
+objective: >-
+  Add best_move(board, player) to game.py. It returns the cell the player
+  should take: a cell that wins the game for them if one exists, otherwise a
+  cell that would win for the opponent, otherwise the first free cell in
+  board order. It raises ValueError for a full board or an unknown player,
+  and leaves the board it was given unchanged.
+workspace_seed: ../tictactoe
+constraints:
+  - tests/test_best_move.py is the specification; read it before writing code.
+  - Change implementation code only.
+  - Reuse the existing helpers in game.py rather than reimplementing them.
+protected_paths:
+  - tests/**
+acceptance:
+  commands:
+    - [python, -m, unittest, tests.test_best_move]
+  require_non_empty_diff: true
+  timeout_seconds: 60
+metadata:
+  demo: feature-addition

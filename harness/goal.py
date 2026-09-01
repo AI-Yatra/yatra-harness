@@ -55,6 +55,7 @@ class GoalRequest:
     repository: Path | None = None
     base_ref: str = ""
     protect: tuple[str, ...] = ()
+    session_id: str = ""
     max_attempts: int = 3
     max_seconds: float = 1800.0
 
