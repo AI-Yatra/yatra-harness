@@ -166,6 +166,19 @@ otherwise use at the source repository's own upstream, so a later push
 targets the remote the pull request needs rather than the operator's
 checkout.
 
+## Shipped skills
+
+| Skill | For |
+|---|---|
+| `skills/bugfix.yaml` | repairing a defect the acceptance command detects |
+| `skills/repo-edit.yaml` | making a specific requested change to a repository |
+| `skills/palimpsest-skill.yaml` | the workshop's artifact-building task |
+
+The distinction between the first two matters more than it looks. `bugfix`
+tells the model to find and repair a defect, so given a plain edit request it
+goes looking for a bug that is not there and asks for clarification instead
+of working. `repo-edit` states that the objective *is* the request.
+
 ## Skill file
 
 ```yaml
