@@ -29,6 +29,7 @@ uv run ruff check harness tests ay.py
 uv run python -m unittest discover -s tests
 uv run harness doctor --config configs/teaching.yaml
 uv run harness run tasks/repair_counter.yaml --config configs/teaching.yaml --skill skills/bugfix.yaml
+uv run harness eval evals/teaching.yaml
 ```
 
 The last two need no API key: `configs/teaching.yaml` runs a scripted local

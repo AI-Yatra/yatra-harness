@@ -20,4 +20,7 @@ uv run harness run tasks/repair_counter.yaml \
   --config configs/teaching.yaml \
   --skill skills/bugfix.yaml
 
+echo "==> evals"
+uv run harness eval evals/teaching.yaml
+
 echo "==> ok"

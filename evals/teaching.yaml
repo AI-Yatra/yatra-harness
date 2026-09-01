@@ -1,0 +1,27 @@
+version: 1
+id: teaching
+# The deterministic suite: no key, no network, same result on every machine.
+# It is a regression gate for the harness itself rather than a benchmark of a
+# model, which is why every route here is a replay script.
+min_pass_rate: 1.0
+defaults:
+  config: ../configs/teaching.yaml
+  skill: ../skills/bugfix.yaml
+cases:
+  - id: repair-counter
+    task: ../tasks/repair_counter.yaml
+    expect: COMPLETED
+
+  # Expected to fail, and that is the point. Its acceptance command always
+  # exits non-zero, so a harness whose verifier stopped verifying would turn
+  # this green -- and every unit test in the repository would stay green with
+  # it. This case is the one that notices.
+  - id: broken-acceptance-is-refused
+    task: ../tasks/repair_counter_fail.yaml
+    expect: FAILED
+
+  - id: delegation
+    task: ../tasks/repair_counter.yaml
+    config: ../configs/delegation.yaml
+    skill: ../skills/bugfix-delegating.yaml
+    expect: COMPLETED

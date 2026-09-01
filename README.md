@@ -278,6 +278,7 @@ harness routes      show the resolved route plan and what was excluded
 harness run         execute a task
 harness goal        attempt a goal until its acceptance command passes
 harness deliver     commit, push and open a pull request for a completed run
+harness eval        run an eval suite and gate on its pass rate
 harness resume      continue a run from its last checkpoint
 harness inspect     terminal state plus the recent event timeline
 harness replay      rebuild a run from its ledger and hash it
@@ -392,6 +393,32 @@ uv run ruff check harness tests ay.py
 247 tests cover the runtime, the tool registry, provider adapters, routing,
 repository workspaces, delivery and the REPL. CI runs them on three Python versions along with `harness doctor` and
 a full deterministic run.
+
+## Evals
+
+```
+uv run harness eval evals/teaching.yaml
+```
+
+```
+suite: teaching  cases: 3
+PASS  repair-counter                       COMPLETED             254ms
+PASS  broken-acceptance-is-refused         FAILED                203ms
+PASS  delegation                           COMPLETED             208ms
+
+pass rate: 100% (threshold 100%)
+```
+
+The unit suite proves each part behaves. It cannot answer the question that
+matters when a prompt, a model or a budget changes: does a run still finish
+the task. `harness eval` runs a set of cases, records the outcome of each, and
+exits non-zero when the pass rate falls below the suite's threshold. CI runs
+it on every push.
+
+The middle case is expected to **fail**, and that is the point. Its acceptance
+command always exits non-zero, so a harness whose verifier stopped verifying
+would turn it green — while every unit test in this repository stayed green
+too. That case is the one that notices.
 
 ## Layout
 

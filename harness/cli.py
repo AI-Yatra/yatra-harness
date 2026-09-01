@@ -17,6 +17,7 @@ from .contracts import RunStatus
 from .delivery import DeliveryRequest, deliver
 from .doctor import run_doctor
 from .errors import HarnessError, InjectedCrash
+from .evals import load_suite, run_suite
 from .events import EventLog
 from .goal import GoalRequest, pursue
 from .model_router import build_llm_light, profile_from_route
@@ -180,6 +181,16 @@ def parser() -> argparse.ArgumentParser:
         help="approve the push and the pull request non-interactively",
     )
 
+    evals = commands.add_parser("eval", help="run an eval suite and gate on its pass rate")
+    evals.add_argument("suite", type=Path)
+    evals.add_argument("--runs-dir", type=Path, default=None,
+                       help="where run bundles go; defaults to the first case's config")
+    evals.add_argument("--report-dir", type=Path, default=Path(".evals"))
+    evals.add_argument("--min-pass-rate", type=float, default=None,
+                       help="override the suite's own threshold")
+    evals.add_argument("--yes", action="store_true", default=True,
+                       help=argparse.SUPPRESS)
+
     listing = commands.add_parser("list-runs", help="list durable run checkpoints")
     listing.add_argument("--runs-dir", type=Path, default=Path(".runs"))
     return root
@@ -251,6 +262,8 @@ def main(argv: list[str] | None = None) -> int:
             return _deliver(
                 run_dir, mode=arguments.mode, base=arguments.base, yes=arguments.deliver_yes
             )
+        if arguments.command == "eval":
+            return _eval(arguments)
         if arguments.command == "list-runs":
             return _list_runs(arguments)
     except InjectedCrash as exc:
@@ -609,6 +622,43 @@ def _goal(arguments: Any) -> int:
             yes=arguments.deliver_yes,
         )
     return 0
+
+
+def _eval(arguments: Any) -> int:
+    """Run an eval suite and turn its pass rate into an exit code."""
+    from dataclasses import replace as _replace  # noqa: PLC0415
+
+    suite = load_suite(arguments.suite)
+    if arguments.min_pass_rate is not None:
+        suite = _replace(suite, min_pass_rate=arguments.min_pass_rate)
+
+    def runner(case: Any) -> Any:
+        return HarnessRuntime.start(
+            config_path=case.config,
+            task_path=case.task,
+            skill_path=case.skill,
+            model=case.model or None,
+            # Every gate is approved: an eval measures whether the harness
+            # completes the task, and a run that stalls on an approval prompt
+            # measures the operator instead.
+            approval_callback=_approval(True),
+        )
+
+    def report_case(result: Any) -> None:
+        marker = "PASS" if result.passed else "FAIL"
+        print(f"{marker}  {result.case_id:36} {result.actual:18} {result.duration_ms:>6}ms")
+
+    print(f"suite: {suite.suite_id}  cases: {len(suite.cases)}")
+    report = run_suite(
+        suite, runner=runner, report_dir=arguments.report_dir, on_case=report_case
+    )
+    print()
+    print(f"pass rate: {report.pass_rate:.0%} (threshold {suite.min_pass_rate:.0%})")
+    print(f"report: {report.report_path}")
+    for result in report.results:
+        if not result.passed:
+            print(f"  {result.case_id}: {result.detail}")
+    return 0 if report.passed else 2
 
 
 def _add_delivery_arguments(command: Any) -> None:
