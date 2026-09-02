@@ -183,8 +183,20 @@ class ModelRouter:
                     self._open_if_needed(route_name, state, event)
                     if route_name in state.opened_routes or attempt >= self.config.retries_per_route:
                         break
-                    delay = self.config.backoff_seconds * (2**attempt)
-                    event("MODEL_RETRY_SCHEDULED", {"route": route_name, "delay_seconds": delay})
+                    # A provider that says how long to wait knows better than
+                    # our doubling does. Ignoring it means either hammering an
+                    # endpoint that just asked us not to, or sleeping much
+                    # longer than it needs.
+                    asked = getattr(exc, "retry_after", 0.0) or 0.0
+                    delay = asked or self.config.backoff_seconds * (2**attempt)
+                    event(
+                        "MODEL_RETRY_SCHEDULED",
+                        {
+                            "route": route_name,
+                            "delay_seconds": delay,
+                            "source": "provider" if asked else "backoff",
+                        },
+                    )
                     if delay:
                         self.sleeper(delay)
             if route_index + 1 < len(routes):

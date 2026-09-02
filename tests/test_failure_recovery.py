@@ -262,3 +262,48 @@ class WriteOverAwkwardFilesTests(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class RetryAfterTests(unittest.TestCase):
+    """A provider that says how long to wait should be believed."""
+
+    @staticmethod
+    def error(headers: dict[str, str]):
+        import io
+        import urllib.error
+
+        return urllib.error.HTTPError(
+            "http://example", 429, "Too Many Requests", headers, io.BytesIO(b"{}")
+        )
+
+    def parse(self, headers: dict[str, str]) -> float:
+        from harness.models.providers import _retry_after
+
+        return _retry_after(self.error(headers))
+
+    def test_delta_seconds_is_read(self) -> None:
+        self.assertEqual(self.parse({"Retry-After": "30"}), 30.0)
+
+    def test_a_fractional_value_is_read(self) -> None:
+        self.assertEqual(self.parse({"Retry-After": "0.5"}), 0.5)
+
+    def test_a_missing_header_falls_back_to_our_own_backoff(self) -> None:
+        self.assertEqual(self.parse({}), 0.0)
+
+    def test_the_http_date_form_is_declined_rather_than_guessed(self) -> None:
+        """Clock skew makes a wrong answer worse than no answer."""
+        self.assertEqual(self.parse({"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}), 0.0)
+
+    def test_an_absurd_wait_is_capped(self) -> None:
+        self.assertEqual(self.parse({"Retry-After": "99999"}), 120.0)
+
+    def test_a_negative_value_is_ignored(self) -> None:
+        self.assertEqual(self.parse({"Retry-After": "-5"}), 0.0)
+
+    def test_the_error_carries_it_to_the_router(self) -> None:
+        error = TransientProviderError("rate limited", 429, 30)
+        self.assertEqual(error.status, 429)
+        self.assertEqual(error.retry_after, 30.0)
+
+    def test_errors_without_one_default_to_zero(self) -> None:
+        self.assertEqual(TransientProviderError("boom").retry_after, 0.0)
