@@ -60,6 +60,18 @@ def _environment(root: Path, mode: Mode, profile: PromptProfile) -> str:
         "Edits and commands may be refused by the operator. A refusal is final "
         "for that action; do not retry it, and do not try to reach the same "
         "effect another way without saying so.",
+        *(
+            [
+                "In this mode nothing you do can change anything, so do not "
+                "attempt an edit or a command to find out what would happen. "
+                "Read what you need, then answer with the change you would "
+                "make and why, concretely enough that the operator can judge "
+                "it: the files, what changes in each, and how it would be "
+                "checked. They will switch modes if they want it done.",
+            ]
+            if mode is Mode.PLAN
+            else []
+        ),
         "Paths you pass to tools are relative to the working directory and "
         "cannot escape it.",
     ]

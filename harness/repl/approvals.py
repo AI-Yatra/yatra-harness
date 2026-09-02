@@ -36,6 +36,9 @@ if TYPE_CHECKING:
 class Mode(StrEnum):
     """How much the gate asks about."""
 
+    #: Read and search only. Nothing that changes anything, and nothing to
+    #: approve: the answer is no until the operator leaves this mode.
+    PLAN = "plan"
     #: Ask before every write and every command.
     SUGGEST = "suggest"
     #: Edit files freely; still ask before running anything.
@@ -46,6 +49,7 @@ class Mode(StrEnum):
     @property
     def label(self) -> str:
         return {
+            Mode.PLAN: "reads and plans, changes nothing",
             Mode.SUGGEST: "asks before edits and commands",
             Mode.AUTO_EDIT: "edits freely, asks before commands",
             Mode.FULL_AUTO: "does not ask",
@@ -128,6 +132,19 @@ class Gate:
         if tool.risk is RiskLevel.READ:
             return Decision(True, "reads do not need approval")
 
+        if self.mode is Mode.PLAN:
+            # A refusal rather than a prompt, deliberately. The point of the
+            # mode is to read a codebase without any chance of changing it, so
+            # offering to approve each change one at a time would be the same
+            # as not being in the mode. Saying the way out keeps the model from
+            # spending the turn asking for permission it cannot be given.
+            return Decision(
+                False,
+                f"{tool.name} would change something and this session is in plan mode, "
+                "which reads only. Finish the plan and say what you would do; the "
+                "operator switches with /mode auto-edit when they are ready.",
+            )
+
         if not self._must_ask(tool.risk):
             return Decision(True, f"{self.mode.value} mode")
 
@@ -161,6 +178,11 @@ class Gate:
         )
 
     def _must_ask(self, risk: RiskLevel) -> bool:
+        if self.mode is Mode.PLAN:
+            # Unreachable through `check`, which stops plan mode earlier. Kept
+            # correct anyway so a future caller cannot read "does not ask" as
+            # "allows".
+            return True
         if self.mode is Mode.FULL_AUTO:
             return False
         if self.mode is Mode.AUTO_EDIT:

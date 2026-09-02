@@ -45,7 +45,7 @@ Ask anything, or give an instruction. The agent works in this directory.
   /help              this
   /model [name]      show or switch the model
   /models [filter]   what the current provider actually serves
-  /mode [name]       approval mode: suggest, auto-edit, full-auto
+  /mode [name]       plan, suggest, auto-edit, full-auto
   /profile [name]    prompting dials for this route, or a dial to change
   /approvals         what you have allowed for the rest of this session
   /tools             the tools the model can call
@@ -624,7 +624,10 @@ class Shell:
             self.render.error(f"modes are: {', '.join(m.value for m in Mode)}")
             return
         self.gate.mode = self.mode
-        self.render.notice(f"mode -> {self.mode.value} ({self.mode.label})")
+        # The system prompt states the mode, so a switch the model is not told
+        # about leaves it planning edits it is about to be refused, or asking
+        # for approval that no longer gets requested.
+        self._restart_conversation(f"mode -> {self.mode.value} ({self.mode.label})")
 
     def _show_context(self) -> None:
         used = self.conversation.token_estimate()
