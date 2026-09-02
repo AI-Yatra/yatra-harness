@@ -83,6 +83,7 @@ def main_with_argv(argv: list[str]) -> int:
         session_id=arguments.session,
         resume=bool(arguments.resume or arguments.session),
         model_override=arguments.model,
+        prompt_profile=arguments.prompt_profile,
         initial_message=message,
         print_once=bool(arguments.print_only),
         sessions_dir=root / ".ay",
@@ -128,6 +129,15 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_CONFIG,
         metavar="FILE",
         help=f"harness config YAML (default: {DEFAULT_CONFIG.name})",
+    )
+    parser.add_argument(
+        "--prompt-profile",
+        default="",
+        metavar="NAME",
+        help=(
+            "prompting dials for every route this session: bare, lean, "
+            "standard, deep or xml (default: each route decides)"
+        ),
     )
     parser.add_argument(
         "--model",

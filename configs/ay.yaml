@@ -58,6 +58,9 @@ model_router:
       latency: low
       quality: 3.5
       context_window: 262144
+      # Fast and competent, but it under-narrates: it will run three tools
+      # and say nothing until the end. lean turns the summary line back on.
+      prompt_profile: lean
     # The same provider's flagship, for when a task wants more thinking than
     # speed. Fewer tool calls and fewer tokens per task, but slower per turn
     # and materially more expensive per token.
@@ -106,6 +109,9 @@ model_router:
       latency: low
       quality: 3.5
       context_window: 131072
+      # Recorded doing the demo repair in 7 tool calls with no wasted reads,
+      # so it needs no nudging. See docs/atlas/public/trace.json.
+      prompt_profile: standard
     # OpenCode Zen: one key, many vendors' models.
     # Key: `ay auth add --provider opencode <key>` from opencode.ai/auth.
     opencode:

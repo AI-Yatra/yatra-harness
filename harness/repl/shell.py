@@ -21,7 +21,7 @@ from harness.core.errors import HarnessError
 from harness.core.util import is_chat_model, model_version
 from harness.execution.process import run_process
 from harness.execution.workspace import Workspace
-from harness.models import auth
+from harness.models import auth, prompting
 from harness.repl.tools import ReplToolset
 
 from . import prompt as prompt_builder
@@ -40,6 +40,7 @@ Ask anything, or give an instruction. The agent works in this directory.
   /model [name]      show or switch the model
   /models [filter]   what the current provider actually serves
   /mode [name]       approval mode: suggest, auto-edit, full-auto
+  /profile [name]    prompting dials for this route, or a dial to change
   /approvals         what you have allowed for the rest of this session
   /tools             the tools the model can call
   /context           how full the context window is
@@ -73,6 +74,9 @@ class Options:
     session_id: str = ""
     resume: bool = False
     model_override: str = ""
+    #: Force a prompt profile for every route this session. Empty means each
+    #: route decides, which is usually what you want.
+    prompt_profile: str = ""
     initial_message: str = ""
     print_once: bool = False
     sessions_dir: Path = field(default_factory=lambda: Path(".ay"))
@@ -85,6 +89,8 @@ class Shell:
         self.render = Renderer(self.console)
         self.config: HarnessConfig = load_config(options.config_path)
         self.root = options.root.resolve()
+        # Set only by /profile; None means the route still decides.
+        self._profile_override: prompting.PromptProfile | None = None
         self.mode = options.mode
         self.session_id = options.session_id or self._latest_session() or f"ay-{uuid.uuid4().hex[:8]}"
         self.workspace = Workspace(self.root, ())
@@ -200,8 +206,16 @@ class Shell:
     def _window(self) -> int:
         return getattr(self.route, "context_window", 0) or 128_000
 
+    def _profile(self) -> prompting.PromptProfile:
+        """The dials for the current route, with any /profile change kept."""
+        if self._profile_override is not None:
+            return self._profile_override
+        return prompting.for_route(self.route, self.options.prompt_profile)
+
     def _open_conversation(self) -> Conversation:
-        system = prompt_builder.build(self.config, self.root, mode=self.mode)
+        system = prompt_builder.build(
+            self.config, self.root, mode=self.mode, profile=self._profile()
+        )
         window = self._window()
         if self.options.resume and self._session_path().exists():
             return Conversation.load(self._session_path(), system=system, max_tokens=window)
@@ -369,6 +383,9 @@ class Shell:
         if name == "mode":
             self._switch_mode(argument)
             return True
+        if name == "profile":
+            self._switch_profile(argument)
+            return True
         if name == "approvals":
             standing = self.gate.standing_approvals
             if not standing:
@@ -510,6 +527,72 @@ class Shell:
             )
         console.line()
         self.render.notice("switch with /model <name>, for example /model gemini")
+
+    def _switch_profile(self, argument: str) -> None:
+        """Show the prompting dials, pick a preset, or move one dial.
+
+        The dials exist because the published guidance disagrees with itself
+        across models: the same instruction that rescues a weak model wastes a
+        turn on a strong one. So this prints what is actually in the prompt
+        rather than describing what it should be.
+        """
+        current = self._profile()
+        if not argument:
+            source = "set by /profile" if self._profile_override else f"from route {self.route.name}"
+            self.console.line()
+            self.console.line(f"  prompt profile: {current.name} ({source})")
+            for label, value in prompting.describe(current):
+                self.console.line(f"    {label:<22} {self.console.dim(value)}")
+            self.console.line()
+            self.console.line(
+                "  " + self.console.dim(
+                    "/profile <" + "|".join(sorted(prompting.PRESETS)) + ">"
+                )
+            )
+            self.console.line(
+                "  " + self.console.dim("/profile <dial> <on|off|value> to change one")
+            )
+            return
+
+        parts = argument.split()
+        if len(parts) == 1:
+            try:
+                self._profile_override = prompting.get(parts[0])
+            except KeyError as exc:
+                self.render.notice(str(exc.args[0]))
+                return
+            self._restart_conversation(f"prompt profile is now {self._profile_override.name}")
+            return
+
+        field = prompting.dial(parts[0])
+        raw = " ".join(parts[1:])
+        if not field:
+            known = ", ".join(sorted(set(prompting.DIALS.values())))
+            self.render.notice(f"no dial called {parts[0]!r}; try one of: {known}")
+            return
+        value: object = raw
+        if raw.lower() in {"on", "true", "yes"}:
+            value = True
+        elif raw.lower() in {"off", "false", "no"}:
+            value = False
+        try:
+            self._profile_override = prompting.with_overrides(current, **{field: value})
+        except (ValueError, TypeError) as exc:
+            self.render.notice(str(exc))
+            return
+        self._restart_conversation(f"{field.replace('_', ' ')} is now {raw}")
+
+    def _restart_conversation(self, reason: str) -> None:
+        """Rebuild the system prompt in place.
+
+        The system prompt is the cached prefix of every request, so changing it
+        invalidates that cache and the conversation has to carry the new one
+        from here on. Saying so is better than a silent reprice.
+        """
+        self.conversation.system = prompt_builder.build(
+            self.config, self.root, mode=self.mode, profile=self._profile()
+        )
+        self.render.notice(f"{reason}; the system prompt was rebuilt for this session.")
 
     def _switch_mode(self, argument: str) -> None:
         if not argument:

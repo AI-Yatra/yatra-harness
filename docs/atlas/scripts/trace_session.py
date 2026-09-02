@@ -41,6 +41,7 @@ from scan_harness import LAYER_ORDER  # noqa: E402
 
 from harness.config import load_config  # noqa: E402
 from harness.execution.workspace import Workspace  # noqa: E402
+from harness.models import prompting  # noqa: E402
 from harness.repl import prompt  # noqa: E402
 from harness.repl.agent import Agent, Events  # noqa: E402
 from harness.repl.approvals import Gate, Mode  # noqa: E402
@@ -205,7 +206,12 @@ def pytest_report(cwd: Path) -> dict[str, Any]:
 
 
 def build_agent(
-    config: Any, route_name: str, root: Path, rec: Recorder, steps: list[dict[str, Any]]
+    config: Any,
+    route_name: str,
+    root: Path,
+    rec: Recorder,
+    steps: list[dict[str, Any]],
+    profile: Any = None,
 ) -> Agent:
     """The same objects `ay` builds for a real session, wired to the recorder."""
     route = config.router.routes[route_name]
@@ -259,7 +265,9 @@ def build_agent(
 
     return Agent(
         model=ChatModel(route),
-        conversation=Conversation(prompt.build(config, root, mode=Mode.FULL_AUTO)),
+        conversation=Conversation(
+            prompt.build(config, root, mode=Mode.FULL_AUTO, profile=profile)
+        ),
         toolset=ReplToolset(Workspace(root, ()), config),
         gate=Gate(config.policy, mode=Mode.FULL_AUTO),
         config=config,
@@ -279,6 +287,11 @@ def main() -> int:
     ap.add_argument("--subject", default=str(ROOT / "demo" / "tictactoe"))
     ap.add_argument("--out", default=str(ROOT / "docs" / "atlas" / "public" / "trace.json"))
     ap.add_argument("--keep", action="store_true", help="keep the working copy")
+    ap.add_argument(
+        "--profile",
+        default="",
+        help="prompt profile to force; default is whatever the route resolves to",
+    )
     args = ap.parse_args()
 
     config = load_config(Path(args.config))
@@ -300,7 +313,9 @@ def main() -> int:
 
     steps: list[dict[str, Any]] = []
     rec = Recorder()
-    agent = build_agent(config, args.route, root, rec, steps)
+    profile = prompting.for_route(route, args.profile)
+    print(f"profile   {profile.name}")
+    agent = build_agent(config, args.route, root, rec, steps, profile)
 
     started = time.time()
     rec.start()
@@ -352,6 +367,10 @@ def main() -> int:
             "model": route.model,
             "base_url": route.base_url,
             "stream": bool(route.stream),
+        },
+        "profile": {
+            "name": profile.name,
+            "dials": dict(prompting.describe(profile)),
         },
         "entry": rec.entry,
         "wall_ms": round(wall * 1000, 1),
