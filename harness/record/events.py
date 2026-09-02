@@ -23,15 +23,42 @@ class EventLog:
         self.run_id = run_id
         self.redactor = redactor or Redactor()
         self._lock = threading.Lock()
-        #: Set by `read` when the final line was half-written, so a caller that
-        #: cares can say the run ended mid-append rather than cleanly.
+        #: Whether a half-written final line was ever seen in this file. Set
+        #: on the first read and never cleared, because the useful question is
+        #: whether the run ended mid-append, and repairing the file afterwards
+        #: does not change the answer.
         self.truncated = False
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._sequence = self._read_last_sequence()
+        if self.truncated:
+            self._discard_torn_tail()
 
     @property
     def sequence(self) -> int:
         return self._sequence
+
+    def _discard_torn_tail(self) -> None:
+        """Cut the half-written last line off the file.
+
+        Tolerating it on read is not enough on its own. The torn line has no
+        newline, so the next append lands on the end of it and produces one
+        corrupt line out of two good halves, which loses the appended event as
+        well and turns a recoverable tail into damage in the middle. Removing
+        it once, when the log is opened, is what makes the recovery hold.
+        """
+        with self.path.open(encoding="utf-8") as handle:
+            lines = handle.readlines()
+        keep = []
+        for line in lines:
+            if not line.strip():
+                continue
+            try:
+                json.loads(line)
+            except json.JSONDecodeError:
+                break
+            keep.append(line if line.endswith("\n") else line + "\n")
+        with self.path.open("w", encoding="utf-8", newline="\n") as handle:
+            handle.writelines(keep)
 
     def _read_last_sequence(self) -> int:
         if not self.path.exists():
@@ -80,7 +107,6 @@ class EventLog:
         than an interrupted append, and continuing past it would silently drop
         events. That still refuses.
         """
-        self.truncated = False
         if not self.path.exists():
             return
         with self.path.open(encoding="utf-8") as handle:
