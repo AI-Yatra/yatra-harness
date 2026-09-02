@@ -375,7 +375,19 @@ class ReplToolset:
         if not isinstance(content, str):
             raise ToolError("write_file needs a string content")
         existed = path.exists()
-        before = _read_text(path) if existed and path.is_file() else ""
+        if existed and path.is_dir():
+            raise ToolError(f"{self._relative(path)} is a directory, not a file")
+        # The old contents are read only to count the change, so failing to
+        # read them must not fail the write. A file that is binary or in
+        # another encoding is exactly the one a caller most wants to replace,
+        # and refusing with an error about the file being overwritten reads as
+        # though the new content were at fault.
+        before = ""
+        if existed and path.is_file():
+            try:
+                before = _read_text(path)
+            except (ToolError, OSError, UnicodeDecodeError):
+                before = ""
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         added, removed = _count_changes(before, content)

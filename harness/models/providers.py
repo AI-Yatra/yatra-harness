@@ -7,6 +7,7 @@ owns orchestration.
 
 from __future__ import annotations
 
+import http.client
 import json
 import urllib.error
 import urllib.request
@@ -159,8 +160,23 @@ class _HTTPProvider:
             ) from exc
         except (urllib.error.URLError, TimeoutError) as exc:
             raise TransientProviderError(f"provider request failed: {exc}") from exc
-        except json.JSONDecodeError as exc:
-            raise TransientProviderError("provider returned invalid JSON") from exc
+        except http.client.HTTPException as exc:
+            # A connection dropped part-way through a response raises
+            # IncompleteRead, which is an HTTPException and not an OSError, so
+            # it slipped past every handler here and past the router, which
+            # only knows the provider error types. The turn died instead of
+            # failing over, on the failure a fallback route exists for.
+            raise TransientProviderError(
+                f"provider connection failed mid-response: {type(exc).__name__}"
+            ) from exc
+        except OSError as exc:
+            # A reset socket inside the response body, rather than during the
+            # handshake where URLError would have wrapped it.
+            raise TransientProviderError(f"provider connection failed: {exc}") from exc
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            # A 200 carrying an HTML error page, or a truncated body. Transient
+            # because the same request to a healthy endpoint would parse.
+            raise TransientProviderError("provider returned a malformed response") from exc
         if not isinstance(payload, dict):
             raise PermanentProviderError("provider response was not a JSON object")
         return payload
