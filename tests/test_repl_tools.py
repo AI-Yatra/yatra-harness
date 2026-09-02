@@ -238,7 +238,7 @@ class DispatchTests(ToolsetTestCase):
     def test_an_unknown_tool_is_reported(self) -> None:
         outcome = self.tools.dispatch("teleport", {})
         self.assertFalse(outcome.ok)
-        self.assertIn("No such tool", outcome.content)
+        self.assertIn("unknown tool", outcome.content)
 
     def test_unparseable_arguments_come_back_as_a_message(self) -> None:
         outcome = self.tools.dispatch("read_file", {"__parse_error__": "bad JSON"})

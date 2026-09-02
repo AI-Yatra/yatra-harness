@@ -17,16 +17,20 @@ from __future__ import annotations
 import fnmatch
 import os
 import re
+import tempfile
 import time
-from collections.abc import Iterator
-from dataclasses import dataclass
+from collections.abc import Iterator, Sequence
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from harness.core.contracts import RiskLevel, ToolSpec
 from harness.core.errors import ToolError, WorkspaceError
+from harness.execution.policy import ANY_COMMAND, PolicyEngine
 from harness.execution.sandbox import build_sandbox
+from harness.execution.tools import ToolRegistry
 from harness.execution.workspace import Workspace
+from harness.record.artifacts import ArtifactStore
 
 # Guarded because `config` is the composition root: it imports every
 # module it configures, so importing it back at runtime would close a
@@ -124,10 +128,53 @@ def _backtracks(expression: re.Pattern[str]) -> bool:
     return False
 
 
-class ReplToolset:
-    """The registry, bound to one workspace root and one config."""
+class _EphemeralArtifacts:
+    """Somewhere for oversized output to go when there is no run directory.
 
-    def __init__(self, workspace: Workspace, config: HarnessConfig) -> None:
+    The batch loop writes artifacts under the run it belongs to. A
+    conversation may not have one, and dropping the overflow instead would
+    make the truncation notice a dead end: the model is told the output was
+    cut and neither it nor the operator can see the rest.
+
+    The directory is made on first use, so a session that never overflows
+    never creates one.
+    """
+
+    def __init__(self) -> None:
+        self._store: ArtifactStore | None = None
+
+    def write_payload(self, name: str, content: str) -> str:
+        if self._store is None:
+            self._store = ArtifactStore(Path(tempfile.mkdtemp(prefix="ay-artifacts-")))
+        return self._store.write_payload(name, content)
+
+
+class ReplToolset:
+    """The conversational tool set, executed by the shared registry.
+
+    The tools here are shaped for a conversation, but running them is not a
+    separate mechanism. Every call goes through `ToolRegistry`, which is the
+    same object the batch loop uses, so a conversation gets the things that
+    were previously only wired to `harness run`: arguments validated against
+    the declared schema before a handler sees them, oversized output spilled to
+    an artifact instead of into the context, every decision written to the
+    event ledger, and an unexpected exception isolated to the call rather than
+    the session.
+
+    It also means a tool only has to be registered once to be available to
+    both. `extra_tools` is how MCP servers, retrieval and delegation reach a
+    conversation, rather than by being reimplemented here.
+    """
+
+    def __init__(
+        self,
+        workspace: Workspace,
+        config: HarnessConfig,
+        *,
+        artifacts: ArtifactStore | None = None,
+        event_callback: Any = None,
+        extra_tools: Sequence[tuple[ToolSpec, Any]] = (),
+    ) -> None:
         self.workspace = workspace
         self.config = config
         self._handlers: dict[str, Handler] = {
@@ -139,10 +186,104 @@ class ReplToolset:
             "edit_file": self.edit_file,
             "run_command": self.run_command,
         }
+        self.registry = self._build_registry(artifacts, event_callback, extra_tools)
+
+    def _build_registry(
+        self,
+        artifacts: ArtifactStore | None,
+        event_callback: Any,
+        extra_tools: Sequence[tuple[ToolSpec, Any]],
+    ) -> ToolRegistry:
+        """Assemble the shared registry for a conversation.
+
+        Two parts of the shared policy are stood down here, both because the
+        operator is present and neither because a conversation deserves less
+        care.
+
+        Approval is left to `Gate`. A second approver inside the registry would
+        prompt twice, or refuse what the operator had just allowed.
+
+        The command allowlist steps aside for the reason `configs/ay.yaml`
+        already gives: this loop asks about commands rather than requiring them
+        to be listed in advance, and a list written to cover everything the
+        operator might agree to stops meaning anything. The deny-list, the
+        network rule and the schema check all still apply, and they are the
+        same code the batch loop runs, so a refusal cannot be reached by going
+        around the gate.
+        """
+        specs = self._native_specs() + tuple(spec for spec, _ in extra_tools)
+        policy = PolicyEngine(
+            replace(
+                self.config.policy,
+                approval_mode="never",
+                allowed_commands=(ANY_COMMAND,),
+            ),
+            tuple(spec.name for spec in specs),
+        )
+        registry = ToolRegistry(
+            policy,
+            max_output_chars=self.config.budgets.max_output_chars,
+            artifacts=artifacts or _EphemeralArtifacts(),
+            event_callback=event_callback,
+        )
+        for spec in self._native_specs():
+            registry.register(spec, self._adapt(spec.name))
+        for spec, handler in extra_tools:
+            registry.register(spec, handler)
+        return registry
+
+    def _repair(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        """Fix the argument shapes models reliably get wrong, before validation.
+
+        The declared schema says what the model should send, and it should keep
+        saying that: widening it to accept a string would teach every model
+        that a string is fine, and would have to survive whatever each provider
+        does with a union type.
+
+        Repairing beforehand keeps both. A model that sends `"pytest -q"`
+        instead of `["pytest", "-q"]` gets what it meant, and one that sends
+        shell syntax is told plainly that there is no shell, rather than having
+        a pipe character handed to a program as a filename.
+        """
+        if name != "run_command":
+            return arguments
+        command = arguments.get("command")
+        if not isinstance(command, str):
+            return arguments
+        if any(character in command for character in "|&;<>$`"):
+            raise ToolError(
+                "command must be an array of arguments and cannot use shell syntax "
+                "(pipes, redirection, substitution). Run the pieces separately."
+            )
+        return {**arguments, "command": command.split()}
+
+    def _adapt(self, name: str) -> Any:
+        """Wrap a conversational handler in the registry's calling convention.
+
+        The registry deals in `(content, metadata)` and decides success by
+        whether the handler raised. A conversation needs more than that: a
+        failing test command has useful output and a non-zero exit, and is not
+        a tool failure. The screen labels travel the same way, so the terminal
+        can show `Read(game.py)` while the model receives the file.
+        """
+
+        def handler(arguments: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+            outcome = self._handlers[name](arguments)
+            return outcome.content, {
+                "display": outcome.display,
+                "detail": outcome.detail,
+                "ok": outcome.ok,
+            }
+
+        return handler
 
     # ------------------------------------------------------------ declaration
 
     def specs(self) -> tuple[ToolSpec, ...]:
+        """Every tool this conversation may call, natives and extras alike."""
+        return self.registry.specs()
+
+    def _native_specs(self) -> tuple[ToolSpec, ...]:
         obj = _object_schema
         return (
             ToolSpec(
@@ -227,18 +368,31 @@ class ReplToolset:
             ),
         )
 
-    def dispatch(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
-        handler = self._handlers.get(name)
-        if handler is None:
-            return ToolOutcome(f"No such tool: {name}", ok=False)
+    def dispatch(self, name: str, arguments: dict[str, Any], call_id: str = "") -> ToolOutcome:
+        """Run one tool call and describe what happened.
+
+        Arguments that never parsed are answered before the registry sees
+        them, because a schema check on a JSON fragment the provider truncated
+        would report a missing field rather than the truncation.
+        """
         if "__parse_error__" in arguments:
             return ToolOutcome(str(arguments["__parse_error__"]), ok=False)
         try:
-            return handler(arguments)
-        except (ToolError, WorkspaceError) as exc:
+            arguments = self._repair(name, arguments)
+        except ToolError as exc:
             return ToolOutcome(str(exc), ok=False)
-        except OSError as exc:
-            return ToolOutcome(f"{type(exc).__name__}: {exc}", ok=False)
+        result = self.registry.execute(call_id or name, name, arguments)
+        metadata = result.metadata or {}
+        if not result.ok:
+            # A refusal or a raised error. The registry has already turned it
+            # into a sentence; the model reads that and tries something else.
+            return ToolOutcome(result.error or "tool failed", ok=False)
+        return ToolOutcome(
+            result.content,
+            display=str(metadata.get("display", "")),
+            detail=str(metadata.get("detail", "")),
+            ok=bool(metadata.get("ok", True)),
+        )
 
     # ------------------------------------------------------------------ reads
 

@@ -70,6 +70,21 @@ COMMAND_PREFIXES = frozenset(
 #: past a few levels the input is pathological rather than plausible.
 MAX_UNWRAP_DEPTH = 4
 
+#: An allowlist entry matching every command, since every command starts with
+#: the empty prefix.
+#:
+#: The two loops need different answers here and both are right. An unattended
+#: run has to say in advance what may execute, because nobody is there to
+#: judge it, so it lists prefixes. A conversation has the operator present and
+#: asks them per command, so a prefix list would only mean enumerating
+#: beforehand everything they might later agree to, and the practical result
+#: of that is the list gets set to something permissive and stops meaning
+#: anything.
+#:
+#: This is the allowlist stepping aside, not the policy doing so. The
+#: deny-list, the network rule and the approval gate all still apply.
+ANY_COMMAND: tuple[str, ...] = ()
+
 #: Shell operators that separate one command from the next.
 _OPERATORS = frozenset({";", "&&", "||", "|", "&"})
 _OPERATOR_SPLIT = re.compile(r"[;&|]+")
