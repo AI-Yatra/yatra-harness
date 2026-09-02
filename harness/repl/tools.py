@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING, Any
 
 from harness.core.contracts import RiskLevel, ToolSpec
 from harness.core.errors import ToolError, WorkspaceError
-from harness.execution.process import run_process
+from harness.execution.sandbox import build_sandbox
 from harness.execution.workspace import Workspace
 
 # Guarded because `config` is the composition root: it imports every
@@ -455,12 +455,17 @@ class ReplToolset:
         if not isinstance(command, list) or not command or not all(isinstance(p, str) for p in command):
             raise ToolError("command must be a non-empty array of strings")
         timeout = float(arguments.get("timeout") or self.config.policy.command_timeout_seconds)
-        result = run_process(
+        # The same execution path the batch loop uses, so the sandbox is a
+        # configuration choice rather than a property of which entry point the
+        # operator happened to start. `kind: local` runs on this machine, which
+        # is what a conversation in the operator's own directory wants;
+        # `kind: docker` puts the same call in a container with no network.
+        result = build_sandbox(self.config.sandbox).run(
             command,
-            cwd=self.workspace.root,
+            workspace=self.workspace.root,
             timeout=timeout,
             max_output_chars=self.config.budgets.max_output_chars,
-            environment=_command_environment(),
+            environment=_command_environment(self.config),
         )
         printable = " ".join(command)
         if result.timed_out:
@@ -579,12 +584,20 @@ def unified_diff(before: str, after: str, path: str, context: int = 3) -> str:
     )
 
 
-def _command_environment() -> dict[str, str]:
+def _command_environment(config: HarnessConfig) -> dict[str, str] | None:
     """The environment a model-run command gets.
 
-    Inherited rather than stripped: the point of this REPL is to run the
-    operator's real toolchain in their real directory, and a command without
-    PATH, HOME or a virtualenv is not that. Secrets are the operator's own
-    and were already readable by anything they ran themselves.
+    Inherited rather than stripped when the sandbox is local: the point of this
+    REPL is to run the operator's real toolchain in their real directory, and a
+    command without PATH, HOME or a virtualenv is not that. The secrets in it
+    are the operator's own and were already readable by anything they ran
+    themselves.
+
+    Under a real sandbox that reasoning does not hold, because the whole point
+    is that the command is not trusted with the operator's environment.
+    Returning None hands the decision to the sandbox, which builds a minimal
+    one of its own.
     """
+    if config.sandbox.kind != "local":
+        return None
     return dict(os.environ)

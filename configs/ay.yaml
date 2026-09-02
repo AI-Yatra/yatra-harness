@@ -12,6 +12,22 @@ runs_dir: ../.runs
 #
 # Credential: run `ay auth add <key>`, or export DASHSCOPE_API_KEY.
 
+# Where a command the model asks for actually runs.
+#
+# `local` runs it on this machine, in the operator's directory, with the
+# operator's environment. That is the point of a conversational session: the
+# real toolchain, the real virtualenv, the real repository. It is also why the
+# approval gate rather than the deny-list is the control here, and why
+# full-auto deserves a directory you would be willing to lose.
+#
+# `docker` runs the same call in a container with no network, dropped
+# capabilities, and only the workspace mounted. Nothing else about the session
+# changes: the same tool, the same policy, the same loop. It is one word here
+# because the batch loop and this one now share an execution path rather than
+# each having their own.
+sandbox:
+  kind: local
+
 budgets:
   # A conversation is not a task with a turn budget; the REPL bounds its own
   # loop per message. These bound one tool call's output and one prompt.
