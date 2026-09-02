@@ -10,21 +10,21 @@ from typing import Any
 
 import yaml
 
-from . import schema
-from .compaction import CompactionConfig, compaction_config_from_dict
-from .contracts import BudgetSpec, SkillContract, TaskContract, VerificationSpec
-from .errors import ConfigurationError
-from .llm_light import (
+from harness.core import schema
+from harness.core.contracts import BudgetSpec, SkillContract, TaskContract, VerificationSpec
+from harness.core.errors import ConfigurationError
+from harness.execution.retrieval import RetrievalConfig, retrieval_config_from_dict
+from harness.execution.sandbox import SandboxConfig, sandbox_config_from_dict
+from harness.execution.search import SearchConfig, search_config_from_dict
+from harness.models.llm_light import (
     PRIORITY_KEYS,
     LLMLightConfig,
     RoutingConstraints,
     RoutingPolicy,
     validate_priorities,
 )
-from .retrieval import RetrievalConfig, retrieval_config_from_dict
-from .sandbox import SandboxConfig, sandbox_config_from_dict
-from .search import SearchConfig, search_config_from_dict
-from .subagents import SubagentConfig, subagent_config_from_dict
+from harness.run.compaction import CompactionConfig, compaction_config_from_dict
+from harness.run.subagents import SubagentConfig, subagent_config_from_dict
 
 ENV_PATTERN = re.compile(r"^\$\{([A-Z][A-Z0-9_]*)\}$")
 

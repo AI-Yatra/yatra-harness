@@ -17,9 +17,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness.contracts import RunStatus
-from harness.errors import ConfigurationError
-from harness.evals import EvalCase, EvalSuite, load_suite, run_suite
+from harness.autonomy.evals import EvalCase, EvalSuite, load_suite, run_suite
+from harness.core.contracts import RunStatus
+from harness.core.errors import ConfigurationError
 
 ROOT = Path(__file__).resolve().parents[1]
 

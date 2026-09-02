@@ -16,8 +16,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness.backlog import Feature, load_backlog, save_backlog
-from harness.loop import LoopRequest, run_loop
+from harness.autonomy.backlog import Feature, load_backlog, save_backlog
+from harness.autonomy.loop import LoopRequest, run_loop
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -172,7 +172,7 @@ class AccumulationTests(LoopTestCase):
         self.assertTrue(self.request().session_id)
 
     def test_every_feature_shares_that_session(self) -> None:
-        from harness.loop import goal_for
+        from harness.autonomy.loop import goal_for
 
         request = self.request()
         first = goal_for(
@@ -193,7 +193,7 @@ class AccumulationTests(LoopTestCase):
 
 class GoalShapeTests(LoopTestCase):
     def test_a_feature_becomes_a_goal_with_its_own_acceptance(self) -> None:
-        from harness.loop import goal_for
+        from harness.autonomy.loop import goal_for
 
         feature = Feature(
             feature_id="f0", description="Answers cite their source.",
@@ -205,7 +205,7 @@ class GoalShapeTests(LoopTestCase):
         self.assertEqual(goal.protect, ("tests/**",))
 
     def test_the_goal_inherits_the_loop_workspace(self) -> None:
-        from harness.loop import goal_for
+        from harness.autonomy.loop import goal_for
 
         goal = goal_for(
             Feature(feature_id="f0", description="d", acceptance=("c",)), self.request()

@@ -19,7 +19,7 @@ Requires:
   - yatra-harness synced with `uv sync` (openpyxl installed)
   - a credential for the variable the active config's primary route names
     (DASHSCOPE_API_KEY by default). Supply it with `ay auth add <key>`, or
-    export it, or put it in .env -- all three are resolved by harness.auth.
+    export it, or put it in .env -- all three are resolved by harness.models.auth.
 """
 
 from __future__ import annotations
@@ -138,13 +138,13 @@ class ChatApp:
     # ---------------------------------------------------------------- setup
 
     def _load_env(self) -> None:
-        """Load .env through harness.auth so both entry points agree.
+        """Load .env through harness.models.auth so both entry points agree.
 
         The nearest .env above the working directory wins; the install
         directory is the fallback, which is what `ay` used to read and keeps
         a repo-local .env working when run from elsewhere.
         """
-        from harness import auth  # noqa: PLC0415
+        from harness.models import auth  # noqa: PLC0415
 
         if auth.load_env_file() is None:
             auth.load_env_file(ROOT)
@@ -163,7 +163,7 @@ class ChatApp:
         """
         try:
             from harness.config import load_config  # noqa: PLC0415
-            from harness.errors import HarnessError  # noqa: PLC0415
+            from harness.core.errors import HarnessError  # noqa: PLC0415
         except ImportError:
             return None
         try:
@@ -223,7 +223,7 @@ class ChatApp:
     def _check_key(self) -> bool:
         """Report a missing credential up front rather than mid-run.
 
-        Resolution goes through ``harness.auth``, so a key held by
+        Resolution goes through ``harness.models.auth``, so a key held by
         ``ay auth add`` counts here exactly as an exported variable does.
         Reading the environment alone made a stored key invisible and left
         the REPL refusing to start on a credential it already had.
@@ -234,7 +234,7 @@ class ChatApp:
         will report far better than a guess from here.
         """
         self._load_env()
-        from harness import auth  # noqa: PLC0415
+        from harness.models import auth  # noqa: PLC0415
 
         route = self._primary_route()
         if route is None or not route.api_key_env:
@@ -245,7 +245,7 @@ class ChatApp:
         # Labels are left-aligned because the variable name makes the
         # export line an unpredictable width.
         print(f"No credential for {env_var} (needed by {self.config_path.name}).")
-        print("  store one:  ay auth add <key>   (the provider is inferred)")
+        print("  store one:  ay auth add <key>   (use --provider if ambiguous)")
         print(f"  or export:  {env_var}=...   (environment or .env)")
         print("  check:      ay auth status")
         return False
@@ -370,7 +370,7 @@ metadata:
         if self.stateless:
             return ""
         try:
-            from harness.session import SessionStore  # noqa: PLC0415
+            from harness.run.session import SessionStore  # noqa: PLC0415
 
             store = SessionStore(RUNS_DIR)
             return store.notes(store.open(self.session_id))
@@ -389,8 +389,8 @@ metadata:
         if self.stateless or not self.last_run_id:
             return
         try:
-            from harness.contracts import RunStatus  # noqa: PLC0415
-            from harness.session import SessionStore  # noqa: PLC0415
+            from harness.core.contracts import RunStatus  # noqa: PLC0415
+            from harness.run.session import SessionStore  # noqa: PLC0415
 
             state_path = RUNS_DIR / self.last_run_id / "state.json"
             state = json.loads(state_path.read_text(encoding="utf-8"))

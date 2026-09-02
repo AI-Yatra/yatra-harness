@@ -378,8 +378,9 @@ operator's yes on something they never saw.
 
 - `HARNESS_RUNS_DIR` overrides `runs_dir` (used by tests and CI).
 - Route API keys come from the env var named in `api_key_env`, or the
-  provider's conventional variable (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`)
-  when unset.
+  provider's conventional variable (including `OPENAI_API_KEY`,
+  `ANTHROPIC_API_KEY`, `OPENCODE_API_KEY`, and `COMMAND_CODE_API_KEY`) when
+  unset.
 
 ## Task file
 

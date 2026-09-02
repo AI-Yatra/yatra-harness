@@ -18,7 +18,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness.tracing import SpanRecorder, new_trace_id, parse_trace_context
+from harness.record.tracing import SpanRecorder, new_trace_id, parse_trace_context
 
 
 class TraceIdTests(unittest.TestCase):

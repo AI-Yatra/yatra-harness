@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import unittest
 import urllib.error
@@ -10,13 +11,13 @@ from typing import Any
 from unittest import mock
 
 from harness.config import RouteConfig, load_config
-from harness.contracts import ActionKind, ModelRequest, RiskLevel, ToolSpec
-from harness.errors import (
+from harness.core.contracts import ActionKind, ModelRequest, RiskLevel, ToolSpec
+from harness.core.errors import (
     ConfigurationError,
     PermanentProviderError,
     TransientProviderError,
 )
-from harness.providers import (
+from harness.models.providers import (
     AnthropicProvider,
     OpenAICompatibleProvider,
     ReplayProvider,
@@ -100,14 +101,12 @@ class FakeHTTPResponse:
 
 class FakeHTTPError(urllib.error.HTTPError):
     def __init__(self, code: int, body: str = "") -> None:
-        # HTTPError requires a real response-like object; a minimal stub works
-        # because the adapter only calls .read() and .code.
-        super().__init__("https://example.test", code, f"error {code}", None, None)
-        self._body = body
-
-    def read(self, limit: int = -1) -> bytes:
-        del limit
-        return self._body.encode("utf-8")
+        # A BytesIO stands in for the response body. Passing fp=None makes
+        # HTTPError lazily open a real temporary file that nothing closes,
+        # which the test run then reports as a ResourceWarning.
+        super().__init__(
+            "https://example.test", code, f"error {code}", None, io.BytesIO(body.encode("utf-8"))
+        )
 
 
 def _openai_route() -> RouteConfig:

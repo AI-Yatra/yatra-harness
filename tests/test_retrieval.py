@@ -19,8 +19,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness.errors import ConfigurationError
-from harness.retrieval import (
+from harness.core.errors import ConfigurationError
+from harness.execution.retrieval import (
     BM25Index,
     Chunk,
     EmbeddingIndex,
@@ -98,7 +98,7 @@ class SignatureTests(unittest.TestCase):
         (self.root / "a.py").write_text("x = 1\n", encoding="utf-8")
 
     def signature(self):
-        from harness.retrieval import workspace_signature
+        from harness.execution.retrieval import workspace_signature
 
         return workspace_signature(self.root, RetrievalConfig())
 
@@ -222,7 +222,7 @@ class EmbeddingIndexTests(unittest.TestCase):
 
 class RenderTests(unittest.TestCase):
     def test_hits_render_with_path_and_line_range(self) -> None:
-        from harness.retrieval import Hit
+        from harness.execution.retrieval import Hit
 
         text = render_hits([Hit(Chunk("a.py", 10, 20, "body text"), 1.5)])
         self.assertIn("a.py:10-20", text)
@@ -232,7 +232,7 @@ class RenderTests(unittest.TestCase):
         self.assertIn("no matches", render_hits([]).lower())
 
     def test_the_model_is_told_these_are_excerpts(self) -> None:
-        from harness.retrieval import Hit
+        from harness.execution.retrieval import Hit
 
         text = render_hits([Hit(Chunk("a.py", 1, 5, "x"), 1.0)])
         self.assertIn("read_file", text)
@@ -253,7 +253,7 @@ class ConfigTests(unittest.TestCase):
 
 class EmbeddingRequestTests(unittest.TestCase):
     def test_the_request_body_carries_the_texts_and_model(self) -> None:
-        from harness.retrieval import embedding_request
+        from harness.execution.retrieval import embedding_request
 
         request = embedding_request(
             RetrievalConfig(kind="embedding", endpoint="https://x/v1/embeddings",
@@ -265,7 +265,7 @@ class EmbeddingRequestTests(unittest.TestCase):
         self.assertEqual(body["model"], "text-embedding-3-small")
 
     def test_the_key_travels_in_a_header(self) -> None:
-        from harness.retrieval import embedding_request
+        from harness.execution.retrieval import embedding_request
 
         request = embedding_request(
             RetrievalConfig(kind="embedding", endpoint="https://x/v1/embeddings"),
@@ -275,7 +275,7 @@ class EmbeddingRequestTests(unittest.TestCase):
         self.assertNotIn("secret", request.url)
 
     def test_vectors_are_read_back_in_request_order(self) -> None:
-        from harness.retrieval import parse_embeddings
+        from harness.execution.retrieval import parse_embeddings
 
         payload = json.dumps(
             {"data": [{"index": 1, "embedding": [0.0, 1.0]}, {"index": 0, "embedding": [1.0, 0.0]}]}
@@ -283,8 +283,8 @@ class EmbeddingRequestTests(unittest.TestCase):
         self.assertEqual(parse_embeddings(payload, 2), [[1.0, 0.0], [0.0, 1.0]])
 
     def test_a_malformed_embedding_response_is_named(self) -> None:
-        from harness.errors import ToolError
-        from harness.retrieval import parse_embeddings
+        from harness.core.errors import ToolError
+        from harness.execution.retrieval import parse_embeddings
 
         with self.assertRaises(ToolError):
             parse_embeddings("not json", 1)

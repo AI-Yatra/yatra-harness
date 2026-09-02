@@ -18,11 +18,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness.artifacts import ArtifactStore
 from harness.config import PolicyConfig
-from harness.policy import PolicyEngine
-from harness.tools import build_registry
-from harness.workspace import Workspace, git_environment
+from harness.execution.policy import PolicyEngine
+from harness.execution.tools import build_registry
+from harness.record.artifacts import ArtifactStore
+from harness.run.workspace import Workspace, git_environment
 
 ROOT = Path(__file__).resolve().parents[1]
 ORIGINAL = "line1\nCHANGED\nline3\n"

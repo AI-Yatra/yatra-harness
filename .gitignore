@@ -1,17 +1,58 @@
-.venv/
-.runs/
+# Python bytecode and packaging artifacts.
 __pycache__/
 *.py[cod]
 *.egg-info/
 build/
 dist/
-.env
-.DS_Store
-.ruff_cache/
 
-# REPL-generated per-message task files. Generated on the fly; not part of
-# the workshop material. Delete the whole folder to start fresh.
+# Virtual environments and a personal interpreter pin. The project supports
+# 3.11 through 3.14; a local pin is one operator's choice, not the repo's.
+.venv/
+venv/
+.python-version
+
+# Secrets. `.env` holds real keys and must never be committed; `.env.example`
+# is the documented template and stays tracked. The credential store lives in
+# the home directory by default, but YATRA_HARNESS_AUTH_FILE can point it
+# anywhere, so the store's own shapes are refused here as a safety net.
+.env
+.env.*
+!.env.example
+.yatra-harness/
+auth.json
+*.pem
+*.key
+
+# Runtime output: one evidence bundle per run, eval reports, and the
+# REPL-generated per-message task files. All reproducible; delete freely.
+.runs/
+.evals/
 tasks/chat/
+
+# Tool caches. The suite runs under unittest, but contributors run pytest,
+# coverage, and type checkers too.
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# Editor and OS noise. Windows development is first-class here (see README),
+# so its droppings are listed alongside macOS's.
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# Local agent-tool state. `.claude/plans/` is tracked on purpose;
+# `settings.local.json` is one person's machine-local configuration.
+.claude/settings.local.json
+.commandcode/
 
 # Local scratch: probe configs, adversarial scenarios, API check scripts.
 .probe/
@@ -19,7 +60,3 @@ tasks/chat/
 # Session findings kept alongside the code but deliberately untracked.
 docs/FINDINGS.md
 docs/FINDINGS-CAPABILITY-AUDIT.md
-
-# Local tool state (Command Code writes personal preference notes here).
-.commandcode/
-.evals/

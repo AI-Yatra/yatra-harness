@@ -10,8 +10,14 @@ from __future__ import annotations
 import json
 import unittest
 
-from harness.errors import ConfigurationError, ToolError
-from harness.search import SearchConfig, SearchResult, build_request, parse_results, render
+from harness.core.errors import ConfigurationError, ToolError
+from harness.execution.search import (
+    SearchConfig,
+    SearchResult,
+    build_request,
+    parse_results,
+    render,
+)
 
 
 def config(**kwargs) -> SearchConfig:

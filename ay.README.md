@@ -103,7 +103,7 @@ of reporting success.
 ## Keys
 
 `ay auth` and `harness auth` are the same command. Store a key once and the
-provider is inferred from its prefix:
+provider is inferred when its key has a distinctive prefix:
 
 ```
 ay auth add sk-ws-...        # or `ay auth add` to be prompted without echo
@@ -112,6 +112,19 @@ ay auth verify               # a real call, not a variable check
 ay auth remove dashscope
 ay auth providers
 ```
+
+OpenCode keys use the same generic `sk-` shape as OpenAI keys, so add OpenCode
+and Command Code explicitly when inference would be ambiguous:
+
+```
+ay auth add --provider opencode
+ay auth add --provider commandcode
+```
+
+Their conventional environment variables are `OPENCODE_API_KEY` and
+`COMMAND_CODE_API_KEY`. OpenCode Zen uses `https://opencode.ai/zen/v1` by
+default; pass `--base-url https://opencode.ai/zen/go/v1` when storing a Go
+credential.
 
 The store lives at `~/.yatra-harness/auth.json`, outside the repository. An
 exported environment variable still takes precedence, and `.env` is loaded on
@@ -195,8 +208,9 @@ yatra-harness/
 ## Troubleshooting
 
 - **`No credential for <VAR>`**: the config's primary route needs a key.
-  Run `ay auth add <key>` (the provider is inferred), or export the variable,
-  or put it in `.env`. `ay auth status` shows what is currently configured.
+  Run `ay auth add <key>` (the provider is inferred when possible), use
+  `--provider` for an ambiguous key, export the variable, or put it in `.env`.
+  `ay auth status` shows what is currently configured.
 - **`error: task workspace seed is not a directory`**: the chat seed
   (`fixtures/chat_seed/`) is missing. Re-run `git restore` or pull.
 - **The agent says "Added lower-bound handling" for an unrelated task**:

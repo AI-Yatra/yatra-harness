@@ -15,16 +15,16 @@ from dataclasses import replace
 from pathlib import Path
 
 from harness.config import load_config
-from harness.context import ContextEngine
-from harness.contracts import (
+from harness.core.contracts import (
     SCHEMA_VERSION,
     RunState,
     RunStatus,
     TaskContract,
     VerificationSpec,
 )
-from harness.errors import ConfigurationError
-from harness.workspace import Workspace
+from harness.core.errors import ConfigurationError
+from harness.run.context import ContextEngine
+from harness.run.workspace import Workspace
 
 ROOT = Path(__file__).resolve().parents[1]
 OBJECTIVE = "Add a troubleshooting entry about running the suite through uv run."

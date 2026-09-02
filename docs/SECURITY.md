@@ -34,7 +34,7 @@ it does not claim to protect against.
 
 ## Provider security
 
-- Credentials resolve through `harness/auth.py` and nowhere else. That module
+- Credentials resolve through `harness/models/auth.py` and nowhere else. That module
   is the only one that holds a raw key, and it hands it to the provider adapter
   alone. `harness doctor` and the runner call the same function, so they cannot
   disagree about whether a route is ready.
@@ -49,8 +49,9 @@ it does not claim to protect against.
   echo. Passing a secret as an argument records it in shell history, so the
   prompt is the safer path on a shared machine.
 - Credentials are never read from config files.
-- `api_key_env` names the variable; the conventional `OPENAI_API_KEY` /
-  `ANTHROPIC_API_KEY` are used when unset.
+- `api_key_env` names the variable; conventional provider variables such as
+  `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENCODE_API_KEY`, and
+  `COMMAND_CODE_API_KEY` are used when unset.
 - LLM Light (`profile_from_route`) strips endpoints and credential variable
   names from routing decisions, so the plan can be logged freely.
 - The `Redactor` scrubs known key shapes (`sk-...`, `Bearer ...`, `gh*_...`)

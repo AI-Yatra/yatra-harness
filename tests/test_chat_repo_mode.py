@@ -18,7 +18,7 @@ from pathlib import Path
 
 import yaml
 
-from harness.workspace import git_environment
+from harness.run.workspace import git_environment
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -193,8 +193,8 @@ class SessionContinuityTests(unittest.TestCase):
     def test_a_later_message_carries_what_already_happened(self) -> None:
         import yaml as yaml_module
 
-        from harness.contracts import RunStatus
-        from harness.session import SessionStore
+        from harness.core.contracts import RunStatus
+        from harness.run.session import SessionStore
 
         app = self.app(session="monday")
         store = SessionStore(self.chat.RUNS_DIR)
@@ -210,7 +210,7 @@ class SessionContinuityTests(unittest.TestCase):
     def test_a_finished_turn_is_written_to_the_session(self) -> None:
         import json as json_module
 
-        from harness.session import SessionStore
+        from harness.run.session import SessionStore
 
         app = self.app(session="tuesday")
         store = SessionStore(self.chat.RUNS_DIR)
@@ -230,7 +230,7 @@ class SessionContinuityTests(unittest.TestCase):
         self.assertEqual(turns[0]["message"], "do the thing")
 
     def test_a_turn_with_no_run_directory_is_not_recorded(self) -> None:
-        from harness.session import SessionStore
+        from harness.run.session import SessionStore
 
         app = self.app(session="wednesday")
         store = SessionStore(self.chat.RUNS_DIR)
@@ -240,7 +240,7 @@ class SessionContinuityTests(unittest.TestCase):
         self.assertEqual(store.open("wednesday").turns, ())
 
     def test_recording_is_skipped_in_stateless_mode(self) -> None:
-        from harness.session import SessionStore
+        from harness.run.session import SessionStore
 
         app = self.app(session="thursday", stateless=True)
         store = SessionStore(self.chat.RUNS_DIR)

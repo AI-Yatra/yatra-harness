@@ -73,6 +73,41 @@ object.
 - Secrets never appear in config files, events, or artifacts (see
   [SECURITY.md](SECURITY.md)).
 
+The credential catalog also recognizes OpenCode and Command Code:
+
+| Provider | Environment variable | Default base URL |
+|---|---|---|
+| OpenCode Zen | `OPENCODE_API_KEY` | `https://opencode.ai/zen/v1` |
+| Command Code | `COMMAND_CODE_API_KEY` | `https://api.commandcode.ai/provider/v1` |
+
+Both expose `POST /chat/completions` for compatible models, so use an
+`openai_compatible` route. For example:
+
+```yaml
+routes:
+  - name: opencode-zen
+    kind: openai_compatible
+    model: deepseek-v4-flash
+    base_url: https://opencode.ai/zen/v1
+    api_key_env: OPENCODE_API_KEY
+  - name: command-code
+    kind: openai_compatible
+    model: deepseek/deepseek-v4-flash
+    base_url: https://api.commandcode.ai/provider/v1
+    api_key_env: COMMAND_CODE_API_KEY
+```
+
+OpenCode uses different wire protocols for different models. Only choose a
+model that OpenCode lists for `/chat/completions` with this adapter; Responses,
+Anthropic, and Gemini endpoints require their corresponding adapter. OpenCode
+Go uses `https://opencode.ai/zen/go/v1`; register that non-default endpoint
+with `auth add --provider opencode --base-url ...` when using a stored key.
+
+OpenCode keys are not inferred from their generic `sk-` prefix because doing
+so would steal OpenAI keys. Use `auth add --provider opencode`; Command Code's
+`user_` key shape can be inferred, though naming the provider explicitly is
+also supported.
+
 ## Replay scripts
 
 ```yaml

@@ -45,7 +45,7 @@ the MCP demo server subprocess cannot import `harness` outside the venv.
   allowed, the workspace decides which paths are reachable, and the verifier
   decides whether a run succeeded. A change that lets the model bypass any of
   those four is wrong even when the tests are green.
-- **`harness/auth.py` is the only module that holds a raw credential.** Keys
+- **`harness/models/auth.py` is the only module that holds a raw credential.** Keys
   must not reach an event, an artifact, or a summary. Anything that resolves a
   credential must also register it with the `Redactor`.
 - **Config schemas are strict.** Unknown keys are rejected on purpose, so a
@@ -64,19 +64,20 @@ the MCP demo server subprocess cannot import `harness` outside the venv.
 | Path | What lives there |
 |---|---|
 | `harness/runtime.py` | the agent loop, checkpoints, retry, termination |
-| `harness/tools.py` | the tool registry and every native tool |
-| `harness/policy.py` | risk classes, command allowlist, approvals |
-| `harness/workspace.py` | seed and repository workspaces, path containment |
-| `harness/verifier.py` | the independent completion gate |
-| `harness/delivery.py` | commit, push, pull request |
-| `harness/sandbox.py` | local or container execution |
-| `harness/session.py` | one workspace and memory across messages |
-| `harness/subagents.py` | read-only delegation |
-| `harness/goal.py`, `loop.py` | attempt-until-true, and the backlog loop |
-| `harness/retrieval.py`, `search.py` | ranked workspace search, web search |
-| `harness/tracing.py`, `evals.py`, `rubric.py` | spans, eval gate, scored review |
-| `harness/context.py` | context budget, compaction, instruction injection |
-| `harness/auth.py` | credentials; the only module holding a raw key |
+| `harness/execution/tools.py` | the tool registry and every native tool |
+| `harness/execution/policy.py` | risk classes, command allowlist, approvals |
+| `harness/run/workspace.py` | seed and repository workspaces, path containment |
+| `harness/run/verifier.py` | the independent completion gate |
+| `harness/autonomy/delivery.py` | commit, push, pull request |
+| `harness/execution/sandbox.py` | local or container execution |
+| `harness/run/session.py` | one workspace and memory across messages |
+| `harness/run/subagents.py` | read-only delegation |
+| `harness/autonomy/goal.py`, `loop.py` | attempt-until-true, and the backlog loop |
+| `harness/execution/retrieval.py`, `search.py` | ranked workspace search, web search |
+| `harness/record/tracing.py` | spans tying a run to the runs around it |
+| `harness/autonomy/evals.py`, `rubric.py` | the eval gate, the scored review |
+| `harness/run/context.py` | context budget, compaction, instruction injection |
+| `harness/models/auth.py` | credentials; the only module holding a raw key |
 | `configs/`, `tasks/`, `skills/` | strict versioned YAML contracts |
 | `docs/` | architecture, configuration, security, operations, testing |
 

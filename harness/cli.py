@@ -12,28 +12,29 @@ from typing import Any
 
 import yaml
 
-from . import __version__, auth
-from .artifacts import ArtifactStore
-from .backlog import load_backlog
-from .config import load_config, load_skill, load_task
-from .contracts import RunStatus
-from .delivery import DeliveryRequest, deliver
-from .doctor import run_doctor
-from .errors import HarnessError, InjectedCrash, WorkspaceError
-from .evals import load_suite, run_suite
-from .events import EventLog
-from .goal import GoalRequest, pursue
-from .loop import LoopRequest, goal_for, run_loop
-from .model_router import build_llm_light, profile_from_route
-from .policy import PolicyEngine
-from .replay import replay_run
-from .rubric import RubricConfig, parse_review, render_rubric_prompt, verdict_for
-from .runtime import HarnessRuntime
-from .state import StateStore
-from .tools import build_registry
-from .tracing import root_context, trace_id_for
-from .util import atomic_write_json, atomic_write_text
-from .workspace import Workspace
+from harness import __version__
+from harness.autonomy.backlog import load_backlog
+from harness.autonomy.delivery import DeliveryRequest, deliver
+from harness.autonomy.evals import load_suite, run_suite
+from harness.autonomy.goal import GoalRequest, pursue
+from harness.autonomy.loop import LoopRequest, goal_for, run_loop
+from harness.autonomy.rubric import RubricConfig, parse_review, render_rubric_prompt, verdict_for
+from harness.config import load_config, load_skill, load_task
+from harness.core.contracts import RunStatus
+from harness.core.errors import HarnessError, InjectedCrash, WorkspaceError
+from harness.core.util import atomic_write_json, atomic_write_text
+from harness.doctor import run_doctor
+from harness.execution.policy import PolicyEngine
+from harness.execution.tools import build_registry
+from harness.models import auth
+from harness.models.model_router import build_llm_light, profile_from_route
+from harness.record.artifacts import ArtifactStore
+from harness.record.events import EventLog
+from harness.record.replay import replay_run
+from harness.record.state import StateStore
+from harness.record.tracing import root_context, trace_id_for
+from harness.run.workspace import Workspace
+from harness.runtime import HarnessRuntime
 
 ROUTE_PRIORITY_KEYS = ("privacy", "quality", "cost", "latency", "context")
 
@@ -156,7 +157,9 @@ def parser() -> argparse.ArgumentParser:
 
     auth_parser = commands.add_parser("auth", help="manage provider credentials")
     auth_sub = auth_parser.add_subparsers(dest="auth_action")
-    add_cmd = auth_sub.add_parser("add", help="store a key; the provider is inferred")
+    add_cmd = auth_sub.add_parser(
+        "add", help="store a key; use --provider when it cannot be inferred"
+    )
     add_cmd.add_argument("key", nargs="?", help="the key; omit to be prompted without echo")
     add_cmd.add_argument("--provider", help="override provider detection")
     add_cmd.add_argument("--base-url", help="pin a non-default base URL")
@@ -1011,4 +1014,3 @@ def _list_runs(arguments: Any) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

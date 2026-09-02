@@ -112,7 +112,7 @@ class ChatTestCase(unittest.TestCase):
 
     def setUp(self) -> None:
         self.chat = _import_chat()
-        from harness import auth  # noqa: PLC0415
+        from harness.models import auth  # noqa: PLC0415
         self.auth = auth
         self._tmp = tempfile.TemporaryDirectory()
         self.tmp = Path(self._tmp.name)

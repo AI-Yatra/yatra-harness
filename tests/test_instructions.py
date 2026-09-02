@@ -12,10 +12,16 @@ import unittest
 from pathlib import Path
 
 from harness.config import load_config
-from harness.context import ContextEngine
-from harness.contracts import SCHEMA_VERSION, RunState, RunStatus, TaskContract, VerificationSpec
-from harness.instructions import load_repository_instructions
-from harness.workspace import Workspace
+from harness.core.contracts import (
+    SCHEMA_VERSION,
+    RunState,
+    RunStatus,
+    TaskContract,
+    VerificationSpec,
+)
+from harness.run.context import ContextEngine
+from harness.run.instructions import load_repository_instructions
+from harness.run.workspace import Workspace
 
 ROOT = Path(__file__).resolve().parents[1]
 

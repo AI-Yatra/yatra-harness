@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness import auth
+from harness.models import auth
 
 
 class AuthTestCase(unittest.TestCase):

@@ -19,8 +19,8 @@ from unittest import mock
 
 from harness.cli import _approval, _resolve_approval
 from harness.config import PolicyConfig
-from harness.contracts import RiskLevel, ToolSpec
-from harness.policy import PolicyEngine
+from harness.core.contracts import RiskLevel, ToolSpec
+from harness.execution.policy import PolicyEngine
 
 
 def policy(mode: str = "mutations") -> PolicyConfig:

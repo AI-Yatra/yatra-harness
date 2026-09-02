@@ -30,7 +30,7 @@ and confirms no protected path changed. Only then does a run report COMPLETED.
 ## Requirements
 
 Python 3.11 or newer, [uv](https://docs.astral.sh/uv/), and `git` on your PATH.
-CI covers Python 3.11, 3.12 and 3.13 on Linux. Development happens on Windows
+CI covers Python 3.11 through 3.14 on Linux. Development happens on Windows
 and macOS too.
 
 ## Install
@@ -143,10 +143,29 @@ fail. A grader that cannot fail is not a grader.
 ## Keys
 
 Store a key once and every route that needs it resolves without exporting
-anything. The provider is inferred from the key's prefix.
+anything. The provider is inferred when its key has a distinctive prefix.
 
 ```
 ay auth add sk-ws-...
+```
+
+OpenCode keys share the generic `sk-` shape used by OpenAI, so select that
+provider explicitly. Command Code can also be named explicitly when adding a
+key or used through its conventional environment variable:
+
+```
+ay auth add --provider opencode
+ay auth add --provider commandcode
+
+export OPENCODE_API_KEY=...
+export COMMAND_CODE_API_KEY=...
+```
+
+OpenCode Zen defaults to `https://opencode.ai/zen/v1`. To use an OpenCode Go
+key, register its endpoint with the stored credential:
+
+```
+ay auth add --provider opencode --base-url https://opencode.ai/zen/go/v1
 ```
 
 ```
@@ -345,7 +364,7 @@ retrieve  "how are credentials redacted from the ledger"
 
 --- README.md:161-200 (score 12.89)
 --- docs/SECURITY.md:41-80 (score 11.40)
---- harness/redaction.py:1-40 (score 10.37)
+--- harness/record/redaction.py:1-40 (score 10.37)
 ```
 
 BM25 by default — no key, no network, deterministic, and therefore actually
@@ -517,10 +536,16 @@ too. That case is the one that notices.
 
 ```text
 yatra-harness/
-├── harness/            runtime: contracts, context, routing, tools, policy,
-│                       workspace, verifier, events, checkpoints, replay,
-│                       sandbox, sessions, sub-agents, delivery, goal, loop,
-│                       retrieval, search, tracing, evals, rubric
+├── harness/
+│   ├── cli.py          operator commands; config.py, doctor.py, runtime.py
+│   ├── core/           shared vocabulary: contracts, errors, schema, util
+│   ├── models/         auth, provider adapters, streaming, LLM Light, router
+│   ├── execution/      tools, policy, MCP, process, sandbox, search, retrieval
+│   ├── run/            workspace, session, context, compaction, verifier,
+│   │                   faults, sub-agents, repository instructions
+│   ├── record/         state, event ledger, artifacts, tracing, redaction, replay
+│   ├── autonomy/       goal, backlog, loop, evals, rubric, delivery
+│   └── mcp_demo/       the demo MCP server the teaching config starts
 ├── ay.py               the ay REPL
 ├── configs/            teaching, local, remote, llm_light
 ├── tasks/              task contracts

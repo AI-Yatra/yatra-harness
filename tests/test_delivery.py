@@ -14,9 +14,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness.contracts import RunStatus
-from harness.delivery import DeliveryError, DeliveryRequest, deliver
-from harness.workspace import WorkspaceManager, git_environment
+from harness.autonomy.delivery import DeliveryError, DeliveryRequest, deliver
+from harness.core.contracts import RunStatus
+from harness.run.workspace import WorkspaceManager, git_environment
 
 GIT_ENV = git_environment({"GIT_AUTHOR_NAME": "Fixture", "GIT_COMMITTER_NAME": "Fixture"})
 
@@ -278,7 +278,7 @@ class SubjectTests(unittest.TestCase):
     """The commit subject is a git subject line, so it has to read like one."""
 
     def subject(self, text: str) -> str:
-        from harness.delivery import subject
+        from harness.autonomy.delivery import subject
 
         return subject(text)
 

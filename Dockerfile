@@ -8,7 +8,7 @@
 #
 #   docker build -t yatra-harness-sandbox .
 #   uv run harness run <task> --config configs/sandboxed.yaml ...
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 # git is needed because acceptance commands routinely shell out to it, and a
 # workspace is a git repository.

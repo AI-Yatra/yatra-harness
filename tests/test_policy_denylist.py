@@ -13,9 +13,9 @@ import unittest
 from pathlib import Path
 
 from harness.config import PolicyConfig, load_config
-from harness.contracts import RiskLevel, ToolSpec
-from harness.errors import ConfigurationError
-from harness.policy import PolicyEngine
+from harness.core.contracts import RiskLevel, ToolSpec
+from harness.core.errors import ConfigurationError
+from harness.execution.policy import PolicyEngine
 
 ROOT = Path(__file__).resolve().parents[1]
 RUN_COMMAND = ToolSpec("run_command", "", {"type": "object"}, RiskLevel.EXECUTE)

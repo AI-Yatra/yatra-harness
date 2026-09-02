@@ -22,28 +22,45 @@ No module bypasses this chain. The model only ever receives a bounded context
 and returns a normalized `ActionProposal` (a tool call, a finish claim, or a
 clarification request). It has no direct filesystem, shell, or network access.
 
+## Package layout
+
+The `harness/` package is grouped by responsibility. The four modules at the
+root are the ones an operator meets first; everything else lives in a themed
+subpackage, and the grouping mirrors the authority chain above.
+
+| Location | Holds |
+|---|---|
+| `harness/` (root) | `cli.py` (operator commands), `config.py` (versioned loading), `doctor.py` (preflight), `runtime.py` (the agent loop) |
+| `harness/core/` | The shared vocabulary: `contracts`, `errors`, `schema`, `util` |
+| `harness/models/` | The model side: `auth`, `providers`, `streaming`, `llm_light`, `model_router` |
+| `harness/execution/` | The tool side: `tools`, `policy`, `mcp`, `process`, `sandbox`, `search`, `retrieval` |
+| `harness/run/` | One run's anatomy: `workspace`, `session`, `context`, `compaction`, `instructions`, `verifier`, `faults`, `subagents` |
+| `harness/record/` | The durable record: `state`, `events`, `artifacts`, `tracing`, `redaction`, `replay` |
+| `harness/autonomy/` | Multi-run modes: `goal`, `backlog`, `loop`, `evals`, `rubric`, `delivery` |
+| `harness/mcp_demo/` | The demo MCP server the teaching config starts |
+
 ## Module map
 
 | Module | Responsibility | Diagram node |
 |---|---|---|
 | `cli.py` | Operator interface: `doctor`, `explain`, `tools`, `routes`, `run`, `resume`, `inspect`, `replay`, `list-runs` | Task intake |
 | `config.py` | Strict, versioned YAML loading for config, tasks, and skills | Task contract |
-| `contracts.py` | The normalized data contracts: `TaskContract`, `ActionProposal`, `ToolResult`, `HarnessEvent`, `RunState` | Contracts |
-| `context.py` | Bounded prompt construction, repo map, observation compaction | Context engine |
-| `providers.py` | Provider adapters: replay, OpenAI-compatible (also Ollama/vLLM), Anthropic | Model call |
-| `llm_light.py` | Priority-based route ordering: cost, latency, privacy, quality, context | Model router (policy) |
-| `model_router.py` | Reliability: retries, backoff, circuit breaking, fallback, plan resolution | Model router (mechanism) |
-| `tools.py` | Typed tool registry, native tools, JSON-schema validation | Tool registry |
-| `mcp.py` | MCP stdio client and lifecycle for external tools | Python/MCP |
-| `policy.py` | Capability authorization: risk classes, command allowlist, approvals | Policy gate |
-| `workspace.py` | Per-run workspace copy, containment, protected paths | Shell/Git, Browser/Files |
-| `verifier.py` | Acceptance commands + diff + protected-path integrity | Verifier |
-| `state.py` | Atomic checkpoints | State + checkpoint |
-| `events.py` | Append-only, sequence-checked JSONL ledger | Trace |
-| `faults.py` | Deterministic fault injection | Reliability |
-| `artifacts.py` | Evidence bundle: `summary.md`, `patch.diff`, verification records | Evidence |
+| `core/contracts.py` | The normalized data contracts: `TaskContract`, `ActionProposal`, `ToolResult`, `HarnessEvent`, `RunState` | Contracts |
+| `run/context.py` | Bounded prompt construction, repo map, observation compaction | Context engine |
+| `models/providers.py` | Provider adapters: replay, OpenAI-compatible (also Ollama/vLLM), Anthropic | Model call |
+| `models/llm_light.py` | Priority-based route ordering: cost, latency, privacy, quality, context | Model router (policy) |
+| `models/model_router.py` | Reliability: retries, backoff, circuit breaking, fallback, plan resolution | Model router (mechanism) |
+| `execution/tools.py` | Typed tool registry, native tools, JSON-schema validation | Tool registry |
+| `execution/mcp.py` | MCP stdio client and lifecycle for external tools | Python/MCP |
+| `execution/policy.py` | Capability authorization: risk classes, command allowlist, approvals | Policy gate |
+| `run/workspace.py` | Per-run workspace copy, containment, protected paths | Shell/Git, Browser/Files |
+| `run/verifier.py` | Acceptance commands + diff + protected-path integrity | Verifier |
+| `record/state.py` | Atomic checkpoints | State + checkpoint |
+| `record/events.py` | Append-only, sequence-checked JSONL ledger | Trace |
+| `run/faults.py` | Deterministic fault injection | Reliability |
+| `record/artifacts.py` | Evidence bundle: `summary.md`, `patch.diff`, verification records | Evidence |
 | `doctor.py` | Preflight diagnostics | Readiness |
-| `replay.py` | Side-effect-free event ledger reconstruction | Replay |
+| `record/replay.py` | Side-effect-free event ledger reconstruction | Replay |
 
 ## Control flow
 

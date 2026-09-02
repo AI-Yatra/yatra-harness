@@ -28,8 +28,8 @@ The split is the teaching point:
 
 | Layer | Owns | Module |
 |---|---|---|
-| LLM Light | *Order*: which route first, which fallback next | `harness/llm_light.py` |
-| Model Router | *Reliability*: retries, backoff, circuit breaking | `harness/model_router.py` |
+| LLM Light | *Order*: which route first, which fallback next | `harness/models/llm_light.py` |
+| Model Router | *Reliability*: retries, backoff, circuit breaking | `harness/models/model_router.py` |
 
 An operator restating what they care about (`--priority cost --priority
 latency`) must not perturb retry behavior, and a change to retry behavior must
