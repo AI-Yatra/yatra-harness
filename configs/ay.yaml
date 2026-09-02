@@ -216,6 +216,28 @@ policy:
   # The REPL's own approval modes (suggest / auto-edit / full-auto) decide
   # what is asked about. This setting governs the batch path only.
   approval_mode: mutations
+  # Decisions about one specific thing, which outrank the mode in both
+  # directions. A mode is a default for everything, so where the two disagree
+  # the more specific one wins.
+  #
+  #   deny  refuses it in every mode, including full-auto, and never offers it
+  #         for approval
+  #   ask   asks even in a mode that would not have
+  #   allow skips the prompt a mode would have shown
+  #
+  # Write a rule as tool(pattern). A command pattern matches by token, so
+  # `git push` does not match `git pushed`, and `*` stands for any run of
+  # tokens. A path pattern is a glob. Wrappers are unwrapped exactly as the
+  # deny-list unwraps them, so `bash -c "docker run x"` matches
+  # `run_command(docker *)`.
+  #
+  # Nothing here reaches past denied_commands below, which stays absolute.
+  # Empty by default: the modes are the right starting point, and a rule is
+  # what you add once you know which specific thing you keep answering.
+  rules:
+    deny: []
+    ask: []
+    allow: []
   # The REPL asks about commands rather than requiring a prefix allowlist, so
   # this list is what runs without a prompt on the batch path. The REPL's gate
   # reads the deny-list below, not this.
