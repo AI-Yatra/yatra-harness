@@ -24,6 +24,7 @@ from harness.core.contracts import ToolSpec
 from harness.core.errors import HarnessError
 from harness.core.util import is_chat_model, model_version
 from harness.execution.process import run_process
+from harness.execution.sandbox import detect_mechanism as sandbox_mechanism
 from harness.execution.tools import optional_tools
 from harness.execution.workspace import Workspace
 from harness.models import auth, prompting
@@ -118,6 +119,15 @@ class Shell:
             extra = []
             self._startup_notices.append(f"optional tools unavailable: {exc}")
         self.toolset = ReplToolset(self.workspace, self.config, extra_tools=extra)
+        # A sandbox that quietly is not one is worse than none, because the
+        # operator relaxes on the strength of it. If the kernel mechanism is
+        # missing, the session says so at startup rather than at no point.
+        if self.config.sandbox.kind == "os":
+            mechanism, why = sandbox_mechanism()
+            if not mechanism:
+                self._startup_notices.append(
+                    f"sandbox: kind is os but {why}. Commands run unconfined."
+                )
         self.gate = Gate(self.config.policy, mode=self.mode, prompt=self._ask)
         self.guessed_route = ""
         self.route = self._route(options.model_override)

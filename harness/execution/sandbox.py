@@ -21,6 +21,8 @@ teaches nothing.
 from __future__ import annotations
 
 import os
+import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -28,7 +30,12 @@ from typing import Any, Protocol
 from harness.core.errors import ConfigurationError
 from harness.execution.process import ProcessResult, run_process
 
-KINDS = ("local", "docker")
+KINDS = ("local", "os", "docker")
+
+#: Bound read-only so a command can find its interpreter and libraries. Bound
+#: with `--ro-bind-try`, so one missing on a given distribution is skipped
+#: rather than failing the whole sandbox.
+SYSTEM_PATHS = ("/usr", "/bin", "/sbin", "/lib", "/lib32", "/lib64", "/etc", "/opt", "/nix")
 CONTAINER_WORKSPACE = "/workspace"
 
 
@@ -127,6 +134,144 @@ class DockerSandbox:
         return result
 
 
+class OsSandbox:
+    """Confinement from the kernel, without a container.
+
+    Docker is a strong boundary and a heavy one: an image to pull, a daemon to
+    run, and a second filesystem where the operator's toolchain is not. That is
+    right for an unattended run and wrong for a conversation in someone's own
+    checkout, which is exactly where the harness previously had nothing.
+
+    Both mechanisms here are the ones the reference implementations use.
+    Neither exists on Windows in a form reachable from Python: job objects
+    bound processes and memory but not files or sockets, and the primitives
+    that would work need Win32 calls this codebase has no business making. So
+    Windows falls back to running locally and says so, rather than reporting a
+    confinement it is not providing.
+    """
+
+    def __init__(self, config: SandboxConfig) -> None:
+        self.config = config
+        self.mechanism, self.reason = detect_mechanism()
+
+    def run(
+        self,
+        command: list[str],
+        *,
+        workspace: Path,
+        timeout: float,
+        max_output_chars: int,
+        environment: dict[str, str] | None = None,
+    ) -> ProcessResult:
+        root = Path(workspace).resolve()
+        if self.mechanism == "bubblewrap":
+            argv = bubblewrap_command(self.config, command, workspace=root)
+        elif self.mechanism == "seatbelt":
+            argv = seatbelt_command(self.config, command, workspace=root)
+        else:
+            argv = list(command)
+        return run_process(
+            argv,
+            cwd=root,
+            timeout=timeout,
+            max_output_chars=max_output_chars,
+            environment=environment or _host_environment(),
+        )
+
+
+def detect_mechanism() -> tuple[str, str]:
+    """Which kernel sandbox is available here, and why not when there is none.
+
+    Reported rather than assumed, because a sandbox that silently is not one
+    is worse than no sandbox: the operator relaxes on the strength of it.
+    """
+    if sys.platform == "darwin":
+        if shutil.which("sandbox-exec"):
+            return "seatbelt", ""
+        return "", "sandbox-exec not found"
+    if sys.platform.startswith("linux"):
+        if shutil.which("bwrap"):
+            return "bubblewrap", ""
+        return "", "bubblewrap (bwrap) is not installed"
+    return "", f"no kernel sandbox is available on {sys.platform}; use kind: docker"
+
+
+def seatbelt_profile(config: SandboxConfig, *, workspace: Path) -> str:
+    """An Apple Seatbelt profile allowing reads, writes only in the workspace.
+
+    `sandbox-exec` is formally deprecated and has been for years, with no
+    replacement offered for this use, which is why Codex still uses it. The
+    risk is that a future macOS removes it; `detect_mechanism` notices that as
+    a missing binary and falls back rather than failing.
+    """
+    rules = [
+        "(version 1)",
+        "(allow default)",
+        "(deny file-write*)",
+        f'(allow file-write* (subpath "{Path(workspace).as_posix()}"))',
+        '(allow file-write* (subpath "/tmp"))',
+        '(allow file-write* (subpath "/private/tmp"))',
+        '(allow file-write* (literal "/dev/null") (literal "/dev/stdout") (literal "/dev/stderr"))',
+    ]
+    if config.network == "none":
+        rules.append("(deny network*)")
+    return "\n".join(rules)
+
+
+def seatbelt_command(
+    config: SandboxConfig, command: list[str], *, workspace: Path
+) -> list[str]:
+    """The `sandbox-exec` invocation for one command. Pure, so it is testable."""
+    return [
+        "sandbox-exec",
+        "-p",
+        seatbelt_profile(config, workspace=workspace),
+        *command,
+    ]
+
+
+def bubblewrap_command(
+    config: SandboxConfig, command: list[str], *, workspace: Path
+) -> list[str]:
+    """The `bwrap` invocation for one command.
+
+    Bubblewrap rather than Landlock as the primary mechanism, for a reason
+    worth writing down: Landlock cannot restrict the network at all before ABI
+    v4, which needs kernel 6.7, so on most machines in use it would give
+    filesystem confinement and silently no network confinement. Bubblewrap's
+    namespaces work far further back and cover both.
+
+    The filesystem is assembled rather than subtracted: the system is bound
+    read-only, the workspace read-write, and nothing else is visible.
+    """
+    argv = [
+        "bwrap",
+        "--die-with-parent",
+        # A new pid namespace means a process that outlives the timeout dies
+        # with the sandbox instead of being reparented and left running.
+        "--unshare-pid",
+        "--unshare-uts",
+        "--unshare-ipc",
+        "--proc", "/proc",
+        "--dev", "/dev",
+        # A tmpfs rather than the host's /tmp, so scratch files a command
+        # writes are gone when it ends and cannot be read by anything else.
+        "--tmpfs", "/tmp",  # noqa: S108 - a private tmpfs is the point
+
+    ]
+    # `--ro-bind-try` rather than checking each path here. Distributions
+    # differ on which of these exist, and asking the machine that builds the
+    # command would make the answer depend on where it was built, which is the
+    # property that makes these functions testable anywhere.
+    for path in SYSTEM_PATHS:
+        argv += ["--ro-bind-try", path, path]
+    root = Path(workspace).as_posix()
+    argv += ["--bind", root, root, "--chdir", root]
+    if config.network == "none":
+        argv.append("--unshare-net")
+    return [*argv, *command]
+
+
 def docker_command(
     config: SandboxConfig, command: list[str], *, workspace: Path, timeout: float
 ) -> list[str]:
@@ -189,7 +334,11 @@ def _mount_suffix(config: SandboxConfig) -> str:
 
 
 def build_sandbox(config: SandboxConfig) -> Sandbox:
-    return DockerSandbox(config) if config.kind == "docker" else LocalSandbox()
+    if config.kind == "docker":
+        return DockerSandbox(config)
+    if config.kind == "os":
+        return OsSandbox(config)
+    return LocalSandbox()
 
 
 def sandbox_config_from_dict(raw: dict[str, Any] | None, path: str = "sandbox") -> SandboxConfig:
