@@ -1,0 +1,2125 @@
+{
+  "generated": "2026-09-02T09:31:54Z",
+  "task": "The test suite in this repository fails. Make it pass.\n\nRun `python -m pytest -q` to see the failures, read the code, fix what is\nwrong and add what is missing. You may not edit anything under tests/, because\nthe tests define the goal and changing them would be changing the goal. When\nthe whole suite passes, say so and show the final test output.",
+  "subject": "demo/tictactoe",
+  "route": {
+    "name": "inception",
+    "model": "mercury-2",
+    "base_url": "https://api.inceptionlabs.ai/v1",
+    "stream": true
+  },
+  "entry": "repl.agent.send",
+  "wall_ms": 6959.3,
+  "ok": true,
+  "error": "",
+  "stats": {
+    "steps": 8,
+    "tool_calls": 7,
+    "input_tokens": 34113,
+    "output_tokens": 1289,
+    "errors": 2
+  },
+  "before": {
+    "exit_code": 1,
+    "summary": "13 failed, 17 passed in 0.10s",
+    "failed": [
+      "test_a_column_threat_is_blocked",
+      "test_a_diagonal_threat_is_blocked",
+      "test_a_full_board_is_refused",
+      "test_a_winning_move_is_taken",
+      "test_an_opponent_win_is_blocked",
+      "test_an_unknown_player_is_refused",
+      "test_it_works_for_either_player",
+      "test_otherwise_the_first_free_cell_is_taken",
+      "test_the_board_is_not_modified",
+      "test_the_chosen_cell_is_always_free",
+      "test_the_first_free_cell_on_an_empty_board_is_zero",
+      "test_winning_beats_blocking",
+      "test_the_other_diagonal_wins"
+    ],
+    "passed": false
+  },
+  "after": {
+    "exit_code": 0,
+    "summary": "30 passed in 0.03s",
+    "failed": [],
+    "passed": true
+  },
+  "diffstat": [
+    " .../test_best_move.cpython-314-pytest-9.1.1.pyc\"   | Bin 0 -> 7761 bytes",
+    " .../__pycache__/test_best_move.cpython-314.pyc\"    | Bin 7674 -> 7648 bytes",
+    " .../dev/null                                       | Bin 7268 -> 0 bytes",
+    " .../test_winner.cpython-314-pytest-9.1.1.pyc\"      | Bin 0 -> 9865 bytes",
+    " .../tests/__pycache__/test_winner.cpython-314.pyc\" | Bin 9778 -> 9752 bytes",
+    " 16 files changed, 77 insertions(+)"
+  ],
+  "steps_taken": [
+    {
+      "n": 1,
+      "kind": "tool",
+      "name": "run_command",
+      "component": "repl.tools",
+      "args": {
+        "command": "['python', '-m', 'pytest', '-q']",
+        "timeout": "100000"
+      },
+      "t": 716.1,
+      "detail": "exit 1",
+      "ok": false,
+      "ms": 36.2
+    },
+    {
+      "n": 2,
+      "kind": "tool",
+      "name": "run_command",
+      "component": "repl.tools",
+      "args": {
+        "command": "['python', '-m', 'unittest', 'discover', '-s', 'tests']",
+        "timeout": "100000"
+      },
+      "t": 1258.3,
+      "detail": "exit 1",
+      "ok": false,
+      "ms": 93.0
+    },
+    {
+      "n": 3,
+      "kind": "tool",
+      "name": "read_file",
+      "component": "repl.tools",
+      "args": {
+        "path": "game.py",
+        "offset": "1",
+        "limit": "200"
+      },
+      "t": 2004.2,
+      "detail": "74 lines",
+      "ok": true,
+      "ms": 1.5
+    },
+    {
+      "n": 4,
+      "kind": "tool",
+      "name": "read_file",
+      "component": "repl.tools",
+      "args": {
+        "path": "tests/test_best_move.py",
+        "offset": "1",
+        "limit": "200"
+      },
+      "t": 2748.7,
+      "detail": "86 lines",
+      "ok": true,
+      "ms": 0.9
+    },
+    {
+      "n": 5,
+      "kind": "tool",
+      "name": "edit_file",
+      "component": "repl.tools",
+      "args": {
+        "path": "game.py",
+        "old_string": "def winning_lines() -> list[tuple[int, int, int]]:\n    \"\"\"Every line that wins the game.\"\"\"\n    lines: list[tuple[int, i",
+        "new_string": "def winning_lines() -> list[tuple[int, int, int]]:\n    \"\"\"Every line that wins the game.\"\"\"\n    lines: list[tuple[int, i"
+      },
+      "t": 4243.7,
+      "detail": "+1 -0",
+      "ok": true,
+      "ms": 7.4
+    },
+    {
+      "n": 6,
+      "kind": "tool",
+      "name": "edit_file",
+      "component": "repl.tools",
+      "args": {
+        "path": "game.py",
+        "old_string": "def is_draw(board: list[str]) -> bool:\n    \"\"\"True when the board is full and nobody has won.\"\"\"\n    return is_full(boar",
+        "new_string": "def is_draw(board: list[str]) -> bool:\n    \"\"\"True when the board is full and nobody has won.\"\"\"\n    return is_full(boar"
+      },
+      "t": 5122.0,
+      "detail": "+29 -0",
+      "ok": true,
+      "ms": 2.5
+    },
+    {
+      "n": 7,
+      "kind": "tool",
+      "name": "run_command",
+      "component": "repl.tools",
+      "args": {
+        "command": "['python', '-m', 'unittest', 'discover', '-s', 'tests']",
+        "timeout": "100000"
+      },
+      "t": 5872.2,
+      "detail": "5 lines",
+      "ok": true,
+      "ms": 103.2
+    },
+    {
+      "n": 8,
+      "kind": "say",
+      "component": "repl.model",
+      "detail": "All tests now pass.\n\n```\n..............................\nRan 30 tests in 0.001s\n\nOK\n```",
+      "t": 6959.1
+    }
+  ],
+  "components": [
+    {
+      "name": "repl.conversation",
+      "layer": "repl",
+      "calls": 327,
+      "ms": 1.0,
+      "held_ms": 1.0,
+      "first_step": 0
+    },
+    {
+      "name": "repl.tools",
+      "layer": "repl",
+      "calls": 225,
+      "ms": 12.7,
+      "held_ms": 243.6,
+      "first_step": 1
+    },
+    {
+      "name": "repl.agent",
+      "layer": "repl",
+      "calls": 72,
+      "ms": 1.1,
+      "held_ms": 6959.1,
+      "first_step": 0
+    },
+    {
+      "name": "models.auth",
+      "layer": "models",
+      "calls": 64,
+      "ms": 2.4,
+      "held_ms": 2.4,
+      "first_step": 0
+    },
+    {
+      "name": "core.contracts",
+      "layer": "core",
+      "calls": 56,
+      "ms": 0.1,
+      "held_ms": 0.1,
+      "first_step": 0
+    },
+    {
+      "name": "repl.model",
+      "layer": "repl",
+      "calls": 47,
+      "ms": 1.1,
+      "held_ms": 6712.7,
+      "first_step": 0
+    },
+    {
+      "name": "repl.approvals",
+      "layer": "repl",
+      "calls": 45,
+      "ms": 0.3,
+      "held_ms": 0.8,
+      "first_step": 1
+    },
+    {
+      "name": "models.providers",
+      "layer": "models",
+      "calls": 32,
+      "ms": 6708.9,
+      "held_ms": 6711.3,
+      "first_step": 0
+    },
+    {
+      "name": "execution.process",
+      "layer": "execution",
+      "calls": 25,
+      "ms": 228.9,
+      "held_ms": 228.9,
+      "first_step": 1
+    },
+    {
+      "name": "execution.policy",
+      "layer": "execution",
+      "calls": 6,
+      "ms": 0.5,
+      "held_ms": 0.5,
+      "first_step": 1
+    },
+    {
+      "name": "execution.workspace",
+      "layer": "execution",
+      "calls": 4,
+      "ms": 2.0,
+      "held_ms": 2.0,
+      "first_step": 3
+    },
+    {
+      "name": "core.util",
+      "layer": "core",
+      "calls": 3,
+      "ms": 0.0,
+      "held_ms": 0.0,
+      "first_step": 1
+    }
+  ],
+  "edges": [
+    {
+      "from": "repl.model",
+      "to": "core.contracts",
+      "calls": 56
+    },
+    {
+      "from": "repl.agent",
+      "to": "repl.conversation",
+      "calls": 40
+    },
+    {
+      "from": "repl.agent",
+      "to": "repl.model",
+      "calls": 16
+    },
+    {
+      "from": "models.providers",
+      "to": "models.auth",
+      "calls": 16
+    },
+    {
+      "from": "repl.model",
+      "to": "repl.conversation",
+      "calls": 15
+    },
+    {
+      "from": "repl.model",
+      "to": "models.providers",
+      "calls": 8
+    },
+    {
+      "from": "repl.agent",
+      "to": "repl.approvals",
+      "calls": 7
+    },
+    {
+      "from": "repl.agent",
+      "to": "repl.tools",
+      "calls": 7
+    },
+    {
+      "from": "repl.tools",
+      "to": "execution.workspace",
+      "calls": 4
+    },
+    {
+      "from": "repl.approvals",
+      "to": "execution.policy",
+      "calls": 3
+    },
+    {
+      "from": "repl.tools",
+      "to": "execution.process",
+      "calls": 3
+    },
+    {
+      "from": "execution.process",
+      "to": "core.util",
+      "calls": 3
+    },
+    {
+      "from": "<entry>",
+      "to": "repl.agent",
+      "calls": 1
+    }
+  ],
+  "spans": [
+    {
+      "id": 0,
+      "parent": -1,
+      "component": "repl.agent",
+      "layer": "repl",
+      "func": "send",
+      "t0": 0.061,
+      "ms": 6959.111,
+      "step": 0
+    },
+    {
+      "id": 1,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_user",
+      "t0": 0.087,
+      "ms": 0.005,
+      "step": 0
+    },
+    {
+      "id": 2,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "needs_compaction",
+      "t0": 0.114,
+      "ms": 0.02,
+      "step": 0
+    },
+    {
+      "id": 3,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "streams",
+      "t0": 0.146,
+      "ms": 0.002,
+      "step": 0
+    },
+    {
+      "id": 4,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wire_messages",
+      "t0": 0.153,
+      "ms": 0.002,
+      "step": 0
+    },
+    {
+      "id": 5,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "converse",
+      "t0": 0.159,
+      "ms": 715.678,
+      "step": 0
+    },
+    {
+      "id": 6,
+      "parent": 5,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 0.171,
+      "ms": 0.002,
+      "step": 0
+    },
+    {
+      "id": 7,
+      "parent": 5,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 0.175,
+      "ms": 0.002,
+      "step": 0
+    },
+    {
+      "id": 8,
+      "parent": 5,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 0.179,
+      "ms": 0.001,
+      "step": 0
+    },
+    {
+      "id": 9,
+      "parent": 5,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 0.181,
+      "ms": 0.001,
+      "step": 0
+    },
+    {
+      "id": 10,
+      "parent": 5,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 0.183,
+      "ms": 0.001,
+      "step": 0
+    },
+    {
+      "id": 11,
+      "parent": 5,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 0.186,
+      "ms": 0.001,
+      "step": 0
+    },
+    {
+      "id": 12,
+      "parent": 5,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 0.188,
+      "ms": 0.001,
+      "step": 0
+    },
+    {
+      "id": 13,
+      "parent": 5,
+      "component": "models.providers",
+      "layer": "models",
+      "func": "send",
+      "t0": 0.199,
+      "ms": 715.385,
+      "step": 0
+    },
+    {
+      "id": 14,
+      "parent": 13,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "resolve_route",
+      "t0": 0.206,
+      "ms": 0.323,
+      "step": 0
+    },
+    {
+      "id": 15,
+      "parent": 13,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "available",
+      "t0": 0.533,
+      "ms": 0.002,
+      "step": 0
+    },
+    {
+      "id": 16,
+      "parent": 5,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "__init__",
+      "t0": 715.753,
+      "ms": 0.021,
+      "step": 0
+    },
+    {
+      "id": 17,
+      "parent": 5,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "__init__",
+      "t0": 715.811,
+      "ms": 0.009,
+      "step": 0
+    },
+    {
+      "id": 18,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_assistant",
+      "t0": 715.866,
+      "ms": 0.076,
+      "step": 0
+    },
+    {
+      "id": 19,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wants_tools",
+      "t0": 715.978,
+      "ms": 0.006,
+      "step": 0
+    },
+    {
+      "id": 20,
+      "parent": 0,
+      "component": "repl.approvals",
+      "layer": "repl",
+      "func": "check",
+      "t0": 716.105,
+      "ms": 0.428,
+      "step": 1
+    },
+    {
+      "id": 21,
+      "parent": 20,
+      "component": "execution.policy",
+      "layer": "execution",
+      "func": "denied_pattern",
+      "t0": 716.176,
+      "ms": 0.294,
+      "step": 1
+    },
+    {
+      "id": 22,
+      "parent": 0,
+      "component": "repl.tools",
+      "layer": "repl",
+      "func": "dispatch",
+      "t0": 716.556,
+      "ms": 35.741,
+      "step": 1
+    },
+    {
+      "id": 23,
+      "parent": 22,
+      "component": "execution.process",
+      "layer": "execution",
+      "func": "run_process",
+      "t0": 717.367,
+      "ms": 34.824,
+      "step": 1
+    },
+    {
+      "id": 24,
+      "parent": 23,
+      "component": "core.util",
+      "layer": "core",
+      "func": "truncate",
+      "t0": 752.173,
+      "ms": 0.006,
+      "step": 1
+    },
+    {
+      "id": 25,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_tool_result",
+      "t0": 752.319,
+      "ms": 0.003,
+      "step": 1
+    },
+    {
+      "id": 26,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "needs_compaction",
+      "t0": 752.334,
+      "ms": 0.029,
+      "step": 1
+    },
+    {
+      "id": 27,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "streams",
+      "t0": 752.371,
+      "ms": 0.002,
+      "step": 1
+    },
+    {
+      "id": 28,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wire_messages",
+      "t0": 752.377,
+      "ms": 0.002,
+      "step": 1
+    },
+    {
+      "id": 29,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "converse",
+      "t0": 752.381,
+      "ms": 505.795,
+      "step": 1
+    },
+    {
+      "id": 30,
+      "parent": 29,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 752.39,
+      "ms": 0.001,
+      "step": 1
+    },
+    {
+      "id": 31,
+      "parent": 29,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 752.393,
+      "ms": 0.001,
+      "step": 1
+    },
+    {
+      "id": 32,
+      "parent": 29,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 752.396,
+      "ms": 0.001,
+      "step": 1
+    },
+    {
+      "id": 33,
+      "parent": 29,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 752.398,
+      "ms": 0.001,
+      "step": 1
+    },
+    {
+      "id": 34,
+      "parent": 29,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 752.4,
+      "ms": 0.001,
+      "step": 1
+    },
+    {
+      "id": 35,
+      "parent": 29,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 752.403,
+      "ms": 0.001,
+      "step": 1
+    },
+    {
+      "id": 36,
+      "parent": 29,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 752.405,
+      "ms": 0.001,
+      "step": 1
+    },
+    {
+      "id": 37,
+      "parent": 29,
+      "component": "models.providers",
+      "layer": "models",
+      "func": "send",
+      "t0": 752.411,
+      "ms": 505.631,
+      "step": 1
+    },
+    {
+      "id": 38,
+      "parent": 37,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "resolve_route",
+      "t0": 752.416,
+      "ms": 0.328,
+      "step": 1
+    },
+    {
+      "id": 39,
+      "parent": 37,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "available",
+      "t0": 752.748,
+      "ms": 0.002,
+      "step": 1
+    },
+    {
+      "id": 40,
+      "parent": 29,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "__init__",
+      "t0": 1258.122,
+      "ms": 0.014,
+      "step": 1
+    },
+    {
+      "id": 41,
+      "parent": 29,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "__init__",
+      "t0": 1258.157,
+      "ms": 0.007,
+      "step": 1
+    },
+    {
+      "id": 42,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_assistant",
+      "t0": 1258.193,
+      "ms": 0.043,
+      "step": 1
+    },
+    {
+      "id": 43,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wants_tools",
+      "t0": 1258.28,
+      "ms": 0.004,
+      "step": 1
+    },
+    {
+      "id": 44,
+      "parent": 0,
+      "component": "repl.approvals",
+      "layer": "repl",
+      "func": "check",
+      "t0": 1258.343,
+      "ms": 0.149,
+      "step": 2
+    },
+    {
+      "id": 45,
+      "parent": 44,
+      "component": "execution.policy",
+      "layer": "execution",
+      "func": "denied_pattern",
+      "t0": 1258.38,
+      "ms": 0.085,
+      "step": 2
+    },
+    {
+      "id": 46,
+      "parent": 0,
+      "component": "repl.tools",
+      "layer": "repl",
+      "func": "dispatch",
+      "t0": 1258.499,
+      "ms": 92.836,
+      "step": 2
+    },
+    {
+      "id": 47,
+      "parent": 46,
+      "component": "execution.process",
+      "layer": "execution",
+      "func": "run_process",
+      "t0": 1259.235,
+      "ms": 92.035,
+      "step": 2
+    },
+    {
+      "id": 48,
+      "parent": 47,
+      "component": "core.util",
+      "layer": "core",
+      "func": "truncate",
+      "t0": 1351.251,
+      "ms": 0.007,
+      "step": 2
+    },
+    {
+      "id": 49,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_tool_result",
+      "t0": 1351.355,
+      "ms": 0.003,
+      "step": 2
+    },
+    {
+      "id": 50,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "needs_compaction",
+      "t0": 1351.368,
+      "ms": 0.039,
+      "step": 2
+    },
+    {
+      "id": 51,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "streams",
+      "t0": 1351.413,
+      "ms": 0.001,
+      "step": 2
+    },
+    {
+      "id": 52,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wire_messages",
+      "t0": 1351.418,
+      "ms": 0.002,
+      "step": 2
+    },
+    {
+      "id": 53,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "converse",
+      "t0": 1351.422,
+      "ms": 652.754,
+      "step": 2
+    },
+    {
+      "id": 54,
+      "parent": 53,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 1351.429,
+      "ms": 0.001,
+      "step": 2
+    },
+    {
+      "id": 55,
+      "parent": 53,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 1351.433,
+      "ms": 0.001,
+      "step": 2
+    },
+    {
+      "id": 56,
+      "parent": 53,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 1351.435,
+      "ms": 0.001,
+      "step": 2
+    },
+    {
+      "id": 57,
+      "parent": 53,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 1351.437,
+      "ms": 0.002,
+      "step": 2
+    },
+    {
+      "id": 58,
+      "parent": 53,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 1351.44,
+      "ms": 0.001,
+      "step": 2
+    },
+    {
+      "id": 59,
+      "parent": 53,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 1351.442,
+      "ms": 0.001,
+      "step": 2
+    },
+    {
+      "id": 60,
+      "parent": 53,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 1351.445,
+      "ms": 0.001,
+      "step": 2
+    },
+    {
+      "id": 61,
+      "parent": 53,
+      "component": "models.providers",
+      "layer": "models",
+      "func": "send",
+      "t0": 1351.451,
+      "ms": 652.638,
+      "step": 2
+    },
+    {
+      "id": 62,
+      "parent": 61,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "resolve_route",
+      "t0": 1351.454,
+      "ms": 0.297,
+      "step": 2
+    },
+    {
+      "id": 63,
+      "parent": 61,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "available",
+      "t0": 1351.756,
+      "ms": 0.003,
+      "step": 2
+    },
+    {
+      "id": 64,
+      "parent": 53,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "__init__",
+      "t0": 2004.138,
+      "ms": 0.009,
+      "step": 2
+    },
+    {
+      "id": 65,
+      "parent": 53,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "__init__",
+      "t0": 2004.16,
+      "ms": 0.004,
+      "step": 2
+    },
+    {
+      "id": 66,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_assistant",
+      "t0": 2004.185,
+      "ms": 0.024,
+      "step": 2
+    },
+    {
+      "id": 67,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wants_tools",
+      "t0": 2004.219,
+      "ms": 0.002,
+      "step": 2
+    },
+    {
+      "id": 68,
+      "parent": 0,
+      "component": "repl.approvals",
+      "layer": "repl",
+      "func": "check",
+      "t0": 2004.252,
+      "ms": 0.009,
+      "step": 3
+    },
+    {
+      "id": 69,
+      "parent": 0,
+      "component": "repl.tools",
+      "layer": "repl",
+      "func": "dispatch",
+      "t0": 2004.265,
+      "ms": 1.399,
+      "step": 3
+    },
+    {
+      "id": 70,
+      "parent": 69,
+      "component": "execution.workspace",
+      "layer": "execution",
+      "func": "resolve",
+      "t0": 2004.301,
+      "ms": 0.559,
+      "step": 3
+    },
+    {
+      "id": 71,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_tool_result",
+      "t0": 2005.684,
+      "ms": 0.005,
+      "step": 3
+    },
+    {
+      "id": 72,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "needs_compaction",
+      "t0": 2005.7,
+      "ms": 0.075,
+      "step": 3
+    },
+    {
+      "id": 73,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "streams",
+      "t0": 2005.783,
+      "ms": 0.003,
+      "step": 3
+    },
+    {
+      "id": 74,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wire_messages",
+      "t0": 2005.79,
+      "ms": 0.002,
+      "step": 3
+    },
+    {
+      "id": 75,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "converse",
+      "t0": 2005.795,
+      "ms": 742.832,
+      "step": 3
+    },
+    {
+      "id": 76,
+      "parent": 75,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 2005.805,
+      "ms": 0.003,
+      "step": 3
+    },
+    {
+      "id": 77,
+      "parent": 75,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 2005.811,
+      "ms": 0.002,
+      "step": 3
+    },
+    {
+      "id": 78,
+      "parent": 75,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 2005.815,
+      "ms": 0.002,
+      "step": 3
+    },
+    {
+      "id": 79,
+      "parent": 75,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 2005.818,
+      "ms": 0.002,
+      "step": 3
+    },
+    {
+      "id": 80,
+      "parent": 75,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 2005.822,
+      "ms": 0.002,
+      "step": 3
+    },
+    {
+      "id": 81,
+      "parent": 75,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 2005.825,
+      "ms": 0.002,
+      "step": 3
+    },
+    {
+      "id": 82,
+      "parent": 75,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 2005.828,
+      "ms": 0.002,
+      "step": 3
+    },
+    {
+      "id": 83,
+      "parent": 75,
+      "component": "models.providers",
+      "layer": "models",
+      "func": "send",
+      "t0": 2005.837,
+      "ms": 742.738,
+      "step": 3
+    },
+    {
+      "id": 84,
+      "parent": 83,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "resolve_route",
+      "t0": 2005.842,
+      "ms": 0.325,
+      "step": 3
+    },
+    {
+      "id": 85,
+      "parent": 83,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "available",
+      "t0": 2006.171,
+      "ms": 0.003,
+      "step": 3
+    },
+    {
+      "id": 86,
+      "parent": 75,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "__init__",
+      "t0": 2748.606,
+      "ms": 0.005,
+      "step": 3
+    },
+    {
+      "id": 87,
+      "parent": 75,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "__init__",
+      "t0": 2748.619,
+      "ms": 0.002,
+      "step": 3
+    },
+    {
+      "id": 88,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_assistant",
+      "t0": 2748.633,
+      "ms": 0.016,
+      "step": 3
+    },
+    {
+      "id": 89,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wants_tools",
+      "t0": 2748.655,
+      "ms": 0.001,
+      "step": 3
+    },
+    {
+      "id": 90,
+      "parent": 0,
+      "component": "repl.approvals",
+      "layer": "repl",
+      "func": "check",
+      "t0": 2748.677,
+      "ms": 0.006,
+      "step": 4
+    },
+    {
+      "id": 91,
+      "parent": 0,
+      "component": "repl.tools",
+      "layer": "repl",
+      "func": "dispatch",
+      "t0": 2748.686,
+      "ms": 0.912,
+      "step": 4
+    },
+    {
+      "id": 92,
+      "parent": 91,
+      "component": "execution.workspace",
+      "layer": "execution",
+      "func": "resolve",
+      "t0": 2748.7,
+      "ms": 0.382,
+      "step": 4
+    },
+    {
+      "id": 93,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_tool_result",
+      "t0": 2749.612,
+      "ms": 0.003,
+      "step": 4
+    },
+    {
+      "id": 94,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "needs_compaction",
+      "t0": 2749.621,
+      "ms": 0.055,
+      "step": 4
+    },
+    {
+      "id": 95,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "streams",
+      "t0": 2749.682,
+      "ms": 0.001,
+      "step": 4
+    },
+    {
+      "id": 96,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wire_messages",
+      "t0": 2749.686,
+      "ms": 0.001,
+      "step": 4
+    },
+    {
+      "id": 97,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "converse",
+      "t0": 2749.689,
+      "ms": 1493.936,
+      "step": 4
+    },
+    {
+      "id": 98,
+      "parent": 97,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 2749.696,
+      "ms": 0.001,
+      "step": 4
+    },
+    {
+      "id": 99,
+      "parent": 97,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 2749.699,
+      "ms": 0.001,
+      "step": 4
+    },
+    {
+      "id": 100,
+      "parent": 97,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 2749.701,
+      "ms": 0.001,
+      "step": 4
+    },
+    {
+      "id": 101,
+      "parent": 97,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 2749.703,
+      "ms": 0.001,
+      "step": 4
+    },
+    {
+      "id": 102,
+      "parent": 97,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 2749.706,
+      "ms": 0.001,
+      "step": 4
+    },
+    {
+      "id": 103,
+      "parent": 97,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 2749.708,
+      "ms": 0.001,
+      "step": 4
+    },
+    {
+      "id": 104,
+      "parent": 97,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 2749.71,
+      "ms": 0.001,
+      "step": 4
+    },
+    {
+      "id": 105,
+      "parent": 97,
+      "component": "models.providers",
+      "layer": "models",
+      "func": "send",
+      "t0": 2749.715,
+      "ms": 1493.767,
+      "step": 4
+    },
+    {
+      "id": 106,
+      "parent": 105,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "resolve_route",
+      "t0": 2749.719,
+      "ms": 0.262,
+      "step": 4
+    },
+    {
+      "id": 107,
+      "parent": 105,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "available",
+      "t0": 2749.983,
+      "ms": 0.002,
+      "step": 4
+    },
+    {
+      "id": 108,
+      "parent": 97,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "__init__",
+      "t0": 4243.584,
+      "ms": 0.012,
+      "step": 4
+    },
+    {
+      "id": 109,
+      "parent": 97,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "__init__",
+      "t0": 4243.611,
+      "ms": 0.005,
+      "step": 4
+    },
+    {
+      "id": 110,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_assistant",
+      "t0": 4243.637,
+      "ms": 0.036,
+      "step": 4
+    },
+    {
+      "id": 111,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wants_tools",
+      "t0": 4243.683,
+      "ms": 0.003,
+      "step": 4
+    },
+    {
+      "id": 112,
+      "parent": 0,
+      "component": "repl.approvals",
+      "layer": "repl",
+      "func": "check",
+      "t0": 4243.719,
+      "ms": 0.022,
+      "step": 5
+    },
+    {
+      "id": 113,
+      "parent": 0,
+      "component": "repl.tools",
+      "layer": "repl",
+      "func": "dispatch",
+      "t0": 4243.746,
+      "ms": 7.298,
+      "step": 5
+    },
+    {
+      "id": 114,
+      "parent": 113,
+      "component": "execution.workspace",
+      "layer": "execution",
+      "func": "resolve",
+      "t0": 4243.777,
+      "ms": 0.711,
+      "step": 5
+    },
+    {
+      "id": 115,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_tool_result",
+      "t0": 4251.07,
+      "ms": 0.006,
+      "step": 5
+    },
+    {
+      "id": 116,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "needs_compaction",
+      "t0": 4251.088,
+      "ms": 0.121,
+      "step": 5
+    },
+    {
+      "id": 117,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "streams",
+      "t0": 4251.217,
+      "ms": 0.002,
+      "step": 5
+    },
+    {
+      "id": 118,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wire_messages",
+      "t0": 4251.225,
+      "ms": 0.002,
+      "step": 5
+    },
+    {
+      "id": 119,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "converse",
+      "t0": 4251.23,
+      "ms": 870.727,
+      "step": 5
+    },
+    {
+      "id": 120,
+      "parent": 119,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 4251.24,
+      "ms": 0.003,
+      "step": 5
+    },
+    {
+      "id": 121,
+      "parent": 119,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 4251.247,
+      "ms": 0.002,
+      "step": 5
+    },
+    {
+      "id": 122,
+      "parent": 119,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 4251.251,
+      "ms": 0.002,
+      "step": 5
+    },
+    {
+      "id": 123,
+      "parent": 119,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 4251.255,
+      "ms": 0.002,
+      "step": 5
+    },
+    {
+      "id": 124,
+      "parent": 119,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 4251.259,
+      "ms": 0.002,
+      "step": 5
+    },
+    {
+      "id": 125,
+      "parent": 119,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 4251.263,
+      "ms": 0.002,
+      "step": 5
+    },
+    {
+      "id": 126,
+      "parent": 119,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 4251.266,
+      "ms": 0.002,
+      "step": 5
+    },
+    {
+      "id": 127,
+      "parent": 119,
+      "component": "models.providers",
+      "layer": "models",
+      "func": "send",
+      "t0": 4251.275,
+      "ms": 870.621,
+      "step": 5
+    },
+    {
+      "id": 128,
+      "parent": 127,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "resolve_route",
+      "t0": 4251.28,
+      "ms": 0.378,
+      "step": 5
+    },
+    {
+      "id": 129,
+      "parent": 127,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "available",
+      "t0": 4251.663,
+      "ms": 0.004,
+      "step": 5
+    },
+    {
+      "id": 130,
+      "parent": 119,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "__init__",
+      "t0": 5121.932,
+      "ms": 0.006,
+      "step": 5
+    },
+    {
+      "id": 131,
+      "parent": 119,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "__init__",
+      "t0": 5121.947,
+      "ms": 0.003,
+      "step": 5
+    },
+    {
+      "id": 132,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_assistant",
+      "t0": 5121.964,
+      "ms": 0.021,
+      "step": 5
+    },
+    {
+      "id": 133,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wants_tools",
+      "t0": 5121.991,
+      "ms": 0.001,
+      "step": 5
+    },
+    {
+      "id": 134,
+      "parent": 0,
+      "component": "repl.approvals",
+      "layer": "repl",
+      "func": "check",
+      "t0": 5122.014,
+      "ms": 0.014,
+      "step": 6
+    },
+    {
+      "id": 135,
+      "parent": 0,
+      "component": "repl.tools",
+      "layer": "repl",
+      "func": "dispatch",
+      "t0": 5122.032,
+      "ms": 2.473,
+      "step": 6
+    },
+    {
+      "id": 136,
+      "parent": 135,
+      "component": "execution.workspace",
+      "layer": "execution",
+      "func": "resolve",
+      "t0": 5122.046,
+      "ms": 0.37,
+      "step": 6
+    },
+    {
+      "id": 137,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_tool_result",
+      "t0": 5124.518,
+      "ms": 0.003,
+      "step": 6
+    },
+    {
+      "id": 138,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "needs_compaction",
+      "t0": 5124.528,
+      "ms": 0.076,
+      "step": 6
+    },
+    {
+      "id": 139,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "streams",
+      "t0": 5124.61,
+      "ms": 0.002,
+      "step": 6
+    },
+    {
+      "id": 140,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wire_messages",
+      "t0": 5124.614,
+      "ms": 0.002,
+      "step": 6
+    },
+    {
+      "id": 141,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "converse",
+      "t0": 5124.618,
+      "ms": 747.459,
+      "step": 6
+    },
+    {
+      "id": 142,
+      "parent": 141,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 5124.624,
+      "ms": 0.001,
+      "step": 6
+    },
+    {
+      "id": 143,
+      "parent": 141,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 5124.627,
+      "ms": 0.001,
+      "step": 6
+    },
+    {
+      "id": 144,
+      "parent": 141,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 5124.629,
+      "ms": 0.001,
+      "step": 6
+    },
+    {
+      "id": 145,
+      "parent": 141,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 5124.631,
+      "ms": 0.001,
+      "step": 6
+    },
+    {
+      "id": 146,
+      "parent": 141,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 5124.633,
+      "ms": 0.001,
+      "step": 6
+    },
+    {
+      "id": 147,
+      "parent": 141,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 5124.635,
+      "ms": 0.001,
+      "step": 6
+    },
+    {
+      "id": 148,
+      "parent": 141,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 5124.637,
+      "ms": 0.003,
+      "step": 6
+    },
+    {
+      "id": 149,
+      "parent": 141,
+      "component": "models.providers",
+      "layer": "models",
+      "func": "send",
+      "t0": 5124.644,
+      "ms": 747.181,
+      "step": 6
+    },
+    {
+      "id": 150,
+      "parent": 149,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "resolve_route",
+      "t0": 5124.647,
+      "ms": 0.203,
+      "step": 6
+    },
+    {
+      "id": 151,
+      "parent": 149,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "available",
+      "t0": 5124.853,
+      "ms": 0.002,
+      "step": 6
+    },
+    {
+      "id": 152,
+      "parent": 141,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "__init__",
+      "t0": 5872.008,
+      "ms": 0.017,
+      "step": 6
+    },
+    {
+      "id": 153,
+      "parent": 141,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "__init__",
+      "t0": 5872.053,
+      "ms": 0.008,
+      "step": 6
+    },
+    {
+      "id": 154,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_assistant",
+      "t0": 5872.096,
+      "ms": 0.051,
+      "step": 6
+    },
+    {
+      "id": 155,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wants_tools",
+      "t0": 5872.165,
+      "ms": 0.004,
+      "step": 6
+    },
+    {
+      "id": 156,
+      "parent": 0,
+      "component": "repl.approvals",
+      "layer": "repl",
+      "func": "check",
+      "t0": 5872.234,
+      "ms": 0.173,
+      "step": 7
+    },
+    {
+      "id": 157,
+      "parent": 156,
+      "component": "execution.policy",
+      "layer": "execution",
+      "func": "denied_pattern",
+      "t0": 5872.274,
+      "ms": 0.102,
+      "step": 7
+    },
+    {
+      "id": 158,
+      "parent": 0,
+      "component": "repl.tools",
+      "layer": "repl",
+      "func": "dispatch",
+      "t0": 5872.415,
+      "ms": 102.99,
+      "step": 7
+    },
+    {
+      "id": 159,
+      "parent": 158,
+      "component": "execution.process",
+      "layer": "execution",
+      "func": "run_process",
+      "t0": 5873.284,
+      "ms": 102.019,
+      "step": 7
+    },
+    {
+      "id": 160,
+      "parent": 159,
+      "component": "core.util",
+      "layer": "core",
+      "func": "truncate",
+      "t0": 5975.286,
+      "ms": 0.006,
+      "step": 7
+    },
+    {
+      "id": 161,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_tool_result",
+      "t0": 5975.434,
+      "ms": 0.007,
+      "step": 7
+    },
+    {
+      "id": 162,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "needs_compaction",
+      "t0": 5975.453,
+      "ms": 0.105,
+      "step": 7
+    },
+    {
+      "id": 163,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "streams",
+      "t0": 5975.565,
+      "ms": 0.002,
+      "step": 7
+    },
+    {
+      "id": 164,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wire_messages",
+      "t0": 5975.57,
+      "ms": 0.002,
+      "step": 7
+    },
+    {
+      "id": 165,
+      "parent": 0,
+      "component": "repl.model",
+      "layer": "repl",
+      "func": "converse",
+      "t0": 5975.574,
+      "ms": 983.499,
+      "step": 7
+    },
+    {
+      "id": 166,
+      "parent": 165,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 5975.582,
+      "ms": 0.002,
+      "step": 7
+    },
+    {
+      "id": 167,
+      "parent": 165,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 5975.586,
+      "ms": 0.001,
+      "step": 7
+    },
+    {
+      "id": 168,
+      "parent": 165,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 5975.588,
+      "ms": 0.001,
+      "step": 7
+    },
+    {
+      "id": 169,
+      "parent": 165,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 5975.591,
+      "ms": 0.001,
+      "step": 7
+    },
+    {
+      "id": 170,
+      "parent": 165,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 5975.593,
+      "ms": 0.001,
+      "step": 7
+    },
+    {
+      "id": 171,
+      "parent": 165,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 5975.595,
+      "ms": 0.001,
+      "step": 7
+    },
+    {
+      "id": 172,
+      "parent": 165,
+      "component": "core.contracts",
+      "layer": "core",
+      "func": "as_model_tool",
+      "t0": 5975.597,
+      "ms": 0.003,
+      "step": 7
+    },
+    {
+      "id": 173,
+      "parent": 165,
+      "component": "models.providers",
+      "layer": "models",
+      "func": "send",
+      "t0": 5975.605,
+      "ms": 983.38,
+      "step": 7
+    },
+    {
+      "id": 174,
+      "parent": 173,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "resolve_route",
+      "t0": 5975.609,
+      "ms": 0.286,
+      "step": 7
+    },
+    {
+      "id": 175,
+      "parent": 173,
+      "component": "models.auth",
+      "layer": "models",
+      "func": "available",
+      "t0": 5975.898,
+      "ms": 0.002,
+      "step": 7
+    },
+    {
+      "id": 176,
+      "parent": 165,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "__init__",
+      "t0": 6959.042,
+      "ms": 0.015,
+      "step": 7
+    },
+    {
+      "id": 177,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "add_assistant",
+      "t0": 6959.092,
+      "ms": 0.008,
+      "step": 7
+    },
+    {
+      "id": 178,
+      "parent": 0,
+      "component": "repl.conversation",
+      "layer": "repl",
+      "func": "wants_tools",
+      "t0": 6959.159,
+      "ms": 0.004,
+      "step": 8
+    }
+  ],
+  "span_total": 179
+}

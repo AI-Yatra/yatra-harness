@@ -97,6 +97,47 @@ exists. It deliberately does not assert that `public/atlas.json` is fresh, so
 editing the harness does not break the suite. Add `--check` to CI if you would
 rather the file never drift.
 
+## The recorded session
+
+Every other region measures the package at rest. The `trace` region measures it
+in motion, from one real conversation:
+
+```bash
+python3 docs/atlas/scripts/trace_session.py --route inception
+```
+
+That copies `demo/tictactoe` to a temporary directory, runs its test suite to
+get a starting score, hands the failing suite to a real model over a real
+provider, and runs the suite again afterwards. The subject has a flaw and a gap
+on purpose: `winning_lines()` omits the anti-diagonal, and `best_move()` does
+not exist. Thirteen tests fail at the start. `tests/` is write-protected, so the
+only way to turn them green is to fix the code.
+
+Nothing is instrumented by hand. A `sys.setprofile` hook watches every call and
+keeps the ones that cross from one component into another, which is what makes
+the diagram worth trusting: a component that stops being on the path stops being
+in the picture, without anyone remembering to update a drawing.
+
+Three things it shows that the static regions cannot:
+
+- **The path.** Which component handed to which, in what order, with call
+  counts. Across the recorded run, of thirteen edges, none runs back up the
+  layer stack. That is the import contract holding at run time and not only
+  under `lint-imports`.
+- **The cost.** Self time per component, with nested calls subtracted so the
+  parts sum to the wall clock rather than exceeding it. In the committed run,
+  96% of seven seconds is blocked on the provider and 3% on the test subprocess
+  the model started. The harness's own work comes to 21ms.
+- **The result.** The before and after summaries are the test runner's own
+  words, captured from a subprocess either side of the conversation. The region
+  reports a failed run as readily as a successful one.
+
+`public/trace.json` is optional. Without it the canvas drops the region and
+everything else works. `tests/test_atlas_trace.py` covers the recorder, most
+importantly the timing arithmetic: summing per-component durations without
+subtracting nested calls once produced a harness that spent 14.4s inside a 7.2s
+session, and no reader would have caught that from the picture.
+
 ## Layout
 
 Sections are built at the origin, measured, and only then placed into columns,

@@ -88,6 +88,24 @@ model_router:
       latency: low
       quality: 3.5
       context_window: 1048576
+    # Inception Mercury: a diffusion LLM. It denoises a whole block of tokens
+    # at once instead of emitting them left to right, which is why it answers
+    # far faster than its size suggests. mercury-2 is the only chat model and
+    # the only one that calls tools; mercury-edit-2 serves /fim and /edit and
+    # cannot drive the agent loop.
+    # Key: `ay auth add --provider inception <key>` from
+    # platform.inceptionlabs.ai/dashboard/api-keys
+    inception:
+      kind: openai_compatible
+      model: mercury-2
+      base_url: https://api.inceptionlabs.ai/v1
+      api_key_env: INCEPTION_API_KEY
+      timeout_seconds: 180
+      stream: true
+      local: false
+      latency: low
+      quality: 3.5
+      context_window: 131072
     # OpenCode Zen: one key, many vendors' models.
     # Key: `ay auth add --provider opencode <key>` from opencode.ai/auth.
     opencode:

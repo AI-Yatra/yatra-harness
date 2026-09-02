@@ -146,6 +146,16 @@ PROVIDERS: tuple[Provider, ...] = (
     P("mistral", API_OPENAI, ("MISTRAL_API_KEY",), "https://api.mistral.ai/v1",
       aliases=("codestral",),
       note="large monthly token allowance, but only a couple of requests/minute"),
+    P("inception", API_OPENAI, ("INCEPTION_API_KEY",),
+      "https://api.inceptionlabs.ai/v1",
+      # `sk_` with an underscore, which the docs do not state but the dashboard
+      # issues. It does not collide with the four providers on `sk-`.
+      prefixes=("sk_",),
+      aliases=("mercury", "inceptionlabs"),
+      note="diffusion LLM, generates a whole block at once rather than "
+           "left-to-right; mercury-2 is the only chat model and the only one "
+           "that calls tools, mercury-edit-2 serves /fim and /edit instead",
+      probe_models=("mercury-2",)),
     P("chutes", API_OPENAI, ("CHUTES_API_KEY",), "https://llm.chutes.ai/v1",
       ("cpk_",), note="open-weight models, free tier"),
     P("sambanova", API_OPENAI, ("SAMBANOVA_API_KEY",), "https://api.sambanova.ai/v1",

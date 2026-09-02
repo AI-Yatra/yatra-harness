@@ -194,3 +194,194 @@
 .key-dashed { border-style: dashed; border-color: var(--accent); background: transparent; }
 .key-term { font-size: 11px; color: var(--ink-soft); }
 .key-meaning { font-size: 11.5px; color: var(--muted); }
+
+/* ── trace: the recorded session ──────────────────────────────────────── */
+
+.tr-verdict {
+  display: flex;
+  align-items: stretch;
+  gap: 14px;
+  margin: 14px 0 4px;
+}
+.tr-side {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+}
+.tr-side-label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.tr-side-value {
+  display: block;
+  font-size: 14px;
+  margin-top: 3px;
+}
+.tr-bad {
+  border-color: color-mix(in srgb, var(--bad) 55%, var(--line));
+}
+.tr-bad .tr-side-value {
+  color: var(--bad);
+}
+.tr-good {
+  border-color: color-mix(in srgb, var(--good) 55%, var(--line));
+}
+.tr-good .tr-side-value {
+  color: var(--good);
+}
+.tr-arrow {
+  align-self: center;
+  color: var(--dim);
+  font-size: 20px;
+}
+.tr-stats {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.tr-bar {
+  display: flex;
+  height: 34px;
+  border-radius: 7px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  margin: 12px 0 4px;
+}
+.tr-seg {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.tr-seg-label {
+  font-size: 11px;
+  color: var(--bg);
+  font-weight: 600;
+}
+.tr-seg-wait {
+  background: color-mix(in srgb, var(--accent) 78%, transparent);
+}
+.tr-seg-own {
+  background: color-mix(in srgb, var(--good) 78%, transparent);
+}
+
+.tr-steps {
+  margin: 12px 0 4px;
+  border-top: 1px solid var(--line);
+}
+.tr-step {
+  display: grid;
+  grid-template-columns: 26px 58px 96px minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.tr-step-n {
+  color: var(--dim);
+}
+.tr-step-t {
+  color: var(--dim);
+  text-align: right;
+}
+.tr-step-name {
+  color: var(--live);
+}
+.tr-step-args,
+.tr-step-detail {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tr-step-bad .tr-step-name {
+  color: var(--warn);
+}
+.tr-denied .tr-step-name {
+  color: var(--bad);
+}
+.tr-say .tr-step-name {
+  color: var(--good);
+}
+
+.tr-flow {
+  position: relative;
+  margin: 14px 0 6px;
+}
+.tr-flow-svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.tr-col-head {
+  position: absolute;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--dim);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 5px;
+}
+.tr-node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 11px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--tint) 55%, var(--line));
+  background: color-mix(in srgb, var(--tint) 11%, var(--panel-2));
+  box-sizing: border-box;
+}
+.tr-node-name {
+  font-size: 12px;
+  color: var(--fg);
+}
+.tr-node-meta {
+  font-size: 10px;
+  color: var(--dim);
+}
+.tr-edge {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.tr-edge-peer {
+  stroke: color-mix(in srgb, var(--muted) 32%, transparent);
+  stroke-dasharray: 2 3;
+}
+/* A call back up the stack. None occur in the recorded run; if one ever does
+   it should be the first thing seen on this diagram. */
+.tr-edge-up {
+  stroke: var(--bad);
+  stroke-width: 2.5;
+}
+
+.tr-diff {
+  margin: 10px 0 6px;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+.tr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 8px 0 2px;
+}
+.chip.tr-fixed {
+  border-color: color-mix(in srgb, var(--good) 45%, var(--line));
+  color: var(--good);
+}
+.tr-seg-world {
+  background: color-mix(in srgb, var(--warn) 78%, transparent);
+}
