@@ -98,7 +98,14 @@ class Agent:
     # -------------------------------------------------------------- interrupt
 
     def cancel(self) -> None:
-        """Ask the running turn to stop at the next safe point."""
+        """Ask the running turn to stop at the next safe point.
+
+        Called from a signal handler, so it does the least it can: set a flag
+        the loop reads between steps and between tool calls. Raising from the
+        handler instead is what the loop is trying to avoid, because the
+        interpreter delivers that wherever the program happens to be, which
+        can be the middle of writing a file.
+        """
         self._cancel.set()
 
     def _check_cancelled(self) -> None:
@@ -111,12 +118,6 @@ class Agent:
         """Run one user message to completion. Returns what it cost."""
         self._cancel.clear()
         self.conversation.add_user(message)
-        return self._drive()
-
-    def resume_after_interrupt(self, note: str) -> TurnStats:
-        """Continue the thread after the operator cut a turn short."""
-        self._cancel.clear()
-        self.conversation.add_system_note(note)
         return self._drive()
 
     def _drive(self) -> TurnStats:

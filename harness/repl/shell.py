@@ -7,13 +7,17 @@ an interrupted turn rather than a dead process.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import shlex
+import signal
 import time
 import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from harness.config import HarnessConfig, RouteConfig, load_config
 from harness.core.contracts import ToolSpec
@@ -673,15 +677,57 @@ class Shell:
 
     # ------------------------------------------------------------------- turns
 
+    @contextlib.contextmanager
+    def _interruptible(self) -> Iterator[None]:
+        """Make the first Ctrl-C a request and the second one an order.
+
+        The agent had a cooperative cancel and nothing ever called it, so every
+        interrupt arrived as a KeyboardInterrupt raised wherever the
+        interpreter happened to be. Usually that is harmless. Sometimes it is
+        inside `edit_file` between reading a file and writing it back, and the
+        result is a truncated file the operator did not ask for.
+
+        The first Ctrl-C now sets a flag the loop reads between steps and
+        between tool calls, so the turn stops after the current tool finishes
+        rather than during it. A second Ctrl-C restores the default handler's
+        behaviour and interrupts immediately, because an operator pressing it
+        twice has stopped asking politely.
+
+        Only the main thread can install a handler, and some hosts do not allow
+        it at all, so a failure here falls back to the old behaviour rather
+        than refusing to run the turn.
+        """
+        pressed = 0
+        previous: Any = None
+
+        def handle(signum: int, frame: Any) -> None:
+            nonlocal pressed
+            pressed += 1
+            if pressed == 1:
+                self.agent.cancel()
+                self.render.notice("Stopping after this step; press ctrl-c again to stop now.")
+                return
+            signal.signal(signal.SIGINT, previous or signal.default_int_handler)
+            raise KeyboardInterrupt
+
+        try:
+            previous = signal.signal(signal.SIGINT, handle)
+        except (ValueError, OSError):
+            yield  # not the main thread, or a host that forbids handlers
+            return
+        try:
+            yield
+        finally:
+            with contextlib.suppress(ValueError, OSError):
+                signal.signal(signal.SIGINT, previous)
+
     def _run_turn(self, message: str) -> bool:
         """Run one message. False when the turn did not complete."""
         started = time.monotonic()
         try:
-            stats = self.agent.send(message)
-        except KeyboardInterrupt:
-            self._abandon_turn()
-            return False
-        except Interrupted:
+            with self._interruptible():
+                stats = self.agent.send(message)
+        except (KeyboardInterrupt, Interrupted):
             self._abandon_turn()
             return False
         except ModelUnavailable as exc:
