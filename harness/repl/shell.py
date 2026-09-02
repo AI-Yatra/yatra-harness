@@ -24,6 +24,7 @@ from harness.execution.workspace import Workspace
 from harness.models import auth, prompting
 from harness.repl.tools import ReplToolset
 
+from . import banner as banner_art
 from . import prompt as prompt_builder
 from .agent import Agent, Events, Interrupted, ModelUnavailable, describe_arguments
 from .approvals import Gate, Mode, Request, Verdict
@@ -830,18 +831,40 @@ class Shell:
         return False
 
     def _banner(self) -> None:
+        """The wordmark, then the three facts worth knowing before typing.
+
+        The art is skipped rather than wrapped when the terminal is too narrow,
+        because a wordmark folded onto two lines is worse than none.
+        """
         console = self.console
         try:
             from .. import __version__ as version  # noqa: PLC0415
         except ImportError:
             version = "?"
+
         console.line()
-        console.line("  " + console.accent(console.bold("ay")) + console.dim(f"  yatra-harness {version}"))
+        art = banner_art.draw(console)
+        for row in art:
+            console.line(row)
+        if art:
+            console.line()
+
         sep = console.glyphs.sep
+        profile = self._profile()
+        head = "# " if art else "  "
+        console.line(head + console.bold(console.paint(f"AI-Yatra {version}", "38;5;189")))
         console.line(
-            "  " + console.dim(f"{self.route.model} {sep} {self.mode.value} {sep} {_short(self.root)}")
+            head
+            + console.paint(
+                f"model: {self.route.model} {sep} {self.mode.value} "
+                f"{sep} {profile.name} profile",
+                "38;5;153",
+            )
         )
+        console.line(head + console.paint(_short(self.root), "38;5;110"))
+        console.line()
         console.line("  " + console.dim("/help for commands, @file to include a file, !cmd to run one"))
+
         if self.guessed_route:
             console.line(
                 "  "
