@@ -25,7 +25,8 @@ uv sync
 `init.sh` is the whole verification path and the single command to trust:
 
 ```
-uv run ruff check harness tests ay.py
+uv run ruff check harness tests ay.py docs/atlas/scripts
+uv run lint-imports
 uv run python -m unittest discover -s tests
 uv run harness doctor --config configs/teaching.yaml
 uv run harness run tasks/repair_counter.yaml --config configs/teaching.yaml --skill skills/bugfix.yaml
@@ -45,7 +46,7 @@ the MCP demo server subprocess cannot import `harness` outside the venv.
   allowed, the workspace decides which paths are reachable, and the verifier
   decides whether a run succeeded. A change that lets the model bypass any of
   those four is wrong even when the tests are green.
-- **`harness/auth.py` is the only module that holds a raw credential.** Keys
+- **`harness/models/auth.py` is the only module that holds a raw credential.** Keys
   must not reach an event, an artifact, or a summary. Anything that resolves a
   credential must also register it with the `Redactor`.
 - **Config schemas are strict.** Unknown keys are rejected on purpose, so a
@@ -61,23 +62,38 @@ the MCP demo server subprocess cannot import `harness` outside the venv.
 
 ## Layout
 
+`harness/` is layered. A package may import the ones below it and never the
+ones above; `uv run lint-imports` fails the build if that stops being true.
+
+| Layer | Package | What lives there |
+|---|---|---|
+| 8 | `harness/repl/` | the conversational loop: thread, tools, approvals, rendering |
+| 7 | `config.py`, `cli.py`, `runtime.py`, `doctor.py` | the composition root and the things you run |
+| 6 | `harness/autonomy/` | goals, backlogs, the loop, evals, review, delivery |
+| 5 | `harness/run/` | context, compaction, instructions, verification, subagents, faults, sessions |
+| 4 | `harness/execution/` | workspace, policy gate, sandbox, process, tools, MCP, retrieval, search |
+| 3 | `harness/record/` | ledger, checkpoints, evidence bundles, spans, replay, redaction |
+| 2 | `harness/models/` | credentials, provider adapters, streaming, routing |
+| 1 | `harness/core/` | contracts, typed errors, schema helpers, utilities. Depends on nothing. |
+
+`config.py` sits with the entry points rather than in `core` because it is the
+composition root: it imports every module it configures. The modules below it
+need only its *types*, so they import it under `TYPE_CHECKING`, which
+`from __future__ import annotations` makes free at runtime. Two deferred
+imports remain, both made inside a function precisely so the cycle does not
+exist at import time; they are listed in the contract's `ignore_imports`.
+
+There are two agent loops on purpose. `harness/runtime.py` runs a task
+contract against a copied workspace and ends in a verifier's verdict.
+`harness/repl/agent.py` runs a conversation in the operator's own directory
+and ends when the model stops asking for tools. They share the providers, the
+config, the contracts and the command deny-list; they do not share the loop,
+because a conversation has no acceptance command.
+
 | Path | What lives there |
 |---|---|
-| `harness/runtime.py` | the agent loop, checkpoints, retry, termination |
-| `harness/tools.py` | the tool registry and every native tool |
-| `harness/policy.py` | risk classes, command allowlist, approvals |
-| `harness/workspace.py` | seed and repository workspaces, path containment |
-| `harness/verifier.py` | the independent completion gate |
-| `harness/delivery.py` | commit, push, pull request |
-| `harness/sandbox.py` | local or container execution |
-| `harness/session.py` | one workspace and memory across messages |
-| `harness/subagents.py` | read-only delegation |
-| `harness/goal.py`, `loop.py` | attempt-until-true, and the backlog loop |
-| `harness/retrieval.py`, `search.py` | ranked workspace search, web search |
-| `harness/tracing.py`, `evals.py`, `rubric.py` | spans, eval gate, scored review |
-| `harness/context.py` | context budget, compaction, instruction injection |
-| `harness/auth.py` | credentials; the only module holding a raw key |
 | `configs/`, `tasks/`, `skills/` | strict versioned YAML contracts |
+| `docs/atlas/` | the architecture canvas, generated from the code |
 | `docs/` | architecture, configuration, security, operations, testing |
 
 `docs/ARCHITECTURE.md` maps every module to the run diagram.

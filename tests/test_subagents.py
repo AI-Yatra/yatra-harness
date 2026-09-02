@@ -17,8 +17,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness.errors import ConfigurationError, ToolError
-from harness.subagents import (
+from harness.core.errors import ConfigurationError, ToolError
+from harness.run.subagents import (
     Subagent,
     SubagentConfig,
     check_delegation_allowed,

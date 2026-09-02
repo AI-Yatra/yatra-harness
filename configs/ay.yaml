@@ -1,0 +1,236 @@
+version: 1
+runs_dir: ../.runs
+
+# The config the `ay` REPL uses by default.
+#
+# It differs from the batch configs in one way that matters: the REPL works in
+# the operator's own directory, on files they have not committed, so the
+# deny-list below is doing real work rather than documenting an intention.
+# Everything on it is refused outright -- no mode and no approval prompt can
+# authorize it -- because these are the commands whose damage is not
+# recoverable by saying no next time.
+#
+# Credential: run `ay auth add <key>`, or export DASHSCOPE_API_KEY.
+
+budgets:
+  # A conversation is not a task with a turn budget; the REPL bounds its own
+  # loop per message. These bound one tool call's output and one prompt.
+  max_turns: 40
+  max_tool_calls: 60
+  max_seconds: 3600
+  max_context_chars: 120000
+  max_output_chars: 30000
+  max_verification_attempts: 1
+
+model_router:
+  primary: qwen
+  fallbacks: []
+  retries_per_route: 2
+  backoff_seconds: 1.0
+  circuit_breaker_failures: 3
+  routes:
+    # Chosen by running the same multi-file bug-fix task three times against
+    # each candidate on this endpoint. Results:
+    #
+    #   qwen3-coder-next    3/3 passed   ~31k tokens   ~14s
+    #   qwen3.7-max         3/3 passed   ~15k tokens   ~33s
+    #   qwen3.8-max         3/3 passed   ~18k tokens   ~47s
+    #   qwen3-coder-flash   0/3 passed   -             -
+    #   qwen3-coder-plus    free quota exhausted
+    #
+    # coder-next wins on speed and on cost: it spends about twice the tokens
+    # of the max models and they are roughly fifteen times cheaper, so a task
+    # lands at a fraction of the price. coder-flash is excluded deliberately
+    # rather than merely unlisted -- it emits `<function=name>` pseudo-calls
+    # as message text instead of real tool calls, so the loop never sees a
+    # tool call and the turn ends having done nothing.
+    qwen:
+      kind: openai_compatible
+      model: qwen3-coder-next
+      base_url: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+      api_key_env: DASHSCOPE_API_KEY
+      timeout_seconds: 180
+      # Prose appears as it is generated rather than after the turn ends.
+      stream: true
+      local: false
+      cost_per_1m_input: 0.12
+      cost_per_1m_output: 0.80
+      latency: low
+      quality: 3.5
+      context_window: 262144
+    # The same provider's flagship, for when a task wants more thinking than
+    # speed. Fewer tool calls and fewer tokens per task, but slower per turn
+    # and materially more expensive per token.
+    qwen-max:
+      kind: openai_compatible
+      model: qwen3.7-max
+      base_url: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
+      api_key_env: DASHSCOPE_API_KEY
+      timeout_seconds: 240
+      stream: true
+      local: false
+      cost_per_1m_input: 1.48
+      cost_per_1m_output: 4.42
+      latency: medium
+      quality: 4.0
+      context_window: 1000000
+    # Google AI Studio, through its OpenAI-compatible surface. The /openai
+    # suffix is required: the bare /v1beta is the native generateContent API.
+    # Key: `ay auth add <AIza...>`, or export GEMINI_API_KEY.
+    gemini:
+      kind: openai_compatible
+      model: gemini-3.7-flash
+      base_url: https://generativelanguage.googleapis.com/v1beta/openai
+      api_key_env: GEMINI_API_KEY
+      timeout_seconds: 180
+      stream: true
+      local: false
+      latency: low
+      quality: 3.5
+      context_window: 1048576
+    # OpenCode Zen: one key, many vendors' models.
+    # Key: `ay auth add --provider opencode <key>` from opencode.ai/auth.
+    opencode:
+      kind: openai_compatible
+      model: claude-sonnet-5
+      base_url: https://opencode.ai/zen/v1
+      api_key_env: OPENCODE_API_KEY
+      timeout_seconds: 180
+      stream: true
+      local: false
+      latency: medium
+      quality: 4.0
+      context_window: 200000
+    # Command Code, same idea. It also serves an Anthropic-shaped endpoint at
+    # the same base URL, reachable with `kind: anthropic`.
+    # Key: `ay auth add --provider commandcode <key>` from Studio.
+    commandcode:
+      kind: openai_compatible
+      model: claude-sonnet-4-6
+      base_url: https://api.commandcode.ai/provider/v1
+      api_key_env: COMMAND_CODE_API_KEY
+      timeout_seconds: 180
+      stream: true
+      local: false
+      latency: medium
+      quality: 4.0
+      context_window: 1000000
+    # OpenRouter. The most useful free tier here: one key reaches ~17 free
+    # models that support tool calling, several at 1M context. 20 requests a
+    # minute and 50 a day; a one-time $10 credit purchase raises the daily
+    # cap to 1000. Any `:free` model id works -- `/models free` lists them.
+    # Key: `ay auth add <sk-or-...>`.
+    openrouter:
+      kind: openai_compatible
+      model: minimax/minimax-m3:free
+      base_url: https://openrouter.ai/api/v1
+      api_key_env: OPENROUTER_API_KEY
+      timeout_seconds: 180
+      stream: true
+      local: false
+      latency: medium
+      quality: 3.5
+      context_window: 1048576
+    # Groq. Very fast, and the highest free request-per-day allowance of the
+    # lot, but a low tokens-per-minute ceiling that a long context hits first.
+    # Key: `ay auth add <gsk_...>`.
+    groq:
+      kind: openai_compatible
+      model: llama-3.3-70b-versatile
+      base_url: https://api.groq.com/openai/v1
+      api_key_env: GROQ_API_KEY
+      timeout_seconds: 120
+      stream: true
+      local: false
+      latency: low
+      quality: 3.0
+      context_window: 131072
+    # Cerebras. Around 1M tokens a day free, but free-tier context is capped
+    # near 8K, which a coding session reaches quickly. Useful as a last
+    # fallback, not as a primary.
+    # Key: `ay auth add --provider cerebras <csk-...>`.
+    cerebras:
+      kind: openai_compatible
+      model: gpt-oss-120b
+      base_url: https://api.cerebras.ai/v1
+      api_key_env: CEREBRAS_API_KEY
+      timeout_seconds: 120
+      stream: true
+      local: false
+      latency: low
+      quality: 3.0
+      context_window: 8192
+    # Switch with `/model local` once something is serving on :11434.
+    local:
+      kind: ollama
+      model: qwen2.5-coder:7b
+      base_url: http://localhost:11434/v1
+      timeout_seconds: 300
+      stream: true
+      local: true
+      latency: low
+      quality: 2.5
+      context_window: 32768
+
+policy:
+  # The REPL's own approval modes (suggest / auto-edit / full-auto) decide
+  # what is asked about. This setting governs the batch path only.
+  approval_mode: mutations
+  # The REPL asks about commands rather than requiring a prefix allowlist, so
+  # this list is what runs without a prompt on the batch path. The REPL's gate
+  # reads the deny-list below, not this.
+  allowed_commands:
+    - [python]
+    - [python3]
+    - [pytest]
+    - [git, status]
+    - [git, diff]
+    - [git, log]
+    - [git, show]
+    - [ls]
+    - [cat]
+  # Refused wherever they appear in a command, not only at the front, so one
+  # inserted flag or a `sudo` prefix does not dodge the rule.
+  #
+  # Three groups: destroying work that is not committed, publishing without
+  # the operator, and installing or fetching things that change the machine.
+  denied_commands:
+    - [rm, -rf]
+    - [rm, -fr]
+    - [git, push]
+    - [git, reset, --hard]
+    - [git, clean, -fd]
+    - [git, clean, -fdx]
+    - [git, checkout, --force]
+    - [git, remote]
+    - [git, config, --global]
+    - [sudo]
+    - [chmod, "777"]
+    - [mkfs]
+    - [dd]
+    - [shutdown]
+    - [reboot]
+    - [curl]
+    - [wget]
+    - [ssh]
+    - [scp]
+    - [pip, install]
+    - [uv, pip, install]
+    - [npm, install]
+    - [npm, publish]
+    - [yarn, add]
+    - [cargo, publish]
+  # The model reaches the network through run_command only, which the gate
+  # asks about; browser_fetch and web_search are batch-path tools.
+  network_enabled: false
+  allowed_domains: []
+  command_timeout_seconds: 120
+  browser_timeout_seconds: 10
+
+context:
+  recent_observations: 8
+  repo_entries: 200
+  # Read at session start and put in the system prompt, so the model follows
+  # the repository's own conventions without being told to.
+  instruction_files: [AGENTS.md, CLAUDE.md]
+  max_instruction_chars: 6000

@@ -34,7 +34,7 @@ it does not claim to protect against.
 
 ## Provider security
 
-- Credentials resolve through `harness/auth.py` and nowhere else. That module
+- Credentials resolve through `harness/models/auth.py` and nowhere else. That module
   is the only one that holds a raw key, and it hands it to the provider adapter
   alone. `harness doctor` and the runner call the same function, so they cannot
   disagree about whether a route is ready.

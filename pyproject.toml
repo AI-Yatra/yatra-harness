@@ -40,7 +40,56 @@ ignore = [
 
 [dependency-groups]
 dev = [
+    "import-linter>=2.14",
     "openpyxl>=3.1.5",
     "ruff>=0.16.5",
 ]
 
+
+# ── architecture ────────────────────────────────────────────────────────────
+# The layering is enforced, not merely intended. Without a check like this a
+# refactor's shape survives exactly until the first hurried import; the
+# Acyclic Dependencies Principle is only worth stating if something fails
+# when it is broken.
+#
+#   uv run lint-imports
+#
+[tool.importlinter]
+root_package = "harness"
+# A name used only in an annotation is not a runtime dependency: every module
+# here has `from __future__ import annotations`, so those imports never
+# execute. Counting them would report the composition root as a cycle it is
+# not.
+exclude_type_checking_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Layers depend downward only"
+type = "layers"
+# Highest first. `config` is the composition root: it imports every module it
+# configures, so it sits with the entry points rather than at the bottom, and
+# the modules below reach it through TYPE_CHECKING only.
+layers = [
+  "harness.repl",
+  "harness.cli : harness.runtime : harness.doctor : harness.config",
+  "harness.autonomy",
+  "harness.run",
+  "harness.execution",
+  "harness.record",
+  "harness.models",
+  "harness.core",
+]
+ignore_imports = [
+  # Deliberate deferred imports, made inside a function precisely so the
+  # cycle does not exist at import time. Both are marked in the source.
+  "harness.execution.workspace -> harness.run.session",
+  "harness.run.subagents -> harness.config",
+]
+
+[[tool.importlinter.contracts]]
+name = "core depends on nothing inside the package"
+type = "forbidden"
+source_modules = ["harness.core"]
+forbidden_modules = [
+  "harness.models", "harness.record", "harness.execution",
+  "harness.run", "harness.autonomy", "harness.repl",
+]

@@ -20,7 +20,7 @@ import sys
 import unittest
 from pathlib import Path
 
-from harness.backlog import load_backlog
+from harness.autonomy.backlog import load_backlog
 from harness.config import load_task
 
 ROOT = Path(__file__).resolve().parents[1]

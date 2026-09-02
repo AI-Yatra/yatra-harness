@@ -13,13 +13,13 @@ from __future__ import annotations
 
 import unittest
 
-from harness.compaction import (
+from harness.core.errors import ConfigurationError, ProviderExhausted
+from harness.run.compaction import (
     CompactionConfig,
     SummarizingCompactor,
     TruncatingCompactor,
     build_compactor,
 )
-from harness.errors import ConfigurationError, ProviderExhausted
 
 
 def observation(index: int, content: str = "") -> dict:

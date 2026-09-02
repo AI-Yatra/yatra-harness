@@ -3,6 +3,10 @@
 This document describes the runtime architecture of the harness, mapping
 each piece of the workshop diagram to a concrete module.
 
+For the same architecture as an interactive canvas, with every figure read out
+of the code by a scanner, see [Harness Atlas](atlas/README.md). This page is the
+prose; the atlas is the measurement.
+
 ## The authority boundary
 
 The central rule of the harness is an authority boundary:

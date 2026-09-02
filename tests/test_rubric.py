@@ -15,7 +15,7 @@ from __future__ import annotations
 import json
 import unittest
 
-from harness.rubric import (
+from harness.autonomy.rubric import (
     DEFAULT_DIMENSIONS,
     RubricConfig,
     parse_review,
