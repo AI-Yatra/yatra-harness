@@ -1,6 +1,6 @@
 import './style.css';
 import './diagrams.css';
-import { loadAtlas } from './data';
+import { loadAtlas, loadTrace } from './data';
 import { buildPanel } from './panel';
 import { buildGates } from './sections/gates';
 import { buildGraph } from './sections/graph';
@@ -8,6 +8,7 @@ import { buildIntro } from './sections/intro';
 import { buildLoops } from './sections/loops';
 import { buildMatrix } from './sections/matrix';
 import { buildState } from './sections/state';
+import { buildTrace } from './sections/trace';
 import { buildTurn } from './sections/turn';
 import { buildMass } from './sections/mass';
 import { buildSurface } from './sections/surface';
@@ -51,6 +52,8 @@ async function boot(): Promise<void> {
   }
   app.replaceChildren();
 
+  const traceData = await loadTrace();
+
   const store = new Store(atlas);
   // A placeholder size; the real one is known once the regions are measured.
   const world = new World(app, { w: 1000, h: 1000 });
@@ -69,8 +72,11 @@ async function boot(): Promise<void> {
   const wall = buildWall(store, 0, 0);
   const graph = buildGraph(store, 0, 0);
   const mass = buildMass(store, 0, 0);
+  // Optional: present only once scripts/trace_session.py has run.
+  const trace = traceData ? buildTrace(traceData, 0, 0) : null;
 
-  const sections = [intro, matrix, turn, gates, state, loops, surface, wall, graph, mass];
+  const sections = [intro, matrix, turn, gates, state, loops, surface, wall, graph, mass]
+    .concat(trace ? [trace] : []);
   for (const s of sections) world.world.appendChild(s.root);
 
   // Columns pair a claim with the measurement that backs it: the argument over
@@ -81,6 +87,7 @@ async function boot(): Promise<void> {
     [intro, gates, loops],
     [matrix, wall],
     [turn, state],
+    ...(trace ? [[trace]] : []),
     [surface, graph, mass],
   ];
   const MARGIN = 120;
@@ -132,6 +139,7 @@ async function boot(): Promise<void> {
     { key: 'start', label: 'start', rect: intro.rect },
     { key: 'map', label: 'map', rect: matrix.rect },
     { key: 'turn', label: 'turn', rect: turn.rect },
+    ...(trace ? [{ key: 'trace', label: 'trace', rect: trace.rect }] : []),
     { key: 'gates', label: 'gates', rect: gates.rect },
     { key: 'state', label: 'state', rect: state.rect },
     { key: 'loops', label: 'loops', rect: loops.rect },

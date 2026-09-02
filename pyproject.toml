@@ -42,6 +42,10 @@ ignore = [
 dev = [
     "import-linter>=2.14",
     "openpyxl>=3.1.5",
+    # The demo repository's suite is what a traced session is judged by, and it
+    # is run with pytest. Without this the judgement is "pytest is missing",
+    # which is not a verdict on the work.
+    "pytest>=8.4",
     "ruff>=0.16.5",
 ]
 

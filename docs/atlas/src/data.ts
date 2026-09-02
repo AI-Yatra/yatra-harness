@@ -298,3 +298,92 @@ export function rangeOf(def: MetricDef, modules: Module[]): Range {
   const hi = Math.max(...values);
   return hi === lo ? { lo, hi: lo + 1 } : { lo, hi };
 }
+
+// ── the recorded session ───────────────────────────────────────────────────
+// scripts/trace_session.py writes this by running one real conversation under
+// a profile hook. It is optional: the atlas describes the harness at rest
+// without it, and gains the region that shows the harness in motion with it.
+
+export interface TraceStep {
+  n: number;
+  kind: 'tool' | 'denied' | 'say';
+  name?: string;
+  component: string;
+  args?: Record<string, string>;
+  detail?: string;
+  ok?: boolean;
+  t: number;
+  ms?: number;
+}
+
+export interface TraceComponent {
+  name: string;
+  layer: string;
+  calls: number;
+  /** Time in this component's own frames, with time in its callees removed. */
+  ms: number;
+  /** Time between entering and leaving it, callees included. */
+  held_ms: number;
+  first_step: number;
+}
+
+export interface TraceEdge {
+  from: string;
+  to: string;
+  calls: number;
+}
+
+export interface TraceSpan {
+  id: number;
+  parent: number;
+  component: string;
+  layer: string;
+  func: string;
+  t0: number;
+  ms: number;
+  step: number;
+}
+
+export interface TraceVerdict {
+  exit_code: number;
+  summary: string;
+  failed: string[];
+  passed: boolean;
+}
+
+export interface Trace {
+  generated: string;
+  task: string;
+  subject: string;
+  route: { name: string; model: string; base_url: string; stream: boolean };
+  entry: string;
+  wall_ms: number;
+  ok: boolean;
+  error: string;
+  stats: {
+    steps: number;
+    tool_calls: number;
+    input_tokens: number;
+    output_tokens: number;
+    errors: number;
+  };
+  before: TraceVerdict;
+  after: TraceVerdict;
+  diffstat: string[];
+  steps_taken: TraceStep[];
+  components: TraceComponent[];
+  edges: TraceEdge[];
+  spans: TraceSpan[];
+  span_total: number;
+}
+
+/** null when no session has been recorded yet; the atlas works without one. */
+export async function loadTrace(): Promise<Trace | null> {
+  try {
+    const res = await fetch(`${import.meta.env.BASE_URL}trace.json`);
+    if (!res.ok) return null;
+    return (await res.json()) as Trace;
+  } catch {
+    return null;
+  }
+}
