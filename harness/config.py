@@ -13,6 +13,7 @@ import yaml
 from harness.core import schema
 from harness.core.contracts import BudgetSpec, SkillContract, TaskContract, VerificationSpec
 from harness.core.errors import ConfigurationError
+from harness.execution.hooks import Hook, parse_hooks
 from harness.execution.policy import EFFECTS, PolicyRule, parse_rule
 from harness.execution.retrieval import RetrievalConfig, retrieval_config_from_dict
 from harness.execution.sandbox import SandboxConfig, sandbox_config_from_dict
@@ -122,6 +123,9 @@ class HarnessConfig:
     subagents: SubagentConfig = field(default_factory=SubagentConfig)
     sandbox: SandboxConfig = field(default_factory=SandboxConfig)
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
+    #: Operator commands that run when the agent acts. They observe; they
+    #: cannot veto, because Gate already answers that question.
+    hooks: tuple[Hook, ...] = ()
     llm_light: LLMLightConfig = field(default_factory=LLMLightConfig)
     fault: str = ""
     selected_model: str = ""
@@ -214,6 +218,7 @@ def load_config(path: str | Path) -> HarnessConfig:
             "subagents",
             "sandbox",
             "retrieval",
+            "hooks",
             "llm_light",
             # Written by the runtime so a resumed run routes identically; not
             # part of the operator-facing hand-authored schema.
@@ -389,6 +394,7 @@ def load_config(path: str | Path) -> HarnessConfig:
         subagents=subagent_config_from_dict(raw.get("subagents"), base, "subagents"),
         sandbox=sandbox_config_from_dict(raw.get("sandbox"), "sandbox"),
         retrieval=retrieval_config_from_dict(raw.get("retrieval"), "retrieval"),
+        hooks=parse_hooks(raw.get("hooks", []), "hooks"),
         compaction=compaction_config_from_dict(context_raw.get("compaction")),
         context_instruction_files=instruction_files,
         context_max_instruction_chars=schema.integer(

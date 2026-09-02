@@ -303,3 +303,25 @@ context:
   # the repository's own conventions without being told to.
   instruction_files: [AGENTS.md, CLAUDE.md]
   max_instruction_chars: 6000
+
+# Commands that run when the agent acts. These observe; they cannot veto. The
+# approval gate already answers whether something may happen, and two
+# authorities over one decision is how a permission system stops being
+# trustworthy.
+#
+#   event    tool_start, tool_end or turn_end
+#   run      the command, as an array; there is no shell
+#   match    optional glob on the tool name
+#   timeout  seconds, default 30
+#
+# The command is yours, from your own config, and gets your environment plus
+# HARNESS_EVENT and HARNESS_TOOL. The model cannot add one. A hook that fails
+# to start is reported once and then switched off for the session; a hook that
+# exits non-zero keeps running, because a lint hook failing is it working.
+#
+#   hooks:
+#     - event: tool_end
+#       match: edit_file
+#       run: [ruff, format, .]
+#       name: format
+hooks: []

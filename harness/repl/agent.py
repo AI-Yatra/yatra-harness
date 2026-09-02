@@ -13,10 +13,11 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from harness.core.contracts import RiskLevel, ToolSpec
 from harness.core.errors import HarnessError, PermanentProviderError, TransientProviderError
+from harness.execution.hooks import HookRunner
 from harness.repl.tools import ReplToolset
 
 from .approvals import Gate
@@ -92,6 +93,7 @@ class Agent:
         events: Events | None = None,
         limits: Limits | None = None,
         checkpoints: Checkpoints | None = None,
+        hooks: HookRunner | None = None,
     ) -> None:
         self.model = model
         self.conversation = conversation
@@ -102,6 +104,7 @@ class Agent:
         self.limits = limits or Limits()
         self.specs: dict[str, ToolSpec] = {spec.name: spec for spec in toolset.specs()}
         self.checkpoints = checkpoints
+        self.hooks = hooks or HookRunner()
         self._cancel = threading.Event()
 
     # -------------------------------------------------------------- interrupt
@@ -211,6 +214,7 @@ class Agent:
             return False
 
         self.events.on_tool_start(call, spec)
+        self._fire("tool_start", call.name, {"arguments": describe_arguments(call)})
 
         decision = self.gate.check(spec, call.arguments)
         if not decision.allowed:
@@ -228,7 +232,24 @@ class Agent:
         # an operator is least likely to have expected.
         if self.checkpoints is not None and spec.risk in _MUTATING:
             self.checkpoints.record(f"{call.name} {describe_arguments(call)}"[:120])
+        # After the checkpoint, so a hook that reformats the tree is itself
+        # captured by the next one rather than appearing as an unexplained
+        # difference later.
+        self._fire("tool_end", call.name, {"ok": outcome.ok, "detail": detail})
         return outcome.ok
+
+    def _fire(self, event: str, tool: str, payload: dict[str, Any]) -> None:
+        """Run the operator's hooks and report anything that went wrong.
+
+        A failing hook is the operator's problem to see, not the model's, so it
+        reaches the screen and never the conversation. Telling the model a
+        formatter is missing would have it try to fix the formatter.
+        """
+        for report in self.hooks.fire(event, tool=tool, payload=payload):
+            if not report.ok:
+                self.events.on_notice(
+                    f"hook {report.hook.label!r} failed: {report.output[:200]}"
+                )
 
     def _record(self, call: ToolCall, content: str) -> None:
         self.conversation.add_tool_result(call.id, call.name, content)
