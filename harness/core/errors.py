@@ -17,14 +17,6 @@ class WorkspaceError(HarnessError):
     """A workspace operation violated containment or lifecycle rules."""
 
 
-class PolicyDenied(HarnessError):
-    """A requested capability is not authorized."""
-
-
-class ApprovalRequired(HarnessError):
-    """A requested capability requires an approval decision."""
-
-
 class ToolError(HarnessError):
     """A registered tool could not complete its request."""
 
@@ -74,10 +66,6 @@ class ProviderExhausted(ProviderError):
 
 class BudgetExceeded(HarnessError):
     """A declared run budget has been exhausted."""
-
-
-class VerificationError(HarnessError):
-    """The verifier itself could not execute safely."""
 
 
 class InjectedCrash(HarnessError):

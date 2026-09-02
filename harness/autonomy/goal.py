@@ -18,7 +18,6 @@ what to carry forward -- and none of that needs a provider.
 
 from __future__ import annotations
 
-import json
 import shlex
 import time
 import uuid
@@ -195,7 +194,3 @@ def _task_yaml(request: GoalRequest, index: int, history: Sequence[str]) -> str:
     else:
         task["workspace_seed"] = str(Path(request.seed or ".").resolve())
     return yaml.safe_dump(task, sort_keys=False, allow_unicode=True)
-
-
-def load_goal_record(path: Path) -> dict[str, Any]:
-    return json.loads(Path(path).read_text(encoding="utf-8"))

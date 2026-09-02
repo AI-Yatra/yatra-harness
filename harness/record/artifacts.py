@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -22,11 +21,6 @@ class ArtifactStore:
         self.payload_dir.mkdir(parents=True, exist_ok=True)
         self.verification_dir.mkdir(parents=True, exist_ok=True)
         self.input_dir.mkdir(parents=True, exist_ok=True)
-
-    def snapshot_input(self, source: Path, name: str) -> Path:
-        destination = self.input_dir / name
-        shutil.copyfile(source, destination)
-        return destination
 
     def write_manifest(self, value: dict[str, Any]) -> Path:
         path = self.run_dir / "manifest.json"

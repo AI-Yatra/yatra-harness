@@ -340,10 +340,6 @@ class RouteChain:
     def streams(self) -> bool:
         return self.current.streams
 
-    @property
-    def alternatives(self) -> list[str]:
-        return [m.route.name for m in self.models[self.index + 1 :]]
-
     def converse(
         self,
         messages: list[dict[str, Any]],
