@@ -20,7 +20,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: uv sync
       - name: Lint
-        run: uv run ruff check harness tests ay.py
+        run: uv run ruff check harness tests ay.py docs/atlas/scripts
+      # The layering is a claim; this is what makes it a fact. Without it the
+      # package structure survives only until the first hurried import.
+      - name: Architecture
+        run: uv run lint-imports
       - name: Unit and end-to-end tests
         run: uv run python -m unittest discover -s tests -v
       - name: Doctor

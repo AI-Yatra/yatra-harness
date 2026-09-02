@@ -10,11 +10,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import auth
-from .config import HarnessConfig, load_config, load_skill, load_task
-from .errors import HarnessError
-from .mcp import MCPStdioClient
-from .model_router import build_llm_light, profile_from_route
+from harness.config import HarnessConfig, load_config, load_skill, load_task
+from harness.core.errors import HarnessError
+from harness.execution.mcp import MCPStdioClient
+from harness.models import auth
+from harness.models.model_router import build_llm_light, profile_from_route
 
 
 @dataclass(frozen=True, slots=True)

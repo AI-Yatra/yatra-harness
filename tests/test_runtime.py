@@ -12,7 +12,7 @@ import unittest
 from pathlib import Path
 
 from harness.config import load_config
-from harness.llm_light import RoutingError
+from harness.models.llm_light import RoutingError
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -273,7 +273,7 @@ class RedactionCoverageTests(unittest.TestCase):
     def test_a_key_resolved_by_endpoint_is_still_redacted(self) -> None:
         """teaching.yaml's remote-api route names a custom variable and
         points at api.openai.com, so its key resolves by endpoint."""
-        from harness import auth  # noqa: PLC0415
+        from harness.models import auth  # noqa: PLC0415
         from harness.runtime import route_secrets  # noqa: PLC0415
 
         secret = "sk-proj-" + "z" * 30
@@ -286,8 +286,8 @@ class RedactionCoverageTests(unittest.TestCase):
         # Collected anywhere but here, it would reach the ledger in the clear.
         from dataclasses import replace  # noqa: PLC0415
 
+        from harness.execution.search import SearchConfig  # noqa: PLC0415
         from harness.runtime import route_secrets  # noqa: PLC0415
-        from harness.search import SearchConfig  # noqa: PLC0415
 
         secret = "brave-" + "q" * 24
         os.environ["BRAVE_API_KEY"] = secret

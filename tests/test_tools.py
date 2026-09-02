@@ -7,11 +7,11 @@ import unittest
 from pathlib import Path
 
 from harness.config import PolicyConfig, load_config, load_skill
-from harness.contracts import RiskLevel, ToolSpec
-from harness.errors import ToolError, WorkspaceError
-from harness.policy import PolicyEngine
-from harness.tools import ToolRegistry, build_registry, validate_json_schema
-from harness.workspace import Workspace
+from harness.core.contracts import RiskLevel, ToolSpec
+from harness.core.errors import ToolError, WorkspaceError
+from harness.execution.policy import PolicyEngine
+from harness.execution.tools import ToolRegistry, build_registry, validate_json_schema
+from harness.execution.workspace import Workspace
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -230,7 +230,7 @@ class PolicyIntegrationTests(unittest.TestCase):
                 max_output_chars=1000,
                 artifacts=type("A", (), {"write_payload": lambda *a, **k: "x"})(),
             )
-            from harness.contracts import ToolSpec
+            from harness.core.contracts import ToolSpec
 
             registry.register(
                 ToolSpec("read_file", "Read.", {"type": "object"}, RiskLevel.READ),

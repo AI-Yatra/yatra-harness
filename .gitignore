@@ -23,3 +23,9 @@ docs/FINDINGS-CAPABILITY-AUDIT.md
 # Local tool state (Command Code writes personal preference notes here).
 .commandcode/
 .evals/
+
+# The atlas site is built from source; its dependencies are not vendored.
+node_modules/
+
+# Conversation history written by the ay REPL into the working directory.
+.ay/

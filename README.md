@@ -75,75 +75,97 @@ ledger, durable checkpoints, the patch, and a summary.
 
 ## ay, the REPL
 
-`ay` is short for AI Yatra. It wraps the same CLI: your message becomes a
-generated task contract, which runs through `harness run` with live output.
+`ay` is short for AI Yatra. It is a coding agent in your terminal, working in
+the directory you launched it in.
 
 ```
+cd ~/my-project
 ay
 ```
 
 ```
-   ███████ ███████     ███ ███ ███████ ███████ ███████ ███████
-   ███ ███   ███       ███ ███ ███ ███   ███   ███ ███ ███ ███
-   ███████   ███       ███████ ███████   ███   ███████ ███████
-   ███ ███   ███         ███   ███ ███   ███   ███ ██  ███ ███
-   ███ ███ ███████       ███   ███ ███   ███   ███  ██ ███ ███
+  ay  yatra-harness 1.0.0
+  qwen3-coder-plus · suggest · ~/my-project
+  /help for commands, @file to include a file, !cmd to run one
 
-# Yatra Harness v1.0.0 · ay REPL
-# model: qwen3-coder-plus · config: palimpsest-config.yaml
-# seed: chat_seed · contract: unverified (acceptance always passes)
-# ~\code\yatra-harness
+> the auth test fails on windows. why?
 
-Type a message to run the agent, or /help for commands.
+⏺ Grep(def test_.*windows)
+  ⎿ 3 matches in 2 files
+⏺ Read(harness/models/auth.py)
+  ⎿ 131 lines
 
-you>
+The lookup in `_resolve` is case-sensitive, but Windows environment
+variables are not, so a lowercase `dashscope_api_key` never matches.
+
+> fix it and run the test
+
+⏺ Edit(harness/models/auth.py)
+  ⎿ Edit harness/models/auth.py?
+       1. Yes   2. Yes, and edit_file any file for the rest of this session
+       3. No, tell the model what to do instead
+  ⎿ +4 -2
+⏺ Run(python -m unittest tests.test_auth)
+  ⎿ 14 lines
+
+Fixed. `_resolve` folds the name before comparing. All 12 tests pass.
 ```
 
-Slash commands: `/runs`, `/inspect <id>`, `/resume <id>`, `/config`, `/model`,
-`/help`, `/exit`. Full usage lives in [ay.README.md](ay.README.md).
+One conversation, one working directory, many turns. Reads happen freely;
+edits and commands ask first, and a deny-list refuses the unrecoverable ones
+with or without approval. Full usage is in [ay.README.md](ay.README.md).
 
-### Messages in a session build on each other
+Slash commands: `/model`, `/mode`, `/approvals`, `/tools`, `/context`,
+`/cost`, `/compact`, `/clear`, `/init`, `/config`, `/help`, `/exit`. In the
+prompt, `@path` inlines a file, `!command` runs one yourself, and Ctrl-C stops
+a turn without ending the session.
 
-Every `ay` conversation gets a session: one workspace and one written memory,
-so the second message edits what the first one wrote and knows it happened.
+### Two shapes, one harness
 
-```
-you> create a file called SCRATCH.md containing the single word hello
-you> now create SCRATCH2.md containing the same word that is in SCRATCH.md
-```
-
-The workspace lives at `.runs/sessions/<id>/workspace` and the memory at
-`session.json` beside it. Outstanding work is committed before each new turn
-begins, so a turn's diff is its own and the session's history is a sequence
-of commits rather than one blob. Failures are remembered as well as
-successes, because a memory that only holds what worked teaches the next turn
-to repeat what did not.
-
-`--session <id>` resumes a named session later. `--stateless` restores the
-old behaviour of a fresh workspace per message.
-
-### Read the contract line before you trust a verdict
-
-A plain chat message runs against an empty scratch workspace with an acceptance
-command that cannot fail, which is why the banner says
-`contract: unverified`. Under that contract a run reports COMPLETED whether or
-not the agent did anything. Fine for open questions, useless as evidence.
-
-Give the run a real workspace, a real acceptance command, and protected paths,
-and the banner changes to `contract: verified`:
+`ay` is the conversational half. `harness run` is the batch half: a task
+contract, a copied workspace, a budget, and an independent verifier that
+decides whether the job is actually done. Use the REPL when the work is a
+conversation and the batch path when you need a verdict you can trust.
 
 ```
-ay --seed fixtures/palimpsest --accept "python verify_contact_workbook.py" --protect "verify_contact_workbook.py" --protect "contact_cards/**"
+ay                          # conversation, here, now
+ay run task.yaml            # task contract, copied workspace, verified
 ```
 
-Now try asking it to collect the contact cards, exclude Tom, sort them, and
-build `contact.xlsx`. Then ask it to do nothing at all and watch that second run
-fail. A grader that cannot fail is not a grader.
+Anything `ay` does not read as a message is handed to the harness CLI
+unchanged, so `ay auth`, `ay inspect` and `ay run` are the same code path as
+`harness ...`.
+
+### Approval modes
+
+| Mode | Behaviour |
+|---|---|
+| `suggest` (default) | asks before every edit and every command |
+| `auto-edit` | edits freely, still asks before running anything |
+| `full-auto` | asks about nothing |
+
+Answering *"Yes, and …"* grants that shape of action for the rest of the
+session. The deny-list in `configs/ay.yaml` is never offered for approval at
+all: `rm -rf`, `git push`, `git reset --hard`, `sudo`, `pip install` and the
+rest are refused outright, and a pattern matches anywhere in the command so
+`sudo rm -rf` is caught by the `rm -rf` rule.
+
+### Sessions
+
+A session is one message history, written to `.ay/<id>.json` after every turn.
+`ay --resume` reopens the most recent one here; `--session <name>` names it.
+When the context window fills, the earlier conversation is summarised and
+replaced; `/context` shows how close you are and `/compact` does it on demand.
 
 ## Keys
 
 Store a key once and every route that needs it resolves without exporting
-anything. The provider is inferred from the key's prefix.
+anything. The provider is inferred from the key's prefix where the prefix
+says anything: a bare `sk-` is issued by OpenAI, DeepSeek, Moonshot and
+OpenCode alike, so in that case the candidates are asked which of them the
+key actually authenticates against, rather than one of them being guessed.
+Name it yourself with `--provider` to skip that, or `--no-probe` to refuse
+rather than ask.
 
 ```
 ay auth add sk-ws-...
@@ -172,9 +194,61 @@ ay auth remove dashscope
 ay auth providers
 ```
 
-`verify` asks the provider to list its models. A variable being set is not
-evidence that the key works, which is how an exhausted quota used to reach the
-agent loop before anyone noticed.
+`verify` makes a real call. A variable being set is not evidence that the key
+works, which is how an exhausted quota used to reach the agent loop before
+anyone noticed. For most providers it lists the models, which is free and
+requires the key. For the aggregator gateways it cannot: OpenCode Zen and
+Command Code both serve their model list unauthenticated and answer 200 to a
+key that is pure nonsense, so `verify` sends them a one-token completion
+against a free model instead.
+
+### Providers
+
+Thirteen are built in. These three are worth calling out:
+
+| Provider | Aliases | Variable | Endpoint |
+|---|---|---|---|
+| `google` | `gemini`, `aistudio` | `GEMINI_API_KEY`, `GOOGLE_API_KEY` | `generativelanguage.googleapis.com/v1beta/openai` |
+| `opencode` | `zen` | `OPENCODE_API_KEY`, `OPENCODE_ZEN_API_KEY` | `opencode.ai/zen/v1` |
+| `commandcode` | `cmd`, `command-code` | `COMMAND_CODE_API_KEY`, `CMD_API_KEY` | `api.commandcode.ai/provider/v1` |
+
+**Google AI Studio.** Get a key from
+[aistudio.google.com/apikey](https://aistudio.google.com/apikey) and run
+`ay auth add` -- both current key formats are recognised on their own. Google
+is partway through replacing the long-standing `AIza` keys with `AQ.` ones, and
+a newly created key comes out in the new format. `AQ.` keys are rejected on
+some native paths that take `?key=`, but work over `Authorization: Bearer`
+against the OpenAI-compatible surface, which is the one this route uses.
+
+That surface is at `/v1beta/openai`; the bare `/v1beta` is the native
+`generateContent` API and does not speak `chat/completions`.
+
+Gemini 3 models return an encrypted `thought_signature` on every function call
+and reject the *next* request if it does not come back. The REPL carries it
+through automatically, including across a saved session -- see
+[ay.README.md](ay.README.md#gemini-and-thought-signatures).
+
+**OpenCode Zen** and **Command Code** are gateways: one key, many vendors'
+models. Neither publishes a key prefix, so name the provider when you store
+one:
+
+```
+ay auth add --provider opencode <key>        # from opencode.ai/auth
+ay auth add --provider commandcode <key>     # from Command Code Studio
+```
+
+Then pick them in the REPL, where `configs/ay.yaml` already has a route for
+each:
+
+```
+/model gemini
+/model opencode
+/model commandcode
+```
+
+Command Code also serves an Anthropic-shaped endpoint at the same base URL, so
+a route with `kind: anthropic` and that `base_url` reaches
+`/provider/v1/messages` and authenticates with `x-api-key`.
 
 Resolution order is the environment variable first, then the stored file, and
 `ay auth status` prints which one won. A stale exported variable shadowing a
@@ -202,11 +276,7 @@ Point a run at a real repository and it works on a clone of it, on its own
 branch, with the repository's history and remote intact.
 
 ```
-ay --repo . --skill skills/repo-edit.yaml --accept "./init.sh" --deliver pr
-```
-
-```
-you> fix the typo in the installation section of README.md
+uv run harness goal "fix the typo in the installation section of README.md" --repo . --skill skills/repo-edit.yaml --accept "./init.sh" --config configs/remote-qwen.yaml --deliver pr
 ```
 
 The agent edits the clone. The verifier runs the acceptance command itself.
@@ -345,7 +415,7 @@ retrieve  "how are credentials redacted from the ledger"
 
 --- README.md:161-200 (score 12.89)
 --- docs/SECURITY.md:41-80 (score 11.40)
---- harness/redaction.py:1-40 (score 10.37)
+--- harness/record/redaction.py:1-40 (score 10.37)
 ```
 
 BM25 by default — no key, no network, deterministic, and therefore actually
@@ -521,7 +591,8 @@ yatra-harness/
 │                       workspace, verifier, events, checkpoints, replay,
 │                       sandbox, sessions, sub-agents, delivery, goal, loop,
 │                       retrieval, search, tracing, evals, rubric
-├── ay.py               the ay REPL
+├── ay.py               the ay REPL entry point
+├── harness/repl/       the conversational agent behind it
 ├── configs/            teaching, local, remote, llm_light
 ├── tasks/              task contracts
 ├── skills/             skill contracts
@@ -543,6 +614,15 @@ and what it does not, including where redaction stops.
 [Operations](docs/OPERATIONS.md) is the runbook,
 [Testing](docs/TESTING.md) maps tests to acceptance criteria, and
 [Workshop](docs/WORKSHOP.md) walks through the material module by module.
+
+[Harness Atlas](docs/atlas/README.md) is the same architecture as an
+interactive pan and zoom canvas: every module, the real import graph, the
+authority chain, the run loop and the tool surface, with every number read out
+of the repository by a scanner rather than typed in.
+
+```bash
+cd docs/atlas && python3 scripts/scan_harness.py && npm install && npm run dev
+```
 
 ## License
 

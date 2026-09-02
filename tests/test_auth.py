@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness import auth
+from harness.models import auth
 
 
 class AuthTestCase(unittest.TestCase):
@@ -44,8 +44,13 @@ class DetectionTests(AuthTestCase):
         self.assertEqual(auth.detect("nvapi-abc").name, "nvidia")
         self.assertEqual(auth.detect("sk-or-v1-abc").name, "openrouter")
 
-    def test_bare_sk_falls_back_to_openai(self) -> None:
-        self.assertEqual(auth.detect("sk-legacykeyvalue").name, "openai")
+    def test_a_bare_sk_is_not_attributed_to_anyone(self) -> None:
+        """It used to fall back to OpenAI, which silently misfiled every
+        OpenCode, DeepSeek and Moonshot key -- they all issue bare `sk-`."""
+        self.assertIsNone(auth.detect("sk-legacykeyvalue"))
+        candidates = {p.name for p in auth.identify("sk-legacykeyvalue").candidates}
+        self.assertIn("openai", candidates)
+        self.assertIn("opencode", candidates)
 
     def test_unknown_shape_is_not_guessed(self) -> None:
         self.assertIsNone(auth.detect("wholly-unknown-key"))

@@ -19,14 +19,14 @@ import threading
 import unittest
 from pathlib import Path
 
-from harness.backlog import (
+from harness.autonomy.backlog import (
     Feature,
     load_backlog,
     mark_feature,
     next_unfinished,
     save_backlog,
 )
-from harness.errors import ConfigurationError
+from harness.core.errors import ConfigurationError
 
 
 class LoadingTests(unittest.TestCase):

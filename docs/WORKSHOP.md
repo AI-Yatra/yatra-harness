@@ -24,7 +24,7 @@ uv run harness explain tasks/repair_counter.yaml \
   --config configs/teaching.yaml --skill skills/bugfix.yaml
 ```
 
-Look at `harness/contracts.py`: `TaskContract`, `ActionProposal`,
+Look at `harness/core/contracts.py`: `TaskContract`, `ActionProposal`,
 `ToolResult`, `HarnessEvent`, `RunResult`. Every boundary is a dataclass.
 
 ## Module 3: Model independence and context (25 min)

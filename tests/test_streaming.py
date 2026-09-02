@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import unittest
 
-from harness.streaming import StreamAccumulator, iter_sse_data
+from harness.models.streaming import StreamAccumulator, iter_sse_data
 
 
 def sse(*chunks: dict | str) -> str:

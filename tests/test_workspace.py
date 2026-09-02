@@ -17,8 +17,8 @@ import unittest
 from pathlib import Path
 
 from harness.config import load_task
-from harness.errors import ConfigurationError, WorkspaceError
-from harness.workspace import WorkspaceManager
+from harness.core.errors import ConfigurationError, WorkspaceError
+from harness.execution.workspace import WorkspaceManager
 
 ROOT = Path(__file__).resolve().parents[1]
 

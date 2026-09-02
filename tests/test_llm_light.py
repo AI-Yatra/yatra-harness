@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import unittest
 
-from harness.errors import RoutingError
-from harness.llm_light import (
+from harness.core.errors import RoutingError
+from harness.models.llm_light import (
     DEFAULT_PRIORITIES,
     LLMLight,
     LLMLightConfig,

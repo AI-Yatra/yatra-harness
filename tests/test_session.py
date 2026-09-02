@@ -14,10 +14,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness.contracts import RunStatus
-from harness.errors import WorkspaceError
-from harness.session import SessionStore
-from harness.workspace import WorkspaceManager, git_environment
+from harness.core.contracts import RunStatus
+from harness.core.errors import WorkspaceError
+from harness.execution.workspace import WorkspaceManager, git_environment
+from harness.run.session import SessionStore
 
 ROOT = Path(__file__).resolve().parents[1]
 

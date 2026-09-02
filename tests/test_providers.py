@@ -10,13 +10,13 @@ from typing import Any
 from unittest import mock
 
 from harness.config import RouteConfig, load_config
-from harness.contracts import ActionKind, ModelRequest, RiskLevel, ToolSpec
-from harness.errors import (
+from harness.core.contracts import ActionKind, ModelRequest, RiskLevel, ToolSpec
+from harness.core.errors import (
     ConfigurationError,
     PermanentProviderError,
     TransientProviderError,
 )
-from harness.providers import (
+from harness.models.providers import (
     AnthropicProvider,
     OpenAICompatibleProvider,
     ReplayProvider,

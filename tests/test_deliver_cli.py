@@ -18,7 +18,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness.workspace import git_environment
+from harness.execution.workspace import git_environment
 
 ROOT = Path(__file__).resolve().parents[1]
 GIT_ENV = git_environment()

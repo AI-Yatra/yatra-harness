@@ -12,28 +12,30 @@ from typing import Any
 
 import yaml
 
-from . import __version__, auth
-from .artifacts import ArtifactStore
-from .backlog import load_backlog
-from .config import load_config, load_skill, load_task
-from .contracts import RunStatus
-from .delivery import DeliveryRequest, deliver
-from .doctor import run_doctor
-from .errors import HarnessError, InjectedCrash, WorkspaceError
-from .evals import load_suite, run_suite
-from .events import EventLog
-from .goal import GoalRequest, pursue
-from .loop import LoopRequest, goal_for, run_loop
-from .model_router import build_llm_light, profile_from_route
-from .policy import PolicyEngine
-from .replay import replay_run
-from .rubric import RubricConfig, parse_review, render_rubric_prompt, verdict_for
-from .runtime import HarnessRuntime
-from .state import StateStore
-from .tools import build_registry
-from .tracing import root_context, trace_id_for
-from .util import atomic_write_json, atomic_write_text
-from .workspace import Workspace
+from harness.autonomy.backlog import load_backlog
+from harness.autonomy.delivery import DeliveryRequest, deliver
+from harness.autonomy.evals import load_suite, run_suite
+from harness.autonomy.goal import GoalRequest, pursue
+from harness.autonomy.loop import LoopRequest, goal_for, run_loop
+from harness.autonomy.rubric import RubricConfig, parse_review, render_rubric_prompt, verdict_for
+from harness.config import load_config, load_skill, load_task
+from harness.core.contracts import RunStatus
+from harness.core.errors import HarnessError, InjectedCrash, WorkspaceError
+from harness.core.util import atomic_write_json, atomic_write_text
+from harness.doctor import run_doctor
+from harness.execution.policy import PolicyEngine
+from harness.execution.tools import build_registry
+from harness.execution.workspace import Workspace
+from harness.models import auth
+from harness.models.model_router import build_llm_light, profile_from_route
+from harness.record.artifacts import ArtifactStore
+from harness.record.events import EventLog
+from harness.record.replay import replay_run
+from harness.record.state import StateStore
+from harness.record.tracing import root_context, trace_id_for
+from harness.runtime import HarnessRuntime
+
+from . import __version__
 
 ROUTE_PRIORITY_KEYS = ("privacy", "quality", "cost", "latency", "context")
 
@@ -160,6 +162,10 @@ def parser() -> argparse.ArgumentParser:
     add_cmd.add_argument("key", nargs="?", help="the key; omit to be prompted without echo")
     add_cmd.add_argument("--provider", help="override provider detection")
     add_cmd.add_argument("--base-url", help="pin a non-default base URL")
+    add_cmd.add_argument(
+        "--no-probe", action="store_true",
+        help="do not contact providers to resolve a key whose prefix is shared",
+    )
     status_cmd = auth_sub.add_parser("status", help="show configured credentials")
     status_cmd.add_argument("--json", action="store_true")
     verify_cmd = auth_sub.add_parser("verify", help="make a real call to the provider")
@@ -579,9 +585,17 @@ def _auth(arguments: Any) -> int:
         if not key:
             # Prompting keeps the secret out of shell history.
             key = getpass.getpass("Paste the API key (input hidden): ").strip()
-        record = auth.add(key, provider=arguments.provider, base_url=arguments.base_url or "")
+        record = auth.add(
+            key,
+            provider=arguments.provider,
+            base_url=arguments.base_url or "",
+            probe=not arguments.no_probe,
+        )
         print(f"stored {record['provider']} key {record['key']}")
         print(f"  file:  {record['path']}")
+        # Say how the provider was decided. A key filed under the wrong one
+        # looks identical in `auth status` to a key filed under the right one.
+        print(f"  how:   {record.get('how', 'stored')}")
         print(f"  routes naming {record['env']} now resolve without exporting it")
         return 0
     if action == "status":

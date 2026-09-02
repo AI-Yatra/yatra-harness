@@ -20,8 +20,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness.errors import ConfigurationError
-from harness.sandbox import (
+from harness.core.errors import ConfigurationError
+from harness.execution.sandbox import (
     DockerSandbox,
     LocalSandbox,
     SandboxConfig,

@@ -12,12 +12,8 @@ from typing import Any
 
 import yaml
 
-from . import auth
-from .artifacts import ArtifactStore
-from .compaction import build_compactor
-from .config import HarnessConfig, load_config, load_skill, load_task
-from .context import ContextEngine
-from .contracts import (
+from harness.config import HarnessConfig, load_config, load_skill, load_task
+from harness.core.contracts import (
     SCHEMA_VERSION,
     ActionKind,
     ModelRequest,
@@ -27,20 +23,24 @@ from .contracts import (
     RunStatus,
     ToolResult,
 )
-from .errors import BudgetExceeded, InjectedCrash, ProviderExhausted
-from .events import EventLog
-from .faults import FaultInjector
-from .llm_light import llm_light_from_dict
-from .model_router import ModelRouter, build_llm_light
-from .policy import ApprovalCallback, PolicyEngine
-from .redaction import Redactor
-from .state import StateStore
-from .subagents import check_delegation_allowed, subagent_task
-from .tools import ToolRegistry, build_registry
-from .tracing import SpanRecorder, new_trace_id, parse_trace_context
-from .util import atomic_write_text, content_hash, safe_slug, truncate, utc_now
-from .verifier import Verifier
-from .workspace import Workspace, WorkspaceManager
+from harness.core.errors import BudgetExceeded, InjectedCrash, ProviderExhausted
+from harness.core.util import atomic_write_text, content_hash, safe_slug, truncate, utc_now
+from harness.execution.policy import ApprovalCallback, PolicyEngine
+from harness.execution.tools import ToolRegistry, build_registry
+from harness.execution.workspace import Workspace, WorkspaceManager
+from harness.models import auth
+from harness.models.llm_light import llm_light_from_dict
+from harness.models.model_router import ModelRouter, build_llm_light
+from harness.record.artifacts import ArtifactStore
+from harness.record.events import EventLog
+from harness.record.redaction import Redactor
+from harness.record.state import StateStore
+from harness.record.tracing import SpanRecorder, new_trace_id, parse_trace_context
+from harness.run.compaction import build_compactor
+from harness.run.context import ContextEngine
+from harness.run.faults import FaultInjector
+from harness.run.subagents import check_delegation_allowed, subagent_task
+from harness.run.verifier import Verifier
 
 
 def subagent_approval() -> ApprovalCallback:

@@ -13,8 +13,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness.contracts import RunStatus
-from harness.goal import GoalError, GoalRequest, pursue
+from harness.autonomy.goal import GoalError, GoalRequest, pursue
+from harness.core.contracts import RunStatus
 
 ROOT = Path(__file__).resolve().parents[1]
 

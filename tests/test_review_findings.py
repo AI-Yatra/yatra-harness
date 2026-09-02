@@ -12,12 +12,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from harness.backlog import Feature, save_backlog
+from harness.autonomy.backlog import Feature, save_backlog
+from harness.autonomy.loop import LoopRequest, run_loop
 from harness.config import PolicyConfig
-from harness.contracts import RiskLevel, ToolSpec
-from harness.errors import WorkspaceError
-from harness.loop import LoopRequest, run_loop
-from harness.policy import PolicyEngine
+from harness.core.contracts import RiskLevel, ToolSpec
+from harness.core.errors import WorkspaceError
+from harness.execution.policy import PolicyEngine
 from harness.runtime import subagent_approval
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -193,7 +193,7 @@ class IndexCacheTests(unittest.TestCase):
     """
 
     def test_the_cache_keeps_only_the_most_recent_workspaces(self) -> None:
-        from harness.tools import _INDEX_CACHE, _remember_index
+        from harness.execution.tools import _INDEX_CACHE, _remember_index
 
         _INDEX_CACHE.clear()
         for index in range(12):
@@ -201,7 +201,7 @@ class IndexCacheTests(unittest.TestCase):
         self.assertLessEqual(len(_INDEX_CACHE), 4)
 
     def test_the_newest_entry_survives(self) -> None:
-        from harness.tools import _INDEX_CACHE, _remember_index
+        from harness.execution.tools import _INDEX_CACHE, _remember_index
 
         _INDEX_CACHE.clear()
         for index in range(12):
