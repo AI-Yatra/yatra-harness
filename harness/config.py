@@ -59,6 +59,10 @@ class RouteConfig:
     quality: float = 3.0
     context_window: int = 8192
     tool_support: bool = True
+    # Which prompting practices this model wants. Empty means infer from
+    # `quality`, because the right dials depend on the model and this is the
+    # claim the operator already made about it. See harness/repl/profile.py.
+    prompt_profile: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -405,6 +409,7 @@ ROUTE_ROUTING_KEYS = {
     "quality",
     "context_window",
     "tool_support",
+    "prompt_profile",
 }
 
 
@@ -431,7 +436,22 @@ def _routing_attributes(item: dict, name: str) -> dict:
             item.get("context_window", 8_192), f"{path}.context_window", minimum=1
         ),
         "tool_support": schema.boolean(item.get("tool_support", True), f"{path}.tool_support"),
+        "prompt_profile": _prompt_profile(item.get("prompt_profile", ""), path),
     }
+
+
+def _prompt_profile(value: object, path: str) -> str:
+    """Validated at load time so a typo fails the config, not the session."""
+    from harness.models.prompting import PRESETS  # noqa: PLC0415 - avoids a cycle
+
+    if value in (None, ""):
+        return ""
+    name = schema.string(value, f"{path}.prompt_profile").strip().lower()
+    if name not in PRESETS:
+        raise ConfigurationError(
+            f"{path}.prompt_profile must be one of {', '.join(sorted(PRESETS))}, got {name!r}"
+        )
+    return name
 
 
 def _load_constraints(raw: Any, path: str) -> RoutingConstraints:

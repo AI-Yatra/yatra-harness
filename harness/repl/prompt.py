@@ -11,9 +11,11 @@ import platform
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from harness.models.prompting import PromptProfile
 from harness.run.instructions import load_repository_instructions
 
 from .approvals import Mode
+from .blocks import compose
 
 # Guarded because `config` is the composition root: it imports every
 # module it configures, so importing it back at runtime would close a
@@ -22,54 +24,28 @@ from .approvals import Mode
 if TYPE_CHECKING:
     from harness.config import HarnessConfig
 
-BASE = """\
-You are a coding agent running in a terminal, in the operator's own working \
-directory. You have tools to read, search, edit and run things there.
-
-How to work:
-- Read a file before you edit it. edit_file matches text exactly, so guessing \
-at the current contents will fail.
-- Prefer edit_file over write_file for existing files. write_file replaces the \
-whole file and silently discards anything you did not include.
-- When you edit code, run the project's tests or linter afterwards if you can, \
-and say what the result was.
-- Use run_command for anything the shell would do. It takes an argument array \
-and there is no shell, so pipes, redirection and globbing do not work; run the \
-pieces separately.
-- Search before you guess. grep and glob are cheap; a wrong assumption about \
-where something lives is not.
-
-How to answer:
-- Be concise and concrete. This is a terminal, not a document.
-- Answer the question that was asked. Do not add summaries of what you just \
-did unless it is not obvious, and do not restate the file you just edited.
-- If you are asked a question, answer it. Do not start editing files to \
-answer a question about how something works.
-- When you cannot do something, say so plainly and say what you would need.
-- Never claim a command passed unless you ran it and saw it pass.
-"""
-
-
 def build(
     config: HarnessConfig,
     root: Path,
     *,
     mode: Mode,
+    profile: PromptProfile | None = None,
     extra: str = "",
 ) -> str:
     """The full system prompt for a session rooted at *root*."""
-    parts = [BASE, _environment(root, mode)]
-    conventions = _conventions(config, root)
+    active = profile or PromptProfile()
+    parts = [compose(active), _environment(root, mode, active)]
+    conventions = _conventions(config, root, active)
     if conventions:
         parts.append(conventions)
     if extra.strip():
-        parts.append(f"# Operator instructions\n\n{extra.strip()}")
+        parts.append(active.block("Operator instructions", extra.strip()))
     return "\n\n".join(parts)
 
 
-def _environment(root: Path, mode: Mode) -> str:
+def _environment(root: Path, mode: Mode, profile: PromptProfile) -> str:
     lines = [
-        "# Environment",
+        profile.heading("Environment"),
         "",
         f"Working directory: {root}",
         f"Platform: {platform.system()} {platform.machine()}",
@@ -126,7 +102,7 @@ def _git_summary(root: Path) -> str:
     return f"Git branch: {branch.output.strip()} ({state})"
 
 
-def _conventions(config: HarnessConfig, root: Path) -> str:
+def _conventions(config: HarnessConfig, root: Path, profile: PromptProfile) -> str:
     """The repository's own AGENTS.md or CLAUDE.md, if it has one."""
     if not config.context_instruction_files:
         return ""
@@ -141,7 +117,5 @@ def _conventions(config: HarnessConfig, root: Path) -> str:
     if not found.text.strip():
         return ""
     named = ", ".join(found.sources)
-    return (
-        f"# Repository conventions\n\nFrom {named} in this repository. Follow them.\n\n"
-        f"{found.text.strip()}"
-    )
+    body = f"From {named} in this repository. Follow them.\n\n{found.text.strip()}"
+    return profile.block("Repository conventions", body)
