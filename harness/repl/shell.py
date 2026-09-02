@@ -20,6 +20,7 @@ from harness.core.contracts import ToolSpec
 from harness.core.errors import HarnessError
 from harness.core.util import is_chat_model, model_version
 from harness.execution.process import run_process
+from harness.execution.tools import optional_tools
 from harness.execution.workspace import Workspace
 from harness.models import auth, prompting
 from harness.repl.tools import ReplToolset
@@ -92,10 +93,24 @@ class Shell:
         self.root = options.root.resolve()
         # Set only by /profile; None means the route still decides.
         self._profile_override: prompting.PromptProfile | None = None
+        #: Shown after the banner, so a startup problem is visible without
+        #: being printed before the session identifies itself.
+        self._startup_notices: list[str] = []
         self.mode = options.mode
         self.session_id = options.session_id or self._latest_session() or f"ay-{uuid.uuid4().hex[:8]}"
         self.workspace = Workspace(self.root, ())
-        self.toolset = ReplToolset(self.workspace, self.config)
+        # Whatever the config makes available, this loop offers too. MCP
+        # servers, retrieval and the network tools were previously reachable
+        # only from `harness run`, not because a conversation had no use for
+        # them but because they were registered inside the batch builder.
+        # A server that fails to start is reported and the session continues,
+        # since losing an optional capability is not worth losing the session.
+        try:
+            extra = optional_tools(self.config, self.workspace)
+        except HarnessError as exc:
+            extra = []
+            self._startup_notices.append(f"optional tools unavailable: {exc}")
+        self.toolset = ReplToolset(self.workspace, self.config, extra_tools=extra)
         self.gate = Gate(self.config.policy, mode=self.mode, prompt=self._ask)
         self.guessed_route = ""
         self.route = self._route(options.model_override)
@@ -875,6 +890,8 @@ class Shell:
                     f"--model <route>:<model> to be explicit."
                 )
             )
+        for notice in self._startup_notices:
+            console.line("  " + console.bad(notice))
         if self.mode is Mode.FULL_AUTO:
             console.line("  " + console.bad("full-auto: edits and commands run without asking"))
 

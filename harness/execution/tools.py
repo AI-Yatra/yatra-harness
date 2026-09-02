@@ -221,6 +221,76 @@ def build_registry(
     return registry
 
 
+def optional_tools(
+    config: HarnessConfig, workspace: Workspace
+) -> list[tuple[ToolSpec, ToolHandler]]:
+    """The capabilities a loop opts into rather than always having.
+
+    These were reachable only from `harness run`, not because a conversation
+    had no use for them but because they were registered inside the batch
+    builder. Returning them as pairs lets either loop offer them, which is the
+    difference between one harness with two entry points and two harnesses.
+
+    What is offered follows the config rather than the caller. A network tool
+    is left out entirely when the policy disables the network, because
+    registering a tool the policy will always refuse spends context on a
+    capability that does not exist and invites the model to keep trying it.
+    """
+    found: list[tuple[ToolSpec, ToolHandler]] = []
+    object_schema = _object_schema
+
+    # Always available: retrieval is lexical by default and needs nothing
+    # beyond the workspace, which is exactly what makes it worth having in a
+    # conversation that has not been told where to look.
+    found.append(
+            (
+                ToolSpec(
+                    "retrieve",
+                    "Find the parts of the workspace most relevant to a question, "
+                    "ranked, as excerpts with their file and line range.",
+                    object_schema(
+                        {"query": {"type": "string"}, "limit": {"type": "integer"}},
+                        ("query",),
+                    ),
+                    RiskLevel.READ,
+                ),
+                lambda args: _retrieve(workspace, args, config),
+            )
+    )
+
+    if config.policy.network_enabled:
+        found.append(
+            (
+                ToolSpec(
+                    "web_search",
+                    "Search the web and return ranked results with their URLs.",
+                    object_schema(
+                        {"query": {"type": "string"}, "limit": {"type": "integer"}},
+                        ("query",),
+                    ),
+                    RiskLevel.NETWORK,
+                ),
+                lambda args: _web_search(args, config),
+            )
+        )
+        found.append(
+            (
+                ToolSpec(
+                    "browser_fetch",
+                    "Fetch one URL and return its readable text.",
+                    object_schema({"url": {"type": "string"}}, ("url",)),
+                    RiskLevel.NETWORK,
+                ),
+                lambda args: _browser_fetch(args, config),
+            )
+        )
+
+    for server in config.mcp_servers:
+        if server.enabled:
+            found.extend(mcp_tools(server, workspace))
+    return found
+
+
 def _object_schema(properties: dict[str, Any], required: tuple[str, ...] = ()) -> dict[str, Any]:
     return {
         "type": "object",
@@ -1037,6 +1107,19 @@ def _expanded_mcp_command(command: tuple[str, ...]) -> tuple[str, ...]:
 
 
 def _register_mcp(registry: ToolRegistry, server: MCPServerConfig, workspace: Workspace) -> None:
+    for spec, handler in mcp_tools(server, workspace):
+        registry.register(spec, handler)
+
+
+def mcp_tools(
+    server: MCPServerConfig, workspace: Workspace
+) -> list[tuple[ToolSpec, ToolHandler]]:
+    """Discover one MCP server's tools as registerable pairs.
+
+    Separated from registration so a conversation can offer the same servers
+    the batch loop does. Discovery opens the server once here and each call
+    opens it again, which is the stdio protocol's shape rather than a choice.
+    """
     command = _expanded_mcp_command(server.command)
     with MCPStdioClient(
         command,
@@ -1045,6 +1128,7 @@ def _register_mcp(registry: ToolRegistry, server: MCPServerConfig, workspace: Wo
         timeout_seconds=server.timeout_seconds,
     ) as client:
         discovered = client.list_tools()
+    found: list[tuple[ToolSpec, ToolHandler]] = []
     for raw in discovered:
         name = raw.get("name")
         description = raw.get("description", "MCP tool")
@@ -1076,13 +1160,16 @@ def _register_mcp(registry: ToolRegistry, server: MCPServerConfig, workspace: Wo
                 "structured_content": result.get("structuredContent"),
             }
 
-        registry.register(
-            ToolSpec(
-                name=name,
-                description=description,
-                input_schema=input_schema,
-                risk=RiskLevel.READ,
-                source=f"mcp:{server.name}",
-            ),
-            handler,
+        found.append(
+            (
+                ToolSpec(
+                    name=name,
+                    description=description,
+                    input_schema=input_schema,
+                    risk=RiskLevel.READ,
+                    source=f"mcp:{server.name}",
+                ),
+                handler,
+            )
         )
+    return found
