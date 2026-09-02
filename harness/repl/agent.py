@@ -15,11 +15,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from harness.core.contracts import ToolSpec
+from harness.core.contracts import RiskLevel, ToolSpec
 from harness.core.errors import HarnessError, PermanentProviderError, TransientProviderError
 from harness.repl.tools import ReplToolset
 
 from .approvals import Gate
+from .checkpoints import Checkpoints
 from .conversation import AssistantTurn, Conversation, ToolCall
 from .model import ChatModel
 
@@ -71,6 +72,12 @@ class Events:
     on_thinking: Callable[[bool], None] = lambda _busy: None
 
 
+#: Risk levels whose calls can change the working tree. READ and CONTROL
+#: cannot, so snapshotting after them would record identical states and push
+#: the useful ones out of the kept range.
+_MUTATING = frozenset({RiskLevel.WRITE, RiskLevel.EXECUTE})
+
+
 class Agent:
     """One session: a thread, a working directory, a model and a gate."""
 
@@ -84,6 +91,7 @@ class Agent:
         config: HarnessConfig,
         events: Events | None = None,
         limits: Limits | None = None,
+        checkpoints: Checkpoints | None = None,
     ) -> None:
         self.model = model
         self.conversation = conversation
@@ -93,6 +101,7 @@ class Agent:
         self.events = events or Events()
         self.limits = limits or Limits()
         self.specs: dict[str, ToolSpec] = {spec.name: spec for spec in toolset.specs()}
+        self.checkpoints = checkpoints
         self._cancel = threading.Event()
 
     # -------------------------------------------------------------- interrupt
@@ -213,6 +222,12 @@ class Agent:
         detail = outcome.detail or ("done" if outcome.ok else outcome.content)
         self.events.on_tool_end(call, detail, outcome.ok)
         self._record(call, outcome.content if outcome.ok else f"Error: {outcome.content}")
+        # After the call rather than inside the tool, so a command that
+        # reformatted the tree or regenerated a lockfile is captured too. A
+        # snapshot taken only by the edit tools would miss exactly the changes
+        # an operator is least likely to have expected.
+        if self.checkpoints is not None and spec.risk in _MUTATING:
+            self.checkpoints.record(f"{call.name} {describe_arguments(call)}"[:120])
         return outcome.ok
 
     def _record(self, call: ToolCall, content: str) -> None:

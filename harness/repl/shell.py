@@ -33,6 +33,7 @@ from . import banner as banner_art
 from . import prompt as prompt_builder
 from .agent import Agent, Events, Interrupted, ModelUnavailable, describe_arguments
 from .approvals import Gate, Mode, Request, Verdict
+from .checkpoints import Checkpoints
 from .conversation import Conversation, ToolCall
 from .model import ChatModel, RouteChain
 from .render import Console, Renderer, Spinner
@@ -52,6 +53,8 @@ Ask anything, or give an instruction. The agent works in this directory.
   /context           how full the context window is
   /cost              tokens used this session
   /compact           summarise the conversation to free context
+  /undo              put the files back to before the last change
+  /checkpoints       the states this session can go back to
   /clear             forget the conversation and start fresh
   /init              write an AGENTS.md describing this repository
   /config            the active config file and route
@@ -120,6 +123,9 @@ class Shell:
         self.route = self._route(options.model_override)
         self.model = self._chat_model()
         self.conversation = self._open_conversation()
+        # Rooted next to the session files rather than in the operator's
+        # repository, so an undo never writes to the history they will publish.
+        self.checkpoints = Checkpoints(self.root, self.root / options.sessions_dir.name / "checkpoints.git")
         self.agent = Agent(
             model=self.model,
             conversation=self.conversation,
@@ -127,6 +133,7 @@ class Shell:
             gate=self.gate,
             config=self.config,
             events=self._events(),
+            checkpoints=self.checkpoints,
         )
         self.total_in = 0
         self.total_out = 0
@@ -406,6 +413,12 @@ class Shell:
         if name == "profile":
             self._switch_profile(argument)
             return True
+        if name == "undo":
+            self._undo(argument)
+            return True
+        if name == "checkpoints":
+            self._list_checkpoints()
+            return True
         if name == "approvals":
             standing = self.gate.standing_approvals
             if not standing:
@@ -613,6 +626,79 @@ class Shell:
             self.config, self.root, mode=self.mode, profile=self._profile()
         )
         self.render.notice(f"{reason}; the system prompt was rebuilt for this session.")
+
+    def _list_checkpoints(self) -> None:
+        found = self.checkpoints.list()
+        if not found:
+            reason = self.checkpoints.reason
+            self.render.notice(
+                f"no checkpoints yet ({reason})" if reason else "no checkpoints yet; "
+                "one is taken after every change the agent makes."
+            )
+            return
+        self.console.line()
+        for index, point in enumerate(found):
+            marker = "now" if index == 0 else f"-{index}"
+            self.console.line(
+                f"  {marker:>4}  {self.console.dim(point.short)}  {point.label[:64]}"
+                f"  {self.console.dim(point.when)}"
+            )
+        self.console.line()
+        self.console.line("  " + self.console.dim("/undo, or /undo <id> to go back to one"))
+
+    def _undo(self, argument: str) -> None:
+        """Put the files back, after saying exactly what that would change."""
+        found = self.checkpoints.list()
+        if not found:
+            reason = self.checkpoints.reason
+            self.render.notice(
+                f"nothing to undo ({reason})" if reason else "nothing to undo yet."
+            )
+            return
+        if argument:
+            target = next((c for c in found if c.ref.startswith(argument)), None)
+            if target is None:
+                self.render.error(f"no checkpoint starting {argument!r}; try /checkpoints")
+                return
+        elif len(found) > 1:
+            target = found[1]
+        else:
+            target = found[0]
+
+        changed = self.checkpoints.changed_since(target.ref)
+        if not changed:
+            self.render.notice("the files already match that checkpoint.")
+            return
+
+        self.console.line()
+        self.console.line(f"  going back to {self.console.dim(target.short)} {target.label[:60]}")
+        for path in changed[:12]:
+            self.console.line(f"    {path}")
+        if len(changed) > 12:
+            self.console.line(f"    {self.console.dim(f'and {len(changed) - 12} more')}")
+        # Asked rather than assumed, because the operator may have edited these
+        # themselves between two turns and a silent restore would discard their
+        # work with no way back to it.
+        if not self._confirm(f"restore {len(changed)} path(s)?"):
+            self.render.notice("left as it is.")
+            return
+        if self.checkpoints.restore(target.ref):
+            self.checkpoints.record(f"undo to {target.short}")
+            self.render.notice(f"restored {len(changed)} path(s) to {target.short}.")
+            self.conversation.add_system_note(
+                "The operator undid the file changes. The working tree no longer matches "
+                "what you did; read anything before relying on it."
+            )
+        else:
+            self.render.error("could not restore; the files were left as they are.")
+
+    def _confirm(self, question: str) -> bool:
+        self.console.write(f"  {question} [y/N] ")
+        try:
+            return input().strip().lower() in {"y", "yes"}
+        except (EOFError, KeyboardInterrupt):
+            self.console.line()
+            return False
 
     def _switch_mode(self, argument: str) -> None:
         if not argument:
