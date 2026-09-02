@@ -17,6 +17,7 @@ from __future__ import annotations
 import fnmatch
 import os
 import re
+import time
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -64,6 +65,63 @@ class ToolOutcome:
 
 
 Handler = Any
+
+
+#: A quantified group that is itself quantified, the classic exponential
+#: backtracking shape. `(a+)+` matches; `(abc)+` and `(a|b)+` do not, because
+#: neither repeats anything inside the group.
+_NESTED_QUANTIFIER = re.compile(r"\([^()]*[+*][^()]*\)\s*[+*{]")
+
+#: Alphabets a runaway pattern is timed against. A pattern built from digits
+#: does not backtrack on letters, and `(a|ab)*` needs a two-character cycle
+#: before it misbehaves at all.
+_PROBE_UNITS = ("a", "ab", "0", "a1")
+
+#: Probe lengths, shortest first, and deliberately short. A single match
+#: cannot be interrupted, so the probe's own worst case is the ceiling on how
+#: long this check can take: at 22 characters an exponential pattern costs
+#: about 2^22 steps, which is a fraction of a second. Longer probes would
+#: detect more shapes and could themselves hang, which is the thing being
+#: defended against.
+_PROBE_LENGTHS = (16, 22)
+
+#: A pattern needing longer than this on a probe this short is backtracking
+#: exponentially. An honest pattern answers in microseconds, so the two
+#: populations sit orders of magnitude apart and the threshold is not delicate.
+_PROBE_BUDGET_SECONDS = 0.01
+
+
+def _backtracks(expression: re.Pattern[str]) -> bool:
+    r"""Whether *expression* blows up on a short string.
+
+    Timing rather than reading the pattern, because a structural check cannot
+    see every shape: `(a|a)*` repeats nothing inside its group and is still
+    exponential. Measuring catches it however it is written.
+
+    This has to happen before the search rather than during it. Matching runs
+    inside C and does not release the GIL, so a worker thread cannot be joined
+    with a timeout and a signal cannot be delivered. Once a catastrophic match
+    starts, nothing in the process can stop it, and the only usable defence is
+    to decline to start.
+
+    The same constraint bounds how good this can be. Detecting a shape whose
+    blow-up only appears on longer input would need a longer probe, and that
+    probe could itself hang. `(\d|\d\d)*$` is the documented survivor. The
+    complete fix is to match in a separate process that can be killed; that is
+    not done here because the pattern comes from the model rather than from an
+    attacker, and the shapes a model actually writes are covered.
+    """
+    for length in _PROBE_LENGTHS:
+        for unit in _PROBE_UNITS:
+            probe = (unit * (length // len(unit) + 1))[:length] + "!"
+            started = time.perf_counter()
+            try:
+                expression.search(probe)
+            except (re.error, RecursionError):
+                return True
+            if time.perf_counter() - started > _PROBE_BUDGET_SECONDS:
+                return True
+    return False
 
 
 class ReplToolset:
@@ -251,10 +309,25 @@ class ReplToolset:
         raw = str(arguments.get("pattern") or "")
         if not raw:
             raise ToolError("grep needs a pattern")
+        if _NESTED_QUANTIFIER.search(raw):
+            # Rejected before it runs rather than after it hangs. A quantified
+            # group that is itself quantified is the classic shape whose
+            # backtracking is exponential in the length of the line.
+            raise ToolError(
+                f"the pattern {raw!r} nests a quantifier inside a quantified group, which "
+                "can take exponential time on a long line. Rewrite it without the nesting, "
+                "for example (a+)+ as a+."
+            )
         try:
             expression = re.compile(raw)
         except re.error as exc:
             raise ToolError(f"not a valid regular expression: {exc}") from exc
+        if _backtracks(expression):
+            raise ToolError(
+                f"the pattern {raw!r} backtracks exponentially: it took too long on a "
+                "22-character probe, so on a real line it would not finish. Rewrite it "
+                "without nested or overlapping repetition."
+            )
         limit = int(arguments.get("limit") or 100)
         scope = self.workspace.root
         if arguments.get("path"):
@@ -262,26 +335,31 @@ class ReplToolset:
         file_glob = str(arguments.get("glob") or "")
         hits: list[str] = []
         files = 0
-        for path in _walk(scope):
-            relative = self._relative(path)
-            if file_glob and not (
-                fnmatch.fnmatch(relative, file_glob) or fnmatch.fnmatch(path.name, file_glob)
-            ):
-                continue
-            try:
-                text = _read_text(path)
-            except (ToolError, OSError):
-                continue
-            matched = False
-            for number, line in enumerate(text.splitlines(), start=1):
-                if expression.search(line):
-                    matched = True
-                    hits.append(f"{relative}:{number}: {line.strip()[:300]}")
-                    if len(hits) >= limit:
-                        break
-            files += 1 if matched else 0
-            if len(hits) >= limit:
-                break
+
+        def search() -> None:
+            nonlocal files
+            for path in _walk(scope):
+                relative = self._relative(path)
+                if file_glob and not (
+                    fnmatch.fnmatch(relative, file_glob) or fnmatch.fnmatch(path.name, file_glob)
+                ):
+                    continue
+                try:
+                    text = _read_text(path)
+                except (ToolError, OSError):
+                    continue
+                matched = False
+                for number, line in enumerate(text.splitlines(), start=1):
+                    if expression.search(line):
+                        matched = True
+                        hits.append(f"{relative}:{number}: {line.strip()[:300]}")
+                        if len(hits) >= limit:
+                            break
+                files += 1 if matched else 0
+                if len(hits) >= limit:
+                    break
+
+        search()
         if not hits:
             return ToolOutcome(f"No matches for {raw}", display=raw, detail="no matches")
         body = "\n".join(hits)
@@ -314,6 +392,16 @@ class ReplToolset:
         new = arguments.get("new_string")
         if not isinstance(old, str) or not isinstance(new, str):
             raise ToolError("edit_file needs string old_string and new_string")
+        if not old:
+            # `"".count()` is one per character plus one, and replacing the
+            # empty string interleaves the replacement throughout the file.
+            # Without this guard the edit reports success on a file it has
+            # destroyed, which is the worst shape a failure can take.
+            raise ToolError(
+                "old_string is empty. It must be the exact text to replace. To create a "
+                "file use write_file; to add to one, include the surrounding line in "
+                "old_string and repeat it in new_string."
+            )
         if old == new:
             raise ToolError("old_string and new_string are identical; nothing to do")
         before = _read_text(path)
