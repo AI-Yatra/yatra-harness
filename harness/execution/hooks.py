@@ -21,7 +21,6 @@ model input and the model cannot add one.
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from fnmatch import fnmatch
 from pathlib import Path
@@ -166,8 +165,3 @@ def _hook_environment(event: str, tool: str) -> dict[str, str]:
     import os  # noqa: PLC0415 - local so the module imports cleanly anywhere
 
     return {**os.environ, "HARNESS_EVENT": event, "HARNESS_TOOL": tool}
-
-
-def hook_events(hooks: Sequence[Hook]) -> set[str]:
-    """Which events anything is listening for, so nothing is assembled in vain."""
-    return {hook.event for hook in hooks}
