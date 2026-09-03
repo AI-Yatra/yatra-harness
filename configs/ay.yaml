@@ -379,28 +379,6 @@ context:
 #     suffixes: [.py]
 diagnostics: {}
 
-# How `retrieve` finds the relevant part of a repository nobody has read.
-#
-#   lexical    BM25 over a persistent SQLite FTS5 index. No key, no network,
-#              no dependency. Always works, and is the default for that reason.
-#   hybrid     lexical plus a local static embedding model, fused by rank.
-#              Needs `pip install "yatra-harness[search]"`; without it this
-#              degrades to lexical and says so rather than failing.
-#   embedding  vectors from a remote provider. Needs an endpoint and a key.
-#
-# The index is per workspace, lives under ~/.yatra-harness/index/ rather than
-# in your repository, and updates one file at a time, so an agent that edits
-# two files re-reads two files.
-#
-# local_model is measured, not assumed. A code-specialised static model
-# scored worse here than the general one, because these queries are English
-# questions about code rather than code searching for code.
-retrieval:
-  kind: hybrid
-  local_model: minishlab/potion-base-8M
-  lines_per_chunk: 40
-  limit: 5
-
 # Commands that run when the agent acts. These observe; they cannot veto. The
 # approval gate already answers whether something may happen, and two
 # authorities over one decision is how a permission system stops being

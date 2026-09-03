@@ -134,23 +134,20 @@ class OneSandboxTests(SharedToolingTestCase):
 class SharedCapabilityTests(SharedToolingTestCase):
     """A tool registered once has to be reachable from either loop."""
 
-    def test_retrieval_is_offered_to_a_conversation(self) -> None:
+    def test_an_optional_tool_is_offered_to_a_conversation(self) -> None:
         names = {spec.name for spec, _ in optional_tools(self.config, self.workspace)}
-        self.assertIn("retrieve", names)
+        self.assertIn("remember", names)
 
-    def test_retrieval_actually_runs_there(self) -> None:
-        (self.root / "auth.py").write_text(
-            "def redact(secret):\n    # hide a credential before writing it down\n    return secret\n",
-            encoding="utf-8",
-        )
+    def test_an_optional_tool_actually_runs_there(self) -> None:
+        """Offered is not the same as wired; this calls it."""
         tools = ReplToolset(
             self.workspace,
             self.config,
             extra_tools=optional_tools(self.config, self.workspace),
         )
-        outcome = tools.dispatch("retrieve", {"query": "redact credential"})
+        outcome = tools.dispatch("remember", {"fact": "the tests are unittest, not pytest"})
         self.assertTrue(outcome.ok, outcome.content)
-        self.assertIn("auth.py", outcome.content)
+        self.assertIn("unittest", outcome.content)
 
     def test_network_tools_are_left_out_when_the_network_is_off(self) -> None:
         """Offering a tool the policy always refuses only wastes context."""

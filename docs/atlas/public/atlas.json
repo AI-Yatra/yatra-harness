@@ -465,8 +465,8 @@
  "generated_by": "docs/atlas/scripts/scan_harness.py",
  "head": {
   "date": "2026-09-03",
-  "sha": "0355212",
-  "subject": "Treat a committed settings file as somebody else's input"
+  "sha": "673c2be",
+  "subject": "Refresh the atlas after the settings review"
  },
  "lanes": [
   {
@@ -566,14 +566,11 @@
    "blurb": "Workspace, policy gate, sandbox, the tools themselves.",
    "key": "execution",
    "modules": [
-    "execution.chunking",
     "execution.diagnostics",
     "execution.hooks",
-    "execution.indexing",
     "execution.mcp",
     "execution.policy",
     "execution.process",
-    "execution.retrieval",
     "execution.sandbox",
     "execution.search",
     "execution.tools",
@@ -853,8 +850,8 @@
    "path": "harness/core/contracts.py",
    "side": "harness",
    "sloc": 235,
-   "test_cases": 409,
-   "test_sloc": 3702,
+   "test_cases": 407,
+   "test_sloc": 3666,
    "tests": [
     "test_atlas_scan.py",
     "test_checkpoints.py",
@@ -1218,7 +1215,7 @@
    "doc": "Typed harness failures used to make terminal behavior explicit.",
    "doc_full": "Typed harness failures used to make terminal behavior explicit.",
    "external": [],
-   "fan_in": 34,
+   "fan_in": 33,
    "fan_out": 0,
    "functions": 0,
    "imported_by": [
@@ -1234,7 +1231,6 @@
     "execution.diagnostics",
     "execution.hooks",
     "execution.mcp",
-    "execution.retrieval",
     "execution.sandbox",
     "execution.search",
     "execution.tools",
@@ -1266,8 +1262,8 @@
    "path": "harness/core/errors.py",
    "side": "harness",
    "sloc": 47,
-   "test_cases": 719,
-   "test_sloc": 6041,
+   "test_cases": 646,
+   "test_sloc": 5604,
    "tests": [
     "test_backlog.py",
     "test_compaction.py",
@@ -1286,7 +1282,6 @@
     "test_repl_agent.py",
     "test_repl_gemini.py",
     "test_repl_tools.py",
-    "test_retrieval.py",
     "test_review_findings.py",
     "test_sandbox.py",
     "test_search.py",
@@ -2399,14 +2394,14 @@
     {
      "doc": "",
      "kind": "class",
-     "line": 50,
+     "line": 43,
      "methods": [],
      "name": "RegisteredTool"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 55,
+     "line": 48,
      "methods": [
       "register",
       "specs",
@@ -2417,28 +2412,28 @@
     {
      "doc": "",
      "kind": "function",
-     "line": 134,
+     "line": 127,
      "methods": [],
      "name": "validate_json_schema"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 195,
+     "line": 188,
      "methods": [],
      "name": "build_registry"
     },
     {
      "doc": "The capabilities a loop opts into rather than always having.",
      "kind": "function",
-     "line": 222,
+     "line": 215,
      "methods": [],
      "name": "optional_tools"
     },
     {
      "doc": "Discover one MCP server's tools as registerable pairs.",
      "kind": "function",
-     "line": 1153,
+     "line": 1034,
      "methods": [],
      "name": "mcp_tools"
     }
@@ -2464,7 +2459,7 @@
     "urllib"
    ],
    "fan_in": 4,
-   "fan_out": 12,
+   "fan_out": 11,
    "functions": 4,
    "imported_by": [
     "cli",
@@ -2480,7 +2475,6 @@
     "execution.mcp",
     "execution.policy",
     "execution.process",
-    "execution.retrieval",
     "execution.sandbox",
     "execution.search",
     "execution.workspace",
@@ -2489,16 +2483,15 @@
    "in_boundary": true,
    "last_touched": "2026-09-03",
    "layer": "execution",
-   "lines": 1214,
+   "lines": 1095,
    "name": "execution.tools",
    "path": "harness/execution/tools.py",
    "side": "harness",
-   "sloc": 1057,
-   "test_cases": 58,
-   "test_sloc": 646,
+   "sloc": 961,
+   "test_cases": 45,
+   "test_sloc": 468,
    "tests": [
     "test_patch_recovery.py",
-    "test_review_findings.py",
     "test_shared_tooling.py",
     "test_tools.py"
    ]
@@ -2610,8 +2603,8 @@
    "path": "harness/execution/policy.py",
    "side": "harness",
    "sloc": 377,
-   "test_cases": 137,
-   "test_sloc": 1160,
+   "test_cases": 135,
+   "test_sloc": 1124,
    "tests": [
     "test_denied_approval.py",
     "test_patch_recovery.py",
@@ -2621,103 +2614,6 @@
     "test_review_findings.py",
     "test_shared_tooling.py",
     "test_tools.py"
-   ]
-  },
-  {
-   "api": [
-    {
-     "doc": "One indexed chunk, as it comes back from a query.",
-     "kind": "class",
-     "line": 86,
-     "methods": [
-      "as_chunk"
-     ],
-     "name": "Row"
-    },
-    {
-     "doc": "Where a workspace's index lives.",
-     "kind": "function",
-     "line": 100,
-     "methods": [],
-     "name": "index_path"
-    },
-    {
-     "doc": "Every file worth indexing, relative and posix, in a stable order.",
-     "kind": "function",
-     "line": 113,
-     "methods": [],
-     "name": "discover"
-    },
-    {
-     "doc": "An operator's question, as an FTS5 expression that cannot be a syntax error.",
-     "kind": "function",
-     "line": 159,
-     "methods": [],
-     "name": "fts_query"
-    },
-    {
-     "doc": "A workspace's chunks, ranked by FTS5, updated one file at a time.",
-     "kind": "class",
-     "line": 171,
-     "methods": [
-      "clear",
-      "close",
-      "sync",
-      "search",
-      "all_chunks",
-      "vector_search",
-      "hybrid_search",
-      "vector_count",
-      "count"
-     ],
-     "name": "SqliteIndex"
-    },
-    {
-     "doc": "Combine rankings by position rather than by score.",
-     "kind": "function",
-     "line": 414,
-     "methods": [],
-     "name": "fuse"
-    }
-   ],
-   "api_count": 6,
-   "classes": 2,
-   "commits": 1,
-   "doc": "A workspace index that survives the process that built it.",
-   "doc_full": "A workspace index that survives the process that built it.\n\nThe old index was built in memory, from a full walk of the tree, in every\nprocess that asked a question. On this repository that is three seconds before\nthe first answer and it is linear in the size of the repository, so the cost\nlands hardest exactly where retrieval matters most. Worse, it was rebuilt from\nscratch when an agent edited one file, because the freshness check was a single\nfingerprint over the whole tree.\n\nSo the index lives in SQLite, under the user's home rather than in the\nrepository, and it updates per file. An agent that edits two files in a\nfive-thousand-file repository re-reads two files.\n\nFTS5 does the ranking. It is a full-text index with a real `bm25()` built into\nthe SQLite that ships with CPython, which means persistence, incremental\nupdate and BM25 arrive together with no dependency at all. Verified present\nbefore this was written, rather than assumed.\n\nDiscovery asks git. `git ls-files --cached --others --exclude-standard` is the\nlist of files that are tracked or could be, which is precisely the set worth\nsearching: it honours `.gitignore` and every other ignore rule the repository\nalready declares, and it includes a file the agent created a moment ago. The\nprevious walk ignored all of that and indexed build output -- on this\nrepository 35% of the index was generated JSON, and two copies of a generated\nartifact outranked real code. A tree that is not a git repository falls back to\nwalking it.",
-   "external": [
-    "__future__",
-    "array",
-    "collections",
-    "dataclasses",
-    "hashlib",
-    "os",
-    "pathlib",
-    "re",
-    "sqlite3",
-    "subprocess"
-   ],
-   "fan_in": 1,
-   "fan_out": 1,
-   "functions": 4,
-   "imported_by": [
-    "execution.retrieval"
-   ],
-   "imports": [
-    "execution.chunking"
-   ],
-   "in_boundary": false,
-   "last_touched": "2026-09-03",
-   "layer": "execution",
-   "lines": 425,
-   "name": "execution.indexing",
-   "path": "harness/execution/indexing.py",
-   "side": "harness",
-   "sloc": 325,
-   "test_cases": 71,
-   "test_sloc": 404,
-   "tests": [
-    "test_retrieval.py"
    ]
   },
   {
@@ -2852,7 +2748,7 @@
    "side": "harness",
    "sloc": 287,
    "test_cases": 74,
-   "test_sloc": 578,
+   "test_sloc": 575,
    "tests": [
     "test_os_sandbox.py",
     "test_sandbox.py",
@@ -2934,8 +2830,8 @@
    "path": "harness/execution/workspace.py",
    "side": "harness",
    "sloc": 278,
-   "test_cases": 483,
-   "test_sloc": 4690,
+   "test_cases": 470,
+   "test_sloc": 4512,
    "tests": [
     "test_checkpoints.py",
     "test_context_budget.py",
@@ -2955,7 +2851,6 @@
     "test_repl_gemini.py",
     "test_repl_tool_safety.py",
     "test_repl_tools.py",
-    "test_review_findings.py",
     "test_session.py",
     "test_shared_tooling.py",
     "test_tools.py",
@@ -3060,125 +2955,6 @@
     {
      "doc": "",
      "kind": "class",
-     "line": 50,
-     "methods": [],
-     "name": "RetrievalConfig"
-    },
-    {
-     "doc": "",
-     "kind": "class",
-     "line": 72,
-     "methods": [
-      "of"
-     ],
-     "name": "Hit"
-    },
-    {
-     "doc": "",
-     "kind": "class",
-     "line": 82,
-     "methods": [],
-     "name": "EmbeddingRequest"
-    },
-    {
-     "doc": "A static embedding model, or None when the optional dependency is absent.",
-     "kind": "function",
-     "line": 91,
-     "methods": [],
-     "name": "local_embedder"
-    },
-    {
-     "doc": "One workspace, kept searchable.",
-     "kind": "class",
-     "line": 117,
-     "methods": [
-      "sync",
-      "search",
-      "close"
-     ],
-     "name": "Retriever"
-    },
-    {
-     "doc": "Similarity, defined as zero wherever it would otherwise be undefined.",
-     "kind": "function",
-     "line": 162,
-     "methods": [],
-     "name": "cosine"
-    },
-    {
-     "doc": "An OpenAI-compatible /embeddings call. The key travels in a header.",
-     "kind": "function",
-     "line": 179,
-     "methods": [],
-     "name": "embedding_request"
-    },
-    {
-     "doc": "Read vectors back, restoring the order they were asked for.",
-     "kind": "function",
-     "line": 191,
-     "methods": [],
-     "name": "parse_embeddings"
-    },
-    {
-     "doc": "What the model sees: excerpts with the coordinates to go read more.",
-     "kind": "function",
-     "line": 218,
-     "methods": [],
-     "name": "render_hits"
-    },
-    {
-     "doc": "",
-     "kind": "function",
-     "line": 235,
-     "methods": [],
-     "name": "retrieval_config_from_dict"
-    }
-   ],
-   "api_count": 10,
-   "classes": 4,
-   "commits": 3,
-   "doc": "Finding the relevant part of a repository too big to read.",
-   "doc_full": "Finding the relevant part of a repository too big to read.\n\n`grep` matches a literal string. That is exact, and useless when you do not\nalready know the identifier: \"where is the retry backoff decided\" finds\nnothing, because nobody wrote that sentence in the code. A model that cannot\nfind the right file reads the wrong ones, and a context budget is spent on\nmaterial that was never going to help.\n\nThree backends, and the default is the one that always works.\n\n`lexical` is BM25 over a persistent SQLite FTS5 index. No key, no network, no\ndependency, deterministic, and available on a laptop with nothing installed.\n\n`hybrid` adds a local static embedding model and fuses the two rankings by\nreciprocal rank. Static embeddings are lookup tables rather than a forward\npass, so the model is 8 MB, needs no GPU, and encodes this repository in about\na second. Measured on ten questions about this codebase, fusing lifted the\ntop-three hit rate from 40% to 70%.\n\n`embedding` is the original remote-provider backend, kept because an operator\nwith a provider they trust should be able to use it.\n\nThe measurement that decided the default model is worth recording, because it\nwas the opposite of what everyone assumes. A *code*-specialised static model\nscored worse than the general one -- 30% at top-three against 70%. Our queries\nare English questions about code, not code searching for code, and the chunks\nlead with a path and a symbol name. The smallest, most general model won.",
-   "external": [
-    "__future__",
-    "collections",
-    "dataclasses",
-    "json",
-    "model2vec",
-    "pathlib",
-    "typing"
-   ],
-   "fan_in": 2,
-   "fan_out": 3,
-   "functions": 6,
-   "imported_by": [
-    "config",
-    "execution.tools"
-   ],
-   "imports": [
-    "core.errors",
-    "execution.chunking",
-    "execution.indexing"
-   ],
-   "in_boundary": false,
-   "last_touched": "2026-09-03",
-   "layer": "execution",
-   "lines": 262,
-   "name": "execution.retrieval",
-   "path": "harness/execution/retrieval.py",
-   "side": "harness",
-   "sloc": 198,
-   "test_cases": 71,
-   "test_sloc": 404,
-   "tests": [
-    "test_retrieval.py"
-   ]
-  },
-  {
-   "api": [
-    {
-     "doc": "",
-     "kind": "class",
      "line": 22,
      "methods": [
       "connect",
@@ -3228,72 +3004,6 @@
    "test_cases": 0,
    "test_sloc": 0,
    "tests": []
-  },
-  {
-   "api": [
-    {
-     "doc": "One rankable piece of one file.",
-     "kind": "class",
-     "line": 42,
-     "methods": [
-      "search_text",
-      "label"
-     ],
-     "name": "Chunk"
-    },
-    {
-     "doc": "Cut one file's contents, at its own boundaries where we can read them.",
-     "kind": "function",
-     "line": 73,
-     "methods": [],
-     "name": "chunk_text"
-    },
-    {
-     "doc": "Fixed windows: the fallback, and the only option for most languages.",
-     "kind": "function",
-     "line": 84,
-     "methods": [],
-     "name": "window_chunks"
-    },
-    {
-     "doc": "Every definition in a Python file, plus whatever sits between them.",
-     "kind": "function",
-     "line": 106,
-     "methods": [],
-     "name": "python_chunks"
-    }
-   ],
-   "api_count": 4,
-   "classes": 1,
-   "commits": 1,
-   "doc": "Cutting a repository into pieces worth ranking.",
-   "doc_full": "Cutting a repository into pieces worth ranking.\n\nA chunk is the unit retrieval returns, so what a chunk *is* decides what\nretrieval can find. Fixed line windows were the cheap answer and they are\nwrong in a specific way: a forty-line window starting at line 60 is a\nfragment of two functions and the whole of neither, and nothing in it says\nwhich functions those were. Rank it first and the model still has to open the\nfile to find out what it is looking at.\n\nSo a Python file is cut at its own boundaries instead, using `ast` from the\nstandard library. Each function and method becomes one chunk that knows its\nown name. Everything else -- other languages, unparseable files, module-level\ncode between definitions -- falls back to line windows, because a worse chunk\nis much better than no chunk.\n\nThe other half of the idea is `search_text`. A chunk is indexed as its path\nand symbol *followed by* its source, so `harness/models/providers.py` and\n`_retry_after` are terms a query can match. Asking \"where is the retry backoff\ndecided\" previously ranked the documentation that contains the phrase above\nthe code that does it, because the code says `backoff_seconds` and never says\n\"retry backoff\" in prose. Naming the symbol in the indexed text is what closes\nthat gap without an embedding model.",
-   "external": [
-    "__future__",
-    "ast",
-    "dataclasses"
-   ],
-   "fan_in": 2,
-   "fan_out": 0,
-   "functions": 3,
-   "imported_by": [
-    "execution.indexing",
-    "execution.retrieval"
-   ],
-   "imports": [],
-   "in_boundary": false,
-   "last_touched": "2026-09-03",
-   "layer": "execution",
-   "lines": 207,
-   "name": "execution.chunking",
-   "path": "harness/execution/chunking.py",
-   "side": "harness",
-   "sloc": 165,
-   "test_cases": 71,
-   "test_sloc": 404,
-   "tests": [
-    "test_retrieval.py"
-   ]
   },
   {
    "api": [
@@ -4283,8 +3993,8 @@
    "path": "harness/autonomy/loop.py",
    "side": "harness",
    "sloc": 146,
-   "test_cases": 29,
-   "test_sloc": 340,
+   "test_cases": 27,
+   "test_sloc": 307,
    "tests": [
     "test_loop.py",
     "test_review_findings.py"
@@ -4436,8 +4146,8 @@
    "path": "harness/autonomy/backlog.py",
    "side": "harness",
    "sloc": 123,
-   "test_cases": 59,
-   "test_sloc": 570,
+   "test_cases": 57,
+   "test_sloc": 537,
    "tests": [
     "test_backlog.py",
     "test_demo_repo.py",
@@ -4588,8 +4298,8 @@
    "path": "harness/cli.py",
    "side": "harness",
    "sloc": 907,
-   "test_cases": 23,
-   "test_sloc": 241,
+   "test_cases": 21,
+   "test_sloc": 208,
    "tests": [
     "test_denied_approval.py",
     "test_review_findings.py"
@@ -4674,8 +4384,8 @@
    "path": "harness/runtime.py",
    "side": "harness",
    "sloc": 781,
-   "test_cases": 52,
-   "test_sloc": 594,
+   "test_cases": 50,
+   "test_sloc": 561,
    "tests": [
     "test_compaction.py",
     "test_review_findings.py",
@@ -4687,35 +4397,35 @@
     {
      "doc": "",
      "kind": "class",
-     "line": 48,
+     "line": 47,
      "methods": [],
      "name": "RouteConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 75,
+     "line": 74,
      "methods": [],
      "name": "ModelRouterConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 85,
+     "line": 84,
      "methods": [],
      "name": "PolicyConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 103,
+     "line": 102,
      "methods": [],
      "name": "MCPServerConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 112,
+     "line": 111,
      "methods": [
       "with_overrides"
      ],
@@ -4724,28 +4434,28 @@
     {
      "doc": "Load the shipped config, then fold any project settings onto it.",
      "kind": "function",
-     "line": 212,
+     "line": 210,
      "methods": [],
      "name": "load_config"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 456,
+     "line": 452,
      "methods": [],
      "name": "reject_unknown_route_keys"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 629,
+     "line": 625,
      "methods": [],
      "name": "load_task"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 711,
+     "line": 707,
      "methods": [],
      "name": "load_skill"
     }
@@ -4765,7 +4475,7 @@
     "yaml"
    ],
    "fan_in": 17,
-   "fan_out": 12,
+   "fan_out": 11,
    "functions": 4,
    "imported_by": [
     "cli",
@@ -4792,7 +4502,6 @@
     "execution.diagnostics",
     "execution.hooks",
     "execution.policy",
-    "execution.retrieval",
     "execution.sandbox",
     "execution.search",
     "models.llm_light",
@@ -4803,13 +4512,13 @@
    "in_boundary": true,
    "last_touched": "2026-09-03",
    "layer": "",
-   "lines": 726,
+   "lines": 722,
    "name": "config",
    "path": "harness/config.py",
    "side": "harness",
-   "sloc": 634,
-   "test_cases": 841,
-   "test_sloc": 7429,
+   "sloc": 630,
+   "test_cases": 768,
+   "test_sloc": 6989,
    "tests": [
     "test_atlas_trace.py",
     "test_auth_gateways.py",
@@ -4837,7 +4546,6 @@
     "test_repl_gemini.py",
     "test_repl_tool_safety.py",
     "test_repl_tools.py",
-    "test_retrieval.py",
     "test_review_findings.py",
     "test_runtime.py",
     "test_settings_and_memory.py",
@@ -5163,7 +4871,7 @@
    "side": "harness",
    "sloc": 654,
    "test_cases": 333,
-   "test_sloc": 3095,
+   "test_sloc": 3092,
    "tests": [
     "test_checkpoints.py",
     "test_diagnostics.py",
@@ -5759,11 +5467,11 @@
    "in_boundary": false,
    "last_touched": "2026-09-03",
    "layer": "repl",
-   "lines": 162,
+   "lines": 155,
    "name": "repl.prompt",
    "path": "harness/repl/prompt.py",
    "side": "harness",
-   "sloc": 131,
+   "sloc": 129,
    "test_cases": 52,
    "test_sloc": 316,
    "tests": [
@@ -5914,7 +5622,7 @@
      "runtime"
     ],
     "sloc": 781,
-    "tests": 52
+    "tests": 50
    },
    "key": "autonomy.loop",
    "name": "Agent loop",
@@ -5951,10 +5659,10 @@
      "repl.conversation",
      "repl.prompt"
     ],
-    "sloc": 319,
+    "sloc": 317,
     "tests": 212
    },
-   "sloc": 708
+   "sloc": 706
   },
   {
    "asks": "typed capabilities, validated arguments, legible failures",
@@ -5965,8 +5673,8 @@
      "execution.tools",
      "core.schema"
     ],
-    "sloc": 1116,
-    "tests": 58
+    "sloc": 1020,
+    "tests": 45
    },
    "key": "execution.tools",
    "name": "Tool design",
@@ -5979,7 +5687,7 @@
     "sloc": 654,
     "tests": 333
    },
-   "sloc": 1770
+   "sloc": 1674
   },
   {
    "asks": "capability sets declared outside the code that runs them",
@@ -5990,8 +5698,8 @@
      "execution.mcp",
      "config"
     ],
-    "sloc": 814,
-    "tests": 841
+    "sloc": 810,
+    "tests": 768
    },
    "key": "skills",
    "name": "Skills and MCP",
@@ -6002,7 +5710,7 @@
     "sloc": 0,
     "tests": 0
    },
-   "sloc": 814
+   "sloc": 810
   },
   {
    "asks": "who may do what, and what may never be authorized at all",
@@ -6013,7 +5721,7 @@
      "execution.policy"
     ],
     "sloc": 377,
-    "tests": 137
+    "tests": 135
    },
    "key": "permissions",
    "name": "Permissions",
@@ -6039,7 +5747,7 @@
      "autonomy.backlog"
     ],
     "sloc": 244,
-    "tests": 75
+    "tests": 73
    },
    "key": "memory",
    "name": "Memory and state",
@@ -6065,7 +5773,7 @@
      "run.subagents"
     ],
     "sloc": 466,
-    "tests": 78
+    "tests": 76
    },
    "key": "planning",
    "name": "Planning and decomposition",
@@ -6089,7 +5797,7 @@
      "execution.workspace"
     ],
     "sloc": 664,
-    "tests": 582
+    "tests": 569
    },
    "key": "execution.sandbox",
    "name": "Sandbox and execution",
@@ -6190,7 +5898,7 @@
      "cli"
     ],
     "sloc": 907,
-    "tests": 23
+    "tests": 21
    },
    "key": "hitl",
    "name": "Human in the loop",
@@ -6240,7 +5948,7 @@
      "core.errors"
     ],
     "sloc": 290,
-    "tests": 719
+    "tests": 646
    },
    "key": "reliability",
    "name": "Reliability",
@@ -6258,17 +5966,16 @@
   {
    "asks": "finding the relevant part of a repository too big to read",
    "batch": {
-    "api": 17,
+    "api": 7,
     "missing": [],
     "modules": [
-     "execution.retrieval",
      "execution.search"
     ],
-    "sloc": 398,
-    "tests": 109
+    "sloc": 200,
+    "tests": 38
    },
-   "key": "execution.retrieval",
-   "name": "Retrieval and search",
+   "key": "execution.search",
+   "name": "Search",
    "repl": {
     "api": 3,
     "missing": [],
@@ -6278,7 +5985,7 @@
     "sloc": 654,
     "tests": 333
    },
-   "sloc": 1052
+   "sloc": 854
   }
  ],
  "repo": "yatra-harness",
@@ -6936,20 +6643,8 @@
    "lines": 265,
    "sloc": 214
   },
-  "test_retrieval.py": {
-   "cases": 71,
-   "covers": [
-    "config",
-    "core.errors",
-    "execution.chunking",
-    "execution.indexing",
-    "execution.retrieval"
-   ],
-   "lines": 549,
-   "sloc": 404
-  },
   "test_review_findings.py": {
-   "cases": 13,
+   "cases": 11,
    "covers": [
     "autonomy.backlog",
     "autonomy.loop",
@@ -6958,12 +6653,10 @@
     "core.contracts",
     "core.errors",
     "execution.policy",
-    "execution.tools",
-    "execution.workspace",
     "runtime"
    ],
-   "lines": 228,
-   "sloc": 175
+   "lines": 187,
+   "sloc": 142
   },
   "test_rubric.py": {
    "cases": 18,
@@ -7038,8 +6731,8 @@
     "execution.workspace",
     "repl.tools"
    ],
-   "lines": 215,
-   "sloc": 172
+   "lines": 212,
+   "sloc": 169
   },
   "test_streaming.py": {
    "cases": 17,
@@ -7098,7 +6791,7 @@
     "objective"
    ],
    "description": "",
-   "line": 179,
+   "line": 172,
    "name": "delegate",
    "required": [
     "agent",
@@ -7111,7 +6804,7 @@
     "fact"
    ],
    "description": "Write one durable fact about this repository for future sessions to read. Worth remembering: a convention that is not written down, where something surprising lives, a command that works here, a dead end and why. Not worth remembering: anything already in AGENTS.md or the README, anything true only of the change you are making now, or a summary of this conversation. One sentence.",
-   "line": 245,
+   "line": 238,
    "name": "remember",
    "required": [
     "fact"
@@ -7123,21 +6816,8 @@
     "query",
     "limit"
    ],
-   "description": "Search the workspace by meaning. Ask a plain question and get back the most relevant excerpts, ranked, each with its file, line range and enclosing function. Use this first to find where something lives when you do not already know the file or the identifier; it replaces listing directories and opening files to look around. Use grep instead when you know the exact string.",
-   "line": 267,
-   "name": "retrieve",
-   "required": [
-    "query"
-   ],
-   "risk": "read"
-  },
-  {
-   "arguments": [
-    "query",
-    "limit"
-   ],
    "description": "Search the web and return ranked results with their URLs.",
-   "line": 292,
+   "line": 261,
    "name": "web_search",
    "required": [
     "query"
@@ -7149,7 +6829,7 @@
     "url"
    ],
    "description": "Fetch one URL and return its readable text.",
-   "line": 306,
+   "line": 275,
    "name": "browser_fetch",
    "required": [
     "url"
@@ -7161,7 +6841,7 @@
     "max_entries"
    ],
    "description": "List a bounded tree of files in the run workspace.",
-   "line": 334,
+   "line": 303,
    "name": "repo_tree",
    "required": [],
    "risk": "read"
@@ -7172,7 +6852,7 @@
     "max_matches"
    ],
    "description": "Search UTF-8 text files in the workspace for a literal string.",
-   "line": 343,
+   "line": 312,
    "name": "search_repo",
    "required": [
     "query"
@@ -7186,7 +6866,7 @@
     "end_line"
    ],
    "description": "Read a UTF-8 file inside the run workspace.",
-   "line": 355,
+   "line": 324,
    "name": "read_file",
    "required": [
     "path"
@@ -7198,7 +6878,7 @@
     "patch"
    ],
    "description": "Apply a unified git patch inside the run workspace.",
-   "line": 371,
+   "line": 340,
    "name": "apply_patch",
    "required": [
     "patch"
@@ -7210,7 +6890,7 @@
     "command"
    ],
    "description": "Run an allowlisted command without a shell in the workspace.",
-   "line": 380,
+   "line": 349,
    "name": "run_command",
    "required": [
     "command"
@@ -7223,7 +6903,7 @@
     "arguments"
    ],
    "description": "Run a workspace-relative Python script in isolated interpreter mode.",
-   "line": 391,
+   "line": 360,
    "name": "python_run",
    "required": [
     "path"
@@ -7233,7 +6913,7 @@
   {
    "arguments": [],
    "description": "Return the current workspace diff and changed paths.",
-   "line": 406,
+   "line": 375,
    "name": "git_diff",
    "required": [],
    "risk": "read"
@@ -7243,7 +6923,7 @@
     "url"
    ],
    "description": "Fetch one allowlisted public HTTP(S) URL without following redirects.",
-   "line": 415,
+   "line": 384,
    "name": "browser_fetch",
    "required": [
     "url"
@@ -7252,23 +6932,10 @@
   },
   {
    "arguments": [
-    "query",
-    "limit"
-   ],
-   "description": "Find the parts of the workspace most relevant to a question, ranked, as excerpts with their file and line range.",
-   "line": 424,
-   "name": "retrieve",
-   "required": [
-    "query"
-   ],
-   "risk": "read"
-  },
-  {
-   "arguments": [
     "query"
    ],
    "description": "Search the public web and return titles, URLs and snippets.",
-   "line": 436,
+   "line": 393,
    "name": "web_search",
    "required": [
     "query"
@@ -7280,7 +6947,7 @@
     "summary"
    ],
    "description": "Submit a completion claim. The harness will independently verify it.",
-   "line": 445,
+   "line": 402,
    "name": "finish",
    "required": [
     "summary"
@@ -7289,17 +6956,17 @@
   }
  ],
  "totals": {
-  "api": 315,
+  "api": 295,
   "commands": 20,
   "commits": 17,
-  "edges": 209,
-  "lines": 17823,
-  "modules": 60,
-  "sloc": 14513,
-  "test_cases": 1286,
-  "test_files": 54,
-  "test_sloc": 10821,
-  "tools": 16
+  "edges": 203,
+  "lines": 16799,
+  "modules": 57,
+  "sloc": 13723,
+  "test_cases": 1213,
+  "test_files": 53,
+  "test_sloc": 10381,
+  "tools": 14
  },
  "transitions": [
   {

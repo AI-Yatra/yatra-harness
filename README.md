@@ -613,8 +613,6 @@ schemas. [Security](docs/SECURITY.md) states what the harness defends against
 and what it does not, including where redaction stops.
 [Interface](docs/INTERFACE.md) is the grid and the palette `ay` draws itself
 with, and how each was measured.
-[Retrieval](docs/RETRIEVAL.md) is how `retrieve` finds the relevant part of a
-repository nobody has read, and the measurements behind its defaults.
 [Project state](docs/PROJECT-STATE.md) covers the three things that follow the
 repository rather than the install: layered settings, what one session
 remembers for the next, and the checker that runs after every edit.

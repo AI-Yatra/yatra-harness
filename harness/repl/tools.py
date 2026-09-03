@@ -163,7 +163,7 @@ class ReplToolset:
     the session.
 
     It also means a tool only has to be registered once to be available to
-    both. `extra_tools` is how MCP servers, retrieval and delegation reach a
+    both. `extra_tools` is how MCP servers and delegation reach a
     conversation, rather than by being reimplemented here.
     """
 

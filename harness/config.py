@@ -17,7 +17,6 @@ from harness.core.errors import ConfigurationError
 from harness.execution.diagnostics import DiagnosticsConfig, diagnostics_config_from_dict
 from harness.execution.hooks import Hook, parse_hooks
 from harness.execution.policy import EFFECTS, PolicyRule, parse_rule
-from harness.execution.retrieval import RetrievalConfig, retrieval_config_from_dict
 from harness.execution.sandbox import SandboxConfig, sandbox_config_from_dict
 from harness.execution.search import SearchConfig, search_config_from_dict
 from harness.models.llm_light import (
@@ -126,7 +125,6 @@ class HarnessConfig:
     compaction: CompactionConfig = field(default_factory=CompactionConfig)
     subagents: SubagentConfig = field(default_factory=SubagentConfig)
     sandbox: SandboxConfig = field(default_factory=SandboxConfig)
-    retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
     #: Operator commands that run when the agent acts. They observe; they
     #: cannot veto, because Gate already answers that question.
     hooks: tuple[Hook, ...] = ()
@@ -240,7 +238,6 @@ def load_config(path: str | Path, *, project_root: Path | None = None) -> Harnes
             "search",
             "subagents",
             "sandbox",
-            "retrieval",
             "hooks",
             "diagnostics",
             "llm_light",
@@ -419,7 +416,6 @@ def load_config(path: str | Path, *, project_root: Path | None = None) -> Harnes
         search=search_config_from_dict(raw.get("search"), "search"),
         subagents=subagent_config_from_dict(raw.get("subagents"), base, "subagents"),
         sandbox=sandbox_config_from_dict(raw.get("sandbox"), "sandbox"),
-        retrieval=retrieval_config_from_dict(raw.get("retrieval"), "retrieval"),
         hooks=parse_hooks(raw.get("hooks", []), "hooks"),
         compaction=compaction_config_from_dict(context_raw.get("compaction")),
         context_instruction_files=instruction_files,

@@ -117,7 +117,7 @@ class Shell:
         self.session_id = options.session_id or self._latest_session() or f"ay-{uuid.uuid4().hex[:8]}"
         self.workspace = Workspace(self.root, ())
         # Whatever the config makes available, this loop offers too. MCP
-        # servers, retrieval and the network tools were previously reachable
+        # servers and the network tools were previously reachable
         # only from `harness run`, not because a conversation had no use for
         # them but because they were registered inside the batch builder.
         # A server that fails to start is reported and the session continues,
