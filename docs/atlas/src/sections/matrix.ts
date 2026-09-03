@@ -22,7 +22,7 @@ export function buildMatrix(store: Store, x: number, y: number): Section {
 
   const { root, body } = section(
     'map',
-    'Coverage Map',
+    'What a harness has to do',
     'Rows are the primitives the field has converged on. Columns are this repository’s two loops.',
     x,
     y,

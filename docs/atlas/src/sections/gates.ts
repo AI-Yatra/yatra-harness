@@ -13,7 +13,7 @@ export function buildGates(store: Store, x: number, y: number): Section {
   const gates = store.atlas.gates;
   const { root, body } = section(
     'gates',
-    'Refusal Gates',
+    'Every way a call can be refused',
     'A proposal falls through these in order. Anything that drops out never reaches the filesystem.',
     x,
     y,

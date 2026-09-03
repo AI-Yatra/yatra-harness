@@ -124,8 +124,7 @@ export function buildBottombar(
 
   const sync = () => {
     const def = store.metric;
-    caption.textContent = def.label;
-    caption.title = def.blurb;
+    caption.textContent = `${def.label} — ${def.blurb}`;
     // Light the region the viewport is mostly sitting in.
     const v = world.viewport();
     let bestIdx = -1;

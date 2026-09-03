@@ -22,7 +22,7 @@ export function buildMass(store: Store, x: number, y: number): Section {
   const a = store.atlas;
   const { root, body } = section(
     'mass',
-    'Code Mass',
+    'Where the lines are',
     'Area is line count. Layers first, then the modules inside them.',
     x,
     y,

@@ -14,7 +14,7 @@ export function buildLoops(store: Store, x: number, y: number): Section {
   const loops = store.atlas.loops;
   const { root, body } = section(
     'loops',
-    'Two Loops',
+    'Two loops, one foundation',
     'They share the transport and the rules. They do not share the loop, because only one has a verdict to reach.',
     x,
     y,

@@ -31,7 +31,7 @@ const ms = (v: number) => (v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${Math.rou
 export function buildTrace(trace: Trace, x: number, y: number): Section {
   const { root, body } = section(
     'trace',
-    'Live Session',
+    'One real session, recorded',
     'The path a single task actually took through the harness, start to green.',
     x,
     y,

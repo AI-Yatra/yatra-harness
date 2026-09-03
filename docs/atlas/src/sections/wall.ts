@@ -23,7 +23,7 @@ export function buildWall(store: Store, x: number, y: number): Section {
 
   const { root, body } = section(
     'wall',
-    'Module Wall',
+    'Every module at once',
     'One column per layer, top of the stack on the left. Colour is the metric in the header.',
     x,
     y,
