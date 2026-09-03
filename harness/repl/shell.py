@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from harness import settings
 from harness.config import HarnessConfig, RouteConfig, load_config
 from harness.core.contracts import ToolSpec
 from harness.core.errors import HarnessError
@@ -57,6 +58,7 @@ Ask anything, or give an instruction. The agent works in this directory.
   /compact           summarise the conversation to free context
   /undo              put the files back to before the last change
   /checkpoints       the states this session can go back to
+  /memory [forget X] what earlier sessions learned, and how to correct it
   /clear             forget the conversation and start fresh
   /init              write an AGENTS.md describing this repository
   /config            the active config file and route
@@ -125,6 +127,15 @@ class Shell:
         except HarnessError as exc:
             extra = []
             self._startup_notices.append(f"optional tools unavailable: {exc}")
+        # A repository quietly trying to register a hook or open the network
+        # is worth seeing, and an operator whose setting does nothing needs to
+        # know it was refused rather than wonder why it had no effect.
+        for layer in settings.discover(options.root):
+            for key in settings.refused(layer):
+                self._startup_notices.append(
+                    f"{layer.path.name} may not set {key}; a committed project file "
+                    "can add refusals but cannot grant permissions or run commands"
+                )
         self.toolset = ReplToolset(self.workspace, self.config, extra_tools=extra)
         # A sandbox that quietly is not one is worse than none, because the
         # operator relaxes on the strength of it. If the kernel mechanism is
@@ -447,6 +458,9 @@ class Shell:
         if name == "checkpoints":
             self._list_checkpoints()
             return True
+        if name == "memory":
+            self._memory(argument)
+            return True
         if name == "approvals":
             standing = self.gate.standing_approvals
             if not standing:
@@ -490,11 +504,11 @@ class Shell:
             return True
         if name == "config":
             self.render.notice(f"config: {self.options.config_path}")
-            for source in self.config.settings_sources:
-                # Named individually rather than summarised. An operator
-                # debugging a rule needs to know which file set it, and
-                # guessing is how they edit the wrong one.
-                self.render.notice(f"        + {source}")
+            # Named individually rather than summarised, and scope-tagged. An
+            # operator debugging a rule needs to know which file set it, and
+            # guessing is how they edit the wrong one.
+            for line in settings.describe(settings.discover(self.root)):
+                self.render.notice(f"        + {line}")
             self.render.notice(f"route:  {self.route.name} ({self.route.kind})")
             self.render.notice(f"model:  {self.route.model}")
             self.render.notice(f"cwd:    {self.root}")
@@ -503,6 +517,34 @@ class Shell:
 
         self.render.error(f"unknown command: /{name}   (try /help)")
         return True
+
+    def _memory(self, argument: str) -> None:
+        """Show what earlier sessions learned here, or drop some of it.
+
+        The operator needs a way to correct this without opening a file. A
+        wrong memory is worse than none: it is stated confidently, it is in
+        every prompt, and the model has no way to know it is out of date.
+        """
+        from harness.record import memory  # noqa: PLC0415 - keeps the layer honest
+
+        if argument.startswith("forget"):
+            needle = argument[len("forget"):].strip()
+            if not needle:
+                self.render.error("say what to forget, for example /memory forget spec/")
+                return
+            gone = memory.forget(self.root, needle)
+            self.render.notice(f"forgot {gone} entr{'y' if gone == 1 else 'ies'} matching {needle!r}")
+            return
+        entries = memory.load(self.root)
+        if not entries:
+            self.render.notice("nothing remembered about this directory yet")
+            return
+        for entry in reversed(entries):
+            age = f"{entry.age_days}d" if entry.age_days else "today"
+            mark = self.console.failure(age) if entry.stale else self.console.muted(age)
+            self.console.line(f"  {mark:>18}  {entry.text[: self.console.measure - 12]}")
+        self.render.notice(f"{memory.path_for(self.root)}")
+        self.render.notice("/memory forget <text> to drop an entry")
 
     def _switch_model(self, argument: str) -> None:
         if not argument:

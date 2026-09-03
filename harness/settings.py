@@ -31,7 +31,6 @@ belong to somebody else's project.
 
 from __future__ import annotations
 
-import os
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -54,6 +53,33 @@ USER_FILE = Path.home() / ".yatra-harness" / "settings.yaml"
 #: How far up the tree to look. A repository deeper than this is not a
 #: repository, and an unbounded walk on a broken symlink is a hang.
 MAX_DEPTH = 40
+
+#: What a *committed* project file may not set, and why it matters.
+#:
+#: `.yatra/settings.yaml` arrives with the repository. Cloning a stranger's
+#: project and running `ay` in it must not hand that stranger the machine, and
+#: without this list it does: their file could register a hook, name a
+#: diagnostics command, grant `allow run_command(*)`, or switch the network
+#: on. Every one of those is arbitrary code execution on clone.
+#:
+#: The rule is that a committed file may **narrow and never widen**. It can add
+#: refusals, choose a model, set timeouts. It cannot grant a permission or run
+#: a command. `.yatra/settings.local.yaml` is exempt because it is gitignored
+#: and the operator wrote it themselves, which is the whole difference.
+#:
+#: This is the same boundary the harness applies everywhere else: what arrives
+#: with the work is data, and only the operator gives instructions.
+UNTRUSTED_KEYS = (
+    ("hooks",),                      # runs commands on every tool call
+    ("diagnostics",),                # runs a command after every edit
+    ("mcp",),                        # launches servers
+    ("sandbox",),                    # could weaken confinement to `local`
+    ("policy", "rules", "allow"),    # widens permission
+    ("policy", "allowed_commands"),  # widens permission
+    ("policy", "network_enabled"),   # opens the network
+    ("policy", "allowed_domains"),   # widens where it may reach
+    ("policy", "approval_mode"),     # could set full-auto for you
+)
 
 #: Keys whose lists merge instead of replacing, because dropping one would
 #: quietly remove a refusal somebody wrote on purpose.
@@ -100,6 +126,12 @@ def discover(root: Path | None = None) -> list[Layer]:
         for index, name in enumerate(PROJECT_FILES):
             path = project / PROJECT_DIR / name
             if path.is_file():
+                if index:
+                    # The local file is documented as gitignored, so something
+                    # has to actually ignore it. Doing it on discovery rather
+                    # than on creation covers the file the operator wrote by
+                    # hand, which is how it will usually appear.
+                    ignore_local_settings(project)
                 layers.append(Layer(path, _read(path), "local" if index else "project"))
     return layers
 
@@ -120,8 +152,51 @@ def apply(base: dict[str, Any], layers: list[Layer]) -> dict[str, Any]:
     """Fold every layer onto *base*, lowest precedence first."""
     merged = base
     for layer in layers:
-        merged = merge(merged, layer.values)
+        values = trusted(layer)
+        merged = merge(merged, values)
     return merged
+
+
+def trusted(layer: Layer) -> dict[str, Any]:
+    """A layer's values with anything it is not allowed to set removed.
+
+    Only the committed project file is filtered. The local file is gitignored
+    and the user file is theirs, so both are the operator speaking; a file that
+    arrived with somebody else's repository is not.
+    """
+    if layer.scope != "project":
+        return layer.values
+    values = _deepcopy(layer.values)
+    for path in UNTRUSTED_KEYS:
+        _prune(values, path)
+    return values
+
+
+def refused(layer: Layer) -> list[str]:
+    """The keys a committed file tried to set and was not allowed to.
+
+    Reported rather than dropped in silence: an operator whose setting does
+    nothing needs to know it was refused, and a repository quietly trying to
+    register a hook is worth seeing.
+    """
+    if layer.scope != "project":
+        return []
+    return [".".join(path) for path in UNTRUSTED_KEYS if _dig(layer.values, path) is not None]
+
+
+def _deepcopy(values: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: _deepcopy(value) if isinstance(value, dict) else value
+        for key, value in values.items()
+    }
+
+
+def _prune(values: dict[str, Any], path: tuple[str, ...]) -> None:
+    for key in path[:-1]:
+        values = values.get(key)  # type: ignore[assignment]
+        if not isinstance(values, dict):
+            return
+    values.pop(path[-1], None)
 
 
 def merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
@@ -193,11 +268,6 @@ def _short(path: Path) -> str:
         return str(path)
 
 
-def project_settings_path(root: Path, *, local: bool = False) -> Path:
-    """Where a project's settings belong, for a writer to create."""
-    return Path(root) / PROJECT_DIR / PROJECT_FILES[1 if local else 0]
-
-
 def ignore_local_settings(root: Path) -> None:
     """Keep the machine-local file out of the repository.
 
@@ -211,8 +281,3 @@ def ignore_local_settings(root: Path) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     marker.write_text(f"{PROJECT_FILES[1]}\n", encoding="utf-8")
 
-
-def env_root() -> Path | None:
-    """`YATRA_PROJECT_DIR`, for a test or a wrapper that knows better."""
-    value = os.environ.get("YATRA_PROJECT_DIR")
-    return Path(value).expanduser() if value else None
