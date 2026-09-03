@@ -81,6 +81,23 @@ class InstallerTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIn("/exit", (ROOT / name).read_text(encoding="utf-8"))
 
+    def test_the_check_uses_the_route_that_needs_no_key(self) -> None:
+        """A fresh machine has no credential, and being asked for one is not a
+        broken install. Checking with the default route made the two identical
+        and failed every first install."""
+        for name in ("install.sh", "install.ps1"):
+            with self.subTest(name=name):
+                self.assertIn("--model local", (ROOT / name).read_text(encoding="utf-8"))
+
+    def test_the_keyless_route_exists_in_the_shipped_config(self) -> None:
+        """The installers depend on it, so it cannot quietly be renamed."""
+        import ay
+        from harness.config import load_config
+
+        routes = load_config(ay.DEFAULT_CONFIG).router.routes
+        self.assertIn("local", routes)
+        self.assertFalse(routes["local"].api_key_env, "the local route now wants a credential")
+
     def test_the_installers_agree_on_the_extra(self) -> None:
         for name in ("install.sh", "install.ps1"):
             with self.subTest(name=name):

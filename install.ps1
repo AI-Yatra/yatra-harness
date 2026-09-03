@@ -128,8 +128,14 @@ if (-not (Test-Path $Ay)) {
 # wheel. Anything that only checks "did the install command succeed" would have
 # reported success. Starting the REPL and exiting loads the config, resolves a
 # route and builds the prompt.
+#
+# `--model local` because the machine this runs on has no API key yet, and the
+# default route wants one. Asking for a credential is `ay` behaving correctly,
+# not a broken install, and the two must not look the same here. The local
+# route needs no key and no server to start and exit, while still reading the
+# config that was the thing missing.
 Write-Step "Checking it runs"
-$output = '/exit' | & $Ay 2>&1
+$output = '/exit' | & $Ay --model local 2>&1
 if ($LASTEXITCODE -eq 0) {
     Write-Detail "ay starts and loads its config"
 } else {

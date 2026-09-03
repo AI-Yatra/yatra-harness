@@ -187,13 +187,19 @@ AY="$BIN/ay"
 # wheel. Anything that only checks "did the install command succeed" would have
 # reported success. Starting the REPL and exiting loads the config, resolves a
 # route and builds the prompt.
+#
+# `--model local` because the machine this runs on has no API key yet, and the
+# default route wants one. Asking for a credential is `ay` behaving correctly,
+# not a broken install, and the two must not look the same here. The local
+# route needs no key and no server to start and exit, while still reading the
+# config that was the thing missing.
 step "Checking it runs"
-if printf '/exit\n' | "$AY" >/dev/null 2>&1; then
+if printf '/exit\n' | "$AY" --model local >/dev/null 2>&1; then
     say "ay starts and loads its config"
 else
     printf '%s\n' "" >&2
     printf '%s\n' "  ay was installed but does not start. Output:" >&2
-    printf '/exit\n' | "$AY" 2>&1 | sed 's/^/  /' >&2 || true
+    printf '/exit\n' | "$AY" --model local 2>&1 | sed 's/^/  /' >&2 || true
     die "install incomplete."
 fi
 

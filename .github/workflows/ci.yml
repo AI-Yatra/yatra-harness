@@ -100,7 +100,26 @@ jobs:
           fi
           mkdir -p "$HOME/elsewhere"
           cd "$HOME/elsewhere"
-          printf '/exit\n' | "$AY" | tee output.txt
+          # `--model local`: a runner has no API key, and asking for one is
+          # correct behaviour rather than a broken install.
+          printf '/exit\n' | "$AY" --model local | tee output.txt
           grep -q "AI-Yatra" output.txt
           "$(dirname "$AY")/harness" --help > /dev/null
           echo "ay and harness both run outside the checkout"
+
+      # The other half of the same question. Without a key the default route
+      # cannot run, and what an operator gets then has to be an explanation,
+      # not a stack trace. This is the first thing a new install does.
+      - name: Without a key, it explains itself
+        shell: bash
+        run: |
+          set -eu
+          AY=""
+          for candidate in "$HOME/.local/bin/ay" "$HOME/.local/bin/ay.exe"; do
+            if [ -x "$candidate" ]; then AY="$candidate"; break; fi
+          done
+          cd "$HOME/elsewhere"
+          printf '/exit\n' | "$AY" > keyless.txt 2>&1 || true
+          cat keyless.txt
+          grep -q "No credential" keyless.txt
+          grep -q "ay auth add" keyless.txt
