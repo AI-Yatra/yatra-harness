@@ -100,6 +100,18 @@ class StylesheetTests(unittest.TestCase):
     def card_background(self):
         return self.colour_of(".card", "background")
 
+    def test_the_error_message_is_readable_on_its_own_background(self) -> None:
+        """An empty red box is worse than no box: it says something is wrong
+        and refuses to say what."""
+        behind = self.colour_of(".error", "background")
+        ratio = contrast(self.colour_of(".error"), behind)
+        self.assertGreaterEqual(
+            ratio,
+            MINIMUM_CONTRAST,
+            f"the error text has {ratio:.2f}:1 against the panel it sits on; "
+            f"WCAG asks for {MINIMUM_CONTRAST}:1, so the panel appears empty",
+        )
+
     def test_the_error_message_is_readable_on_the_card(self) -> None:
         """The whole point. An invisible error is the same as no error."""
         ratio = contrast(self.colour_of(".error"), self.card_background())

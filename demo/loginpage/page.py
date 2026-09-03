@@ -38,7 +38,6 @@ def render(*, error: str = "", username: str = "") -> str:
         id="username"
         name="username"
         type="text"
-        placeholder="Username"
         value="{escape(username)}"
         autocomplete="username"
         autofocus>
@@ -50,7 +49,6 @@ def render(*, error: str = "", username: str = "") -> str:
         id="password"
         name="password"
         type="password"
-        placeholder="Password"
         autocomplete="current-password">
     </div>
 
