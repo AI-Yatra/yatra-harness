@@ -49,3 +49,77 @@ jobs:
       # breaks without breaking a single unit test.
       - name: Eval suite
         run: uv run harness eval evals/teaching.yaml
+
+  # The one-line install, run the way a stranger runs it: on a machine with no
+  # clone, from the checked-out script, into a real shell.
+  #
+  # This exists because the package was not installable standalone and nothing
+  # noticed. `uv sync` and the whole suite above pass from inside a clone,
+  # where the config sits next to the code. A wheel that omits `configs/`
+  # installs perfectly and then dies on first run. Only installing it somewhere
+  # else and starting it catches that, so that is what this does.
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install from the script (POSIX)
+        if: runner.os != 'Windows'
+        env:
+          AY_SOURCE: ${{ github.workspace }}
+        run: sh install.sh
+
+      - name: Install from the script (Windows)
+        if: runner.os == 'Windows'
+        env:
+          AY_SOURCE: ${{ github.workspace }}
+        shell: pwsh
+        run: ./install.ps1
+
+      # Away from the checkout, because the fault this guards against is
+      # exactly a config found only because the repository happened to be the
+      # working directory. The commands are located by path rather than through
+      # `uv`, since the installer may have just put uv somewhere this shell's
+      # PATH does not yet know about, which is the normal first-install case.
+      - name: Run ay from an unrelated directory
+        shell: bash
+        run: |
+          set -eu
+          AY=""
+          for candidate in "$HOME/.local/bin/ay" "$HOME/.local/bin/ay.exe"; do
+            if [ -x "$candidate" ]; then AY="$candidate"; break; fi
+          done
+          if [ -z "$AY" ]; then
+            echo "ay was not installed into ~/.local/bin"
+            ls -la "$HOME/.local/bin" || true
+            exit 1
+          fi
+          mkdir -p "$HOME/elsewhere"
+          cd "$HOME/elsewhere"
+          # `--model local`: a runner has no API key, and asking for one is
+          # correct behaviour rather than a broken install.
+          printf '/exit\n' | "$AY" --model local | tee output.txt
+          grep -q "AI-Yatra" output.txt
+          "$(dirname "$AY")/harness" --help > /dev/null
+          echo "ay and harness both run outside the checkout"
+
+      # The other half of the same question. Without a key the default route
+      # cannot run, and what an operator gets then has to be an explanation,
+      # not a stack trace. This is the first thing a new install does.
+      - name: Without a key, it explains itself
+        shell: bash
+        run: |
+          set -eu
+          AY=""
+          for candidate in "$HOME/.local/bin/ay" "$HOME/.local/bin/ay.exe"; do
+            if [ -x "$candidate" ]; then AY="$candidate"; break; fi
+          done
+          cd "$HOME/elsewhere"
+          printf '/exit\n' | "$AY" > keyless.txt 2>&1 || true
+          cat keyless.txt
+          grep -q "No credential" keyless.txt
+          grep -q "ay auth add" keyless.txt

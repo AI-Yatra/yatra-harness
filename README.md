@@ -35,9 +35,41 @@ and macOS too.
 
 ## Install
 
-Every command below runs unchanged in PowerShell, cmd, bash and zsh. They are
-written on single lines for that reason, since backslash continuations break on
-Windows and backtick continuations break everywhere else.
+macOS and Linux:
+
+```
+curl -fsSL https://raw.githubusercontent.com/AI-Yatra/yatra-harness/main/install.sh | sh
+```
+
+Windows:
+
+```
+powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/AI-Yatra/yatra-harness/main/install.ps1 | iex"
+```
+
+That gives you `ay` and `harness` as commands in any directory. **You do not
+need Python.** The installer uses [uv](https://docs.astral.sh/uv/), which ships
+its own CPython and fetches one if the machine has none.
+
+It also starts `ay` once before claiming success, so a broken install fails
+during the install rather than the first time you use it.
+
+To read it before running it, which is the right instinct for anything piped
+into a shell:
+
+```
+curl -fsSL https://raw.githubusercontent.com/AI-Yatra/yatra-harness/main/install.sh -o install.sh
+less install.sh
+sh install.sh
+```
+
+`AY_PYTHON`, `AY_REF`, `AY_SOURCE` and `AY_DRY_RUN` change what it does; run it
+with `--help` for the list.
+
+### From a clone
+
+The one-liner installs the agent. The worked examples in `demo/` are files you
+edit, so for those you want the repository:
 
 ```
 git clone https://github.com/AI-Yatra/yatra-harness
@@ -45,8 +77,8 @@ cd yatra-harness
 uv sync
 ```
 
-That gives you `uv run harness` and `uv run ay`. To get `ay` and `harness` as
-plain commands from any directory:
+That gives you `uv run harness` and `uv run ay`. To get them as plain commands
+from any directory, tracking your working copy:
 
 ```
 uv tool install --editable . --with openpyxl
@@ -54,6 +86,10 @@ uv tool install --editable . --with openpyxl
 
 `--with openpyxl` is not optional. The REPL spawns the harness with its own
 interpreter, and the workshop's spreadsheet task needs openpyxl available there.
+
+Every command in this section runs unchanged in PowerShell, cmd, bash and zsh.
+They are written on single lines for that reason, since backslash continuations
+break on Windows and backtick continuations break everywhere else.
 
 ## Your first run needs no API key
 
