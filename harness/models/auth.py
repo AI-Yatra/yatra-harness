@@ -177,6 +177,21 @@ PROVIDERS: tuple[Provider, ...] = (
           "MiniMaxAI/MiniMax-M2.7",
           "MiniMaxAI/MiniMax-M3",
       )),
+    # IFM, serving MBZUAI's K2 models. Ordinary OpenAI shape: Bearer token,
+    # /chat/completions, and the reply at choices[0].message.content.
+    #
+    # `verify_via` is a completion on purpose. IFM answers /v1/models to
+    # anyone, with no Authorization header at all, so a models probe would
+    # report success for a key that is expired, mistyped or absent. The only
+    # question worth asking is whether the key can complete, so that is what
+    # is asked. Checked live: /v1/models returns 200 unauthenticated, and
+    # /v1/chat/completions returns 401 naming the Bearer scheme.
+    P("ifm", API_OPENAI, ("IFM_API_KEY",), "https://api.ifm.ai/v1",
+      prefixes=("IFM-",),
+      aliases=("k2", "mbzuai"),
+      note="MBZUAI K2 models; keys from platform.ifm.ai/api-keys",
+      verify_via=VERIFY_COMPLETION,
+      probe_models=("IFM/K2-Think-v2", "IFM/K2-Horizon-375B-A23B")),
     P("chutes", API_OPENAI, ("CHUTES_API_KEY",), "https://llm.chutes.ai/v1",
       ("cpk_",), note="open-weight models, free tier"),
     P("sambanova", API_OPENAI, ("SAMBANOVA_API_KEY",), "https://api.sambanova.ai/v1",

@@ -240,11 +240,12 @@ against a free model instead.
 
 ### Providers
 
-Thirteen are built in. These three are worth calling out:
+Twenty-five are built in. These four are worth calling out:
 
 | Provider | Aliases | Variable | Endpoint |
 |---|---|---|---|
 | `google` | `gemini`, `aistudio` | `GEMINI_API_KEY`, `GOOGLE_API_KEY` | `generativelanguage.googleapis.com/v1beta/openai` |
+| `ifm` | `k2`, `mbzuai` | `IFM_API_KEY` | `api.ifm.ai/v1` |
 | `opencode` | `zen` | `OPENCODE_API_KEY`, `OPENCODE_ZEN_API_KEY` | `opencode.ai/zen/v1` |
 | `commandcode` | `cmd`, `command-code` | `COMMAND_CODE_API_KEY`, `CMD_API_KEY` | `api.commandcode.ai/provider/v1` |
 
@@ -263,6 +264,21 @@ Gemini 3 models return an encrypted `thought_signature` on every function call
 and reject the *next* request if it does not come back. The REPL carries it
 through automatically, including across a saved session -- see
 [ay.README.md](ay.README.md#gemini-and-thought-signatures).
+
+**IFM** serves MBZUAI's K2 models on the ordinary OpenAI shape. Get a key from
+[platform.ifm.ai/api-keys](https://platform.ifm.ai/api-keys) and run
+`ay auth add IFM-...`; the prefix is recognised, so no provider flag is needed.
+Two routes use it:
+
+| Route | Model | Context | For |
+|---|---|---|---|
+| `ifm` | `IFM/K2-Horizon-375B-A23B` | 524,288 | agentic work, 375B MoE with 23B active |
+| `ifm-think` | `IFM/K2-Think-v2` | 262,144 | long reasoning, 70B dense |
+
+One thing to know about verifying it. IFM answers `GET /v1/models` to anyone,
+with no `Authorization` header at all, so listing models proves nothing about
+a key. `ay auth verify ifm` completes a real request instead, which is the
+only thing that answers the question you are asking.
 
 **OpenCode Zen** and **Command Code** are gateways: one key, many vendors'
 models. Neither publishes a key prefix, so name the provider when you store
