@@ -14,6 +14,7 @@ starts a container needs docker.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tempfile
@@ -22,12 +23,15 @@ from pathlib import Path
 
 from harness.core.errors import ConfigurationError
 from harness.execution.sandbox import (
+    CONTAINER_WORKSPACE,
     DockerSandbox,
     LocalSandbox,
     SandboxConfig,
     build_sandbox,
     docker_command,
 )
+
+WORKSPACE = Path("/runs/r1/workspace")
 
 HAS_DOCKER = shutil.which("docker") is not None and (
     subprocess.run(["docker", "info"], capture_output=True, timeout=30).returncode == 0
@@ -44,7 +48,7 @@ def config(**kwargs) -> SandboxConfig:
 class DockerCommandTests(unittest.TestCase):
     def command(self, argv=("python", "-m", "unittest"), **kwargs) -> list[str]:
         return docker_command(
-            config(**kwargs), list(argv), workspace=Path("/runs/r1/workspace"), timeout=30
+            config(**kwargs), list(argv), workspace=WORKSPACE, timeout=30
         )
 
     def test_the_container_is_removed_after_the_run(self) -> None:
@@ -66,13 +70,28 @@ class DockerCommandTests(unittest.TestCase):
         self.assertIn("no-new-privileges", " ".join(self.command()))
 
     def test_the_process_does_not_run_as_root(self) -> None:
-        self.assertIn("--user", self.command())
+        """Where the host has a uid to match. Windows has none.
+
+        `--user` exists to keep files the container writes owned by the
+        operator rather than by root. Windows has no uid to pass, and Docker
+        Desktop maps ownership itself, so the flag is correctly absent there.
+        An explicit `user:` in the config still wins on every platform, which
+        is the part that has to hold everywhere.
+        """
+        if hasattr(os, "getuid"):
+            self.assertIn("--user", self.command())
+        else:
+            self.assertNotIn("--user", self.command())
+        self.assertIn("--user", self.command(user="1000:1000"))
 
     def test_only_the_workspace_is_mounted(self) -> None:
         argv = self.command()
         mounts = [argv[index + 1] for index, part in enumerate(argv) if part == "--volume"]
         self.assertEqual(len(mounts), 1, mounts)
-        self.assertTrue(mounts[0].startswith("/runs/r1/workspace:/workspace"), mounts[0])
+        # Built from the same path the command was, because `resolve()` gives
+        # a drive-lettered path on Windows and a posix one elsewhere.
+        expected = f"{WORKSPACE.resolve()}:{CONTAINER_WORKSPACE}"
+        self.assertTrue(mounts[0].startswith(expected), mounts[0])
 
     def test_an_selinux_host_gets_a_labelled_mount(self) -> None:
         # Without the label an SELinux host denies the container every read of

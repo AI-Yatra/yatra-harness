@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import stat
 import subprocess
 import sys
 import tempfile
@@ -19,6 +18,7 @@ import unittest
 from pathlib import Path
 
 from harness.execution.workspace import git_environment
+from tests.support import install_gh_stub
 
 ROOT = Path(__file__).resolve().parents[1]
 GIT_ENV = git_environment()
@@ -66,15 +66,7 @@ class DeliverCommandTests(unittest.TestCase):
 
     def stub_gh(self) -> None:
         binaries = self.base / "bin"
-        binaries.mkdir(exist_ok=True)
-        script = binaries / "gh"
-        script.write_text(
-            "#!/bin/sh\n"
-            f'printf "%s\\n" "$*" >> "{self.gh_calls}"\n'
-            'echo "https://example.invalid/pr/7"\n',
-            encoding="utf-8",
-        )
-        script.chmod(script.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+        install_gh_stub(binaries, self.gh_calls, url="https://example.invalid/pr/7")
         previous = os.environ.get("PATH", "")
         os.environ["PATH"] = f"{binaries}{os.pathsep}{previous}"
         self.addCleanup(lambda: os.environ.__setitem__("PATH", previous))

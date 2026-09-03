@@ -8,6 +8,14 @@ license = { text = "MIT" }
 authors = [{ name = "AI Yatra" }]
 dependencies = ["PyYAML>=6.0,<7"]
 
+[project.optional-dependencies]
+# Semantic retrieval. Optional on purpose: `retrieval.kind: hybrid` degrades
+# to lexical when this is absent, and the promise that a laptop with nothing
+# installed still runs the harness outranks a better ranking. model2vec's
+# models are static lookup tables rather than a forward pass, so this needs
+# numpy and no GPU, and the default model is 8 MB.
+search = ["model2vec>=0.9,<1"]
+
 [project.scripts]
 harness = "harness.cli:main"
 ay = "ay:main"

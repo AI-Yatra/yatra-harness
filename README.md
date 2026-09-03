@@ -613,6 +613,8 @@ schemas. [Security](docs/SECURITY.md) states what the harness defends against
 and what it does not, including where redaction stops.
 [Interface](docs/INTERFACE.md) is the grid and the palette `ay` draws itself
 with, and how each was measured.
+[Retrieval](docs/RETRIEVAL.md) is how `retrieve` finds the relevant part of a
+repository nobody has read, and the measurements behind its defaults.
 [Operations](docs/OPERATIONS.md) is the runbook,
 [Testing](docs/TESTING.md) maps tests to acceptance criteria, and
 [Workshop](docs/WORKSHOP.md) walks through the material module by module.

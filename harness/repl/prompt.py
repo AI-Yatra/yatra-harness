@@ -74,6 +74,13 @@ def _environment(root: Path, mode: Mode, profile: PromptProfile) -> str:
         ),
         "Paths you pass to tools are relative to the working directory and "
         "cannot escape it.",
+        # One line, not a paragraph. A six-line version of this was measured
+        # against two live runs and changed nothing: the model still opened
+        # with list_dir and read_file. Tool choice is driven by the tool's own
+        # description far more than by house rules in the system prompt, so
+        # the persuasion lives there and this is only the tie-breaker.
+        "When you do not already know where something lives, retrieve finds "
+        "it; grep is for when you know the exact string.",
     ]
     return "\n".join(lines)
 
