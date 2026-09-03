@@ -45,6 +45,12 @@ class AssistantTurn:
     tool_calls: tuple[ToolCall, ...] = ()
     usage: dict[str, Any] = field(default_factory=dict)
     stop_reason: str = ""
+    #: Things about *this* inference the operator should see, which are not
+    #: part of the answer: a router naming the model it picked, for instance.
+    #: Carried on the turn rather than asked of the model afterwards, because
+    #: a model can be a chain of routes and the turn knows which one answered
+    #: while the chain has already moved on.
+    notes: tuple[str, ...] = ()
 
     @property
     def wants_tools(self) -> bool:

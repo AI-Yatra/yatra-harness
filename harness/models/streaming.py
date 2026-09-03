@@ -52,10 +52,28 @@ class StreamAccumulator:
         self._calls: dict[int, dict[str, Any]] = {}
         self._usage: dict[str, Any] = {}
         self._finish_reason: str = ""
+        self._extra: dict[str, Any] = {}
+        self._error: str = ""
 
     @property
     def content(self) -> str:
         return "".join(self._content)
+
+    @property
+    def error(self) -> str:
+        """A failure the provider announced inside the stream, if it did.
+
+        A stream that dies after output has started still ends with a 200 and
+        a plausible-looking partial completion. Without this the caller cannot
+        tell that answer apart from a short one, and a truncated turn is
+        accepted as a finished one.
+        """
+        return self._error
+
+    #: Top-level chunk keys that are not part of the OpenAI completion shape
+    #: but that the caller needs. GMI's router reports which model it picked
+    #: this way, in a frame of its own after the content.
+    CARRIED = ("routing_metadata",)
 
     def feed(self, chunk: dict[str, Any]) -> None:
         """Absorb one decoded chunk. Anything unexpected in it is ignored.
@@ -66,6 +84,15 @@ class StreamAccumulator:
         usage = chunk.get("usage")
         if isinstance(usage, dict):
             self._usage = usage
+        for key in self.CARRIED:
+            value = chunk.get(key)
+            if isinstance(value, dict):
+                self._extra[key] = value
+        failure = chunk.get("error")
+        if failure:
+            self._error = (
+                str(failure.get("message") or failure) if isinstance(failure, dict) else str(failure)
+            )
         choices = chunk.get("choices") or []
         if not isinstance(choices, list) or not choices:
             return
@@ -135,4 +162,5 @@ class StreamAccumulator:
                 {"message": message, "finish_reason": self._finish_reason or "stop"}
             ],
             "usage": self._usage,
+            **self._extra,
         }

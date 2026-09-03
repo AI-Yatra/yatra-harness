@@ -191,11 +191,14 @@ class Agent:
         streaming = self.model.streams and self.events.on_delta is not None
         self.events.on_thinking(True)
         try:
-            return self.model.converse(
+            turn = self.model.converse(
                 self.conversation.wire_messages(),
                 specs,
                 on_delta=self.events.on_delta if streaming else None,
             )
+            for note in turn.notes:
+                self.events.on_notice(note)
+            return turn
         except (TransientProviderError, PermanentProviderError) as exc:
             # Surfaced as a turn rather than raised: the thread stays usable
             # and the operator can retry, change model, or ask something else.

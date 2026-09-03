@@ -15,11 +15,17 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Callable
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 
 from harness.core.contracts import ToolSpec
 from harness.core.errors import PermanentProviderError, ProviderError, TransientProviderError
-from harness.models.providers import AnthropicProvider, OpenAICompatibleProvider, provider_for
+from harness.models.providers import (
+    AnthropicProvider,
+    GmiRouterProvider,
+    OpenAICompatibleProvider,
+    provider_for,
+)
 
 from .conversation import AssistantTurn, ToolCall
 
@@ -96,10 +102,24 @@ class ChatModel:
             payload = self.provider.send(body)
             return _read_anthropic(payload)
         if isinstance(self.provider, OpenAICompatibleProvider):
-            body = _openai_body(self.route, messages, tools, self.max_output_tokens)
+            # adapt_body so a subclass that reshapes the request -- the GMI
+            # router sends a mode where a model id would go -- changes it in
+            # one place rather than here and in the batch path separately.
+            body = self.provider.adapt_body(
+                _openai_body(self.route, messages, tools, self.max_output_tokens)
+            )
             stream = bool(getattr(self.route, "stream", False)) and on_delta is not None
             payload = self.provider.send(body, stream=stream, on_delta=on_delta)
-            return _read_openai(payload)
+            turn = _read_openai(payload)
+            if isinstance(self.provider, GmiRouterProvider):
+                # A router hides which model answered, and that is the one
+                # thing worth saying out loud: otherwise a cheap model's
+                # answer is indistinguishable from an expensive one's.
+                self.provider.remember_routing(payload)
+                note = self.provider.describe_routing()
+                if note:
+                    turn = replace(turn, notes=(*turn.notes, note))
+            return turn
         raise PermanentProviderError(
             f"route {self.route.name!r} uses provider kind {self.route.kind!r}, which has no "
             "conversational adapter; the REPL needs an openai_compatible, ollama, vllm or "
