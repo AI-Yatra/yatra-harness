@@ -225,6 +225,11 @@ class _HTTPProvider:
                 continue
             if isinstance(chunk, dict):
                 accumulator.feed(chunk)
+        if accumulator.error:
+            # A stream that failed part-way still returns 200 and a partial
+            # completion, so nothing above would notice. Transient because a
+            # mid-stream failure is the kind another attempt can win.
+            raise TransientProviderError(f"provider failed mid-stream: {accumulator.error}")
         return accumulator.as_payload()
 
     def _secret(self) -> str:
@@ -352,13 +357,23 @@ class OpenAICompatibleProvider(_HTTPProvider):
         return endpoint if endpoint.endswith("/chat/completions") else endpoint + "/chat/completions"
 
     def _body(self, request: ModelRequest) -> dict[str, Any]:
-        return {
+        return self.adapt_body({
             "model": self.route.model,
             "messages": list(request.messages),
             "tools": [tool.as_model_tool() for tool in request.tools],
             "tool_choice": "auto",
             "temperature": 0,
-        }
+        })
+
+    def adapt_body(self, body: dict[str, Any]) -> dict[str, Any]:
+        """Last chance for a subclass to reshape an OpenAI-shaped body.
+
+        A hook rather than two overrides, because the conversational path in
+        `harness.repl.model` builds its own body for the same wire format.
+        Without somewhere both can call, a subclass that changes the request
+        would have to be special-cased in each, and the two would drift.
+        """
+        return body
 
     def _headers(self, secret: str) -> dict[str, str]:
         headers = {"Content-Type": "application/json", "User-Agent": USER_AGENT}
@@ -399,6 +414,108 @@ class OpenAICompatibleProvider(_HTTPProvider):
             raw_summary=str(message.get("content") or "tool call")[:500],
             usage=dict(usage),
         )
+
+
+#: Where the GMI Router lives. A full URL rather than a path appended to
+#: `base_url`, because it is a different host from GMI's inference endpoint
+#: and appending would silently produce a 404 on the wrong service.
+GMI_ROUTER_URL = "https://console.gmicloud.ai/api/v1/ie/recommendation/autoroute"
+
+#: What to optimise for. The router takes one of these where an ordinary
+#: endpoint takes a model id.
+GMI_MODES = ("cost", "balanced", "quality")
+GMI_DEFAULT_MODE = "balanced"
+
+
+class GmiRouterProvider(OpenAICompatibleProvider):
+    """GMI Cloud's router, which picks the model instead of being told one.
+
+    The response is an ordinary OpenAI completion, so everything that reads
+    one -- normalization, streaming reassembly, the conversational reader --
+    is inherited unchanged. Three things differ, and all three are load-bearing.
+
+    The endpoint is a fixed URL on another host, so `base_url` is ignored
+    rather than appended to.
+
+    There is no `model` field. The request carries a `mode` instead, and this
+    route's `model:` is where the operator writes it, because the mode is
+    exactly what "which model do you want" means when a router is answering.
+    Inventing a second field for one provider would be worse.
+
+    `stream` defaults to *true* here, the opposite of every other endpoint the
+    harness talks to. A request that did not mention it would come back as an
+    event stream to a caller expecting one JSON object, and the decoder would
+    read that as a malformed response -- a transient error, so it would retry,
+    and fail identically every time. It is sent explicitly for that reason.
+    """
+
+    name = "gmi_router"
+
+    def __init__(self, route: RouteConfig) -> None:
+        self.route = route
+        self.default_api_key_env = "GMI_API_KEY"
+        self.mode = self._mode(route)
+        #: What the router said it did, from the last response. Read by the
+        #: REPL so the operator can see which model actually answered, which
+        #: is the one thing a router hides and the one thing worth showing.
+        self.last_routing: dict[str, Any] = {}
+
+    @staticmethod
+    def _mode(route: RouteConfig) -> str:
+        mode = (route.model or "").strip().lower()
+        if not mode:
+            return GMI_DEFAULT_MODE
+        if mode not in GMI_MODES:
+            raise ConfigurationError(
+                f"route {route.name!r} is a gmi_router route, so its model: is the routing "
+                f"mode and must be one of {', '.join(GMI_MODES)}; got {route.model!r}"
+            )
+        return mode
+
+    def _endpoint(self) -> str:
+        return self.route.base_url.rstrip("/") if self.route.base_url else GMI_ROUTER_URL
+
+    def adapt_body(self, body: dict[str, Any]) -> dict[str, Any]:
+        adapted = {key: value for key, value in body.items() if key != "model"}
+        adapted["mode"] = self.mode
+        adapted.setdefault("stream", False)
+        return adapted
+
+    def _normalize(self, payload: dict[str, Any], request: ModelRequest) -> ModelResponse:
+        self.remember_routing(payload)
+        return super()._normalize(payload, request)
+
+    def remember_routing(self, payload: dict[str, Any]) -> None:
+        """Keep the routing report off a response. Public so the conversational
+        path, which reads a payload without going through `_normalize`, can
+        record it too rather than reaching into a private method."""
+        metadata = payload.get("routing_metadata")
+        self.last_routing = dict(metadata) if isinstance(metadata, dict) else {}
+
+    def describe_routing(self) -> str:
+        """One line naming the model the router chose, or nothing to say."""
+        return describe_routing(self.last_routing)
+
+
+def describe_routing(metadata: dict[str, Any]) -> str:
+    """Render routing metadata for a human, tolerating a changing shape.
+
+    Written against fields that may be renamed or absent, so a key the router
+    stops sending costs a shorter line rather than a crash mid-turn.
+    """
+    if not metadata:
+        return ""
+    selected = metadata.get("selected_model") or metadata.get("model") or ""
+    parts = [f"routed to {selected}"] if selected else ["routed"]
+    task = metadata.get("task_type") or metadata.get("primary_task_type")
+    if task:
+        parts.append(f"task {task}")
+    if metadata.get("fallback_triggered"):
+        reason = metadata.get("fallback_reason") or "primary unavailable"
+        attempted = metadata.get("attempted_primary_model") or metadata.get("primary_model")
+        origin = f" from {attempted}" if attempted else ""
+        parts.append(f"fell back{origin} ({reason})")
+    return ", ".join(parts)
 
 
 class AnthropicProvider(_HTTPProvider):
@@ -497,6 +614,8 @@ class AnthropicProvider(_HTTPProvider):
 def provider_for(route: RouteConfig) -> Provider:
     if route.kind == "replay":
         return ReplayProvider(route)
+    if route.kind == "gmi_router":
+        return GmiRouterProvider(route)
     # ollama and vllm serve the OpenAI chat-completions wire format.
     if route.kind in {"openai_compatible", "ollama", "vllm"}:
         return OpenAICompatibleProvider(route)

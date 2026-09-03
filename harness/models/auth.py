@@ -156,6 +156,27 @@ PROVIDERS: tuple[Provider, ...] = (
            "left-to-right; mercury-2 is the only chat model and the only one "
            "that calls tools, mercury-edit-2 serves /fim and /edit instead",
       probe_models=("mercury-2",)),
+    # GMI Cloud. One key reaches two different things, which is why the note
+    # says so: `https://api.gmi-serving.com/v1` is an ordinary OpenAI-shaped
+    # endpoint, and the router at console.gmicloud.ai is a separate host with
+    # a separate path that picks the model for you. A `kind: gmi_router`
+    # route reaches the second; this entry is the first, and the credential
+    # is the same either way. No prefix is listed because GMI does not
+    # document one, and guessing would misdetect somebody else's key.
+    P("gmi", API_OPENAI, ("GMI_API_KEY", "GMI_CLOUD_APIKEY"),
+      "https://api.gmi-serving.com/v1",
+      aliases=("gmicloud", "gmi-cloud"),
+      note="keys from console.gmicloud.ai; the two MiniMax models are free "
+           "and the rest bill; `kind: gmi_router` routes instead to the GMI "
+           "Router, which charges for every request whatever the mode",
+      # The free models, because a probe has to answer the question the
+      # operator is asking: does this key work. Probing a billed model on an
+      # account with no balance returns 402, which fails a key that is
+      # perfectly good -- the same trap Cerebras sets and for the same reason.
+      probe_models=(
+          "MiniMaxAI/MiniMax-M2.7",
+          "MiniMaxAI/MiniMax-M3",
+      )),
     P("chutes", API_OPENAI, ("CHUTES_API_KEY",), "https://llm.chutes.ai/v1",
       ("cpk_",), note="open-weight models, free tier"),
     P("sambanova", API_OPENAI, ("SAMBANOVA_API_KEY",), "https://api.sambanova.ai/v1",

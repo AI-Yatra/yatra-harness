@@ -135,6 +135,59 @@ model_router:
       # Recorded doing the demo repair in 7 tool calls with no wasted reads,
       # so it needs no nudging. See docs/atlas/public/trace.json.
       prompt_profile: standard
+    # GMI Cloud. The ordinary inference endpoint: you name the model.
+    # Key: `ay auth add --provider gmi <key>` from console.gmicloud.ai.
+    #
+    # The two MiniMax models below are the free ones. Everything else in the
+    # catalogue bills, and an account with no balance answers HTTP 402 on the
+    # first request rather than at signup, so a route pointed at a paid model
+    # looks configured and fails on use. Both were checked live: each calls
+    # tools and each streams.
+    gmi:
+      kind: openai_compatible
+      model: MiniMaxAI/MiniMax-M3
+      base_url: https://api.gmi-serving.com/v1
+      api_key_env: GMI_API_KEY
+      timeout_seconds: 180
+      stream: true
+      local: false
+      latency: medium
+      quality: 3.5
+      context_window: 1048576
+    # The other free one. Smaller and older than M3; kept as a separate route
+    # rather than a note, because switching is `/model gmi-m27` either way and
+    # a route you cannot name is a route you will not use.
+    gmi-m27:
+      kind: openai_compatible
+      model: MiniMaxAI/MiniMax-M2.7
+      base_url: https://api.gmi-serving.com/v1
+      api_key_env: GMI_API_KEY
+      timeout_seconds: 180
+      stream: true
+      local: false
+      latency: medium
+      quality: 3.0
+      context_window: 204800
+    # The same key, pointed at the GMI Router, which reads the prompt and
+    # picks the model itself. `model:` is the routing mode, not a model id:
+    # cost, balanced or quality. Which model answered is printed after the
+    # turn, because a router that does not say is a router you cannot audit.
+    #
+    # The router bills for every request whatever the mode, and refuses with
+    # HTTP 402 on an account with no balance before it looks at the body. So
+    # tool_support stays false: it is still unproven, and the route cannot be
+    # used at all here yet. Both were checked against a live key.
+    gmi-router:
+      kind: gmi_router
+      model: balanced
+      api_key_env: GMI_API_KEY
+      timeout_seconds: 180
+      stream: false
+      local: false
+      latency: medium
+      quality: 4.0
+      context_window: 131072
+      tool_support: false
     # OpenCode Zen: one key, many vendors' models.
     # Key: `ay auth add --provider opencode <key>` from opencode.ai/auth.
     opencode:

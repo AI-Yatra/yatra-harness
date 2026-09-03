@@ -611,6 +611,8 @@ yatra-harness/
 [Configuration](docs/CONFIGURATION.md) documents the config, task and skill
 schemas. [Security](docs/SECURITY.md) states what the harness defends against
 and what it does not, including where redaction stops.
+[Interface](docs/INTERFACE.md) is the grid and the palette `ay` draws itself
+with, and how each was measured.
 [Operations](docs/OPERATIONS.md) is the runbook,
 [Testing](docs/TESTING.md) maps tests to acceptance criteria, and
 [Workshop](docs/WORKSHOP.md) walks through the material module by module.

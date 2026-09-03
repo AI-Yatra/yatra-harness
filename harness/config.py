@@ -31,10 +31,12 @@ from harness.run.subagents import SubagentConfig, subagent_config_from_dict
 ENV_PATTERN = re.compile(r"^\$\{([A-Z][A-Z0-9_]*)\}$")
 
 # Provider kinds accepted on a route.
-ROUTE_KINDS = {"replay", "openai_compatible", "anthropic", "ollama", "vllm"}
+ROUTE_KINDS = {"replay", "openai_compatible", "anthropic", "ollama", "vllm", "gmi_router"}
 
-# Route kinds that speak the OpenAI chat-completions wire format.
-OPENAI_SHAPED_KINDS = {"openai_compatible", "ollama", "vllm"}
+# Route kinds that speak the OpenAI chat-completions wire format. gmi_router
+# belongs here even though its request is not quite one: what comes back is an
+# ordinary completion, and every reader downstream only ever sees the response.
+OPENAI_SHAPED_KINDS = {"openai_compatible", "ollama", "vllm", "gmi_router"}
 
 # Locality is derived from the kind, but an explicit `local:` always wins.
 DEFAULT_LOCAL_KINDS = {"replay", "ollama", "vllm"}

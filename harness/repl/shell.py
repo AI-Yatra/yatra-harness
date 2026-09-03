@@ -38,6 +38,7 @@ from .checkpoints import Checkpoints
 from .conversation import Conversation, ToolCall
 from .model import ChatModel, RouteChain
 from .render import Console, Renderer, Spinner
+from .theme import GUTTER
 
 HISTORY_LIMIT = 500
 
@@ -278,12 +279,22 @@ class Shell:
         if busy:
             self._streamed = False
             self._spinner = Spinner(self.console).__enter__()
-        elif self._spinner is not None:
+            return
+        self._stop_spinner()
+        if self._streamed:
+            # Closing the stream is unconditional. It used to sit inside the
+            # `self._spinner is not None` branch, but `_on_delta` had already
+            # cleared the spinner on the first token, so the branch was dead
+            # and a streamed answer ran straight into the next tool card with
+            # no break at all.
+            self.render.assistant_done()
+            self.console.line()
+            self._streamed = False
+
+    def _stop_spinner(self) -> None:
+        if self._spinner is not None:
             self._spinner.stop()
             self._spinner = None
-            if self._streamed:
-                self.console.line()
-                self.console.line()
 
     def _on_delta(self, text: str) -> None:
         """Model prose as it arrives.
@@ -291,16 +302,17 @@ class Shell:
         The spinner is stopped on the first token rather than at the end of
         the request, because a spinner still turning under text that is
         already streaming reads as two things happening at once.
+
+        The text goes through the same renderer a blocking response uses, so
+        streaming changes when the words appear and nothing about how.
         """
         if not text:
             return
         if not self._streamed:
-            if self._spinner is not None:
-                self._spinner.stop()
-                self._spinner = None
+            self._stop_spinner()
             self.console.line()
             self._streamed = True
-        self.console.write(text)
+        self.render.assistant_delta(text)
 
     def _on_tool_start(self, call: ToolCall, spec: ToolSpec) -> None:
         del spec
@@ -366,7 +378,7 @@ class Shell:
             except KeyboardInterrupt:
                 self.console.line()
                 if not parts:
-                    self.console.line(self.console.dim("  (ctrl-c again or /exit to leave)"))
+                    self.console.line(self.console.muted("  (ctrl-c again or /exit to leave)"))
                     return ""
                 return ""
             if line.endswith("\\"):
@@ -409,7 +421,7 @@ class Shell:
         if name in {"help", "?"}:
             self.console.line()
             for row in HELP.splitlines():
-                self.console.line("  " + (self.console.dim(row) if row.startswith("  ") else row))
+                self.console.line("  " + (self.console.muted(row) if row.startswith("  ") else row))
             return True
         if name == "model":
             self._switch_model(argument)
@@ -440,8 +452,8 @@ class Shell:
         if name == "tools":
             for spec in self.toolset.specs():
                 self.console.line(
-                    f"  {self.console.bold(spec.name.ljust(14))}"
-                    f"{self.console.dim(spec.risk.value.ljust(9))}"
+                    f"  {self.console.strong(spec.name.ljust(14))}"
+                    f"{self.console.muted(spec.risk.value.ljust(9))}"
                     f"{spec.description.splitlines()[0][: self.console.width - 30]}"
                 )
             return True
@@ -520,6 +532,16 @@ class Shell:
         as a 404 that reads like a broken endpoint. Asking is cheap and the
         answer is authoritative.
         """
+        if self.route.kind == "gmi_router":
+            # A routing route has no model list to fetch, because choosing is
+            # the service. Pointing that out beats the generic "not a known
+            # provider", which reads like the route is misconfigured.
+            self.render.notice(
+                f"{self.route.name} routes; it picks a model per request. "
+                f"Its model: is the mode ({self.route.model}). "
+                "Use /model gmi:<id> to name a model yourself."
+            )
+            return
         provider = auth.provider_for_base_url(self.route.base_url)
         if provider is None:
             self.render.error(
@@ -546,7 +568,7 @@ class Shell:
             row = names[chunk : chunk + 2]
             self.console.line("  " + "".join(n.ljust(44) for n in row).rstrip())
         if len(names) > 60:
-            self.console.line(self.console.dim(f"  ... {len(names) - 60} more; /models <filter>"))
+            self.console.line(self.console.muted(f"  ... {len(names) - 60} more; /models <filter>"))
         self.console.line()
         self.render.notice(f"use one with /model {self.route.name}:<id>")
 
@@ -563,10 +585,10 @@ class Shell:
         for name, route in sorted(self.config.router.routes.items()):
             ready = self._has_credential(route)
             mark = console.accent("*") if name == self.route.name else " "
-            state = console.dim("ready") if ready else console.bad("no key")
+            state = console.muted("ready") if ready else console.failure("no key")
             console.line(
-                f"  {mark} {console.bold(name.ljust(14))}"
-                f"{console.dim(route.model.ljust(24))}{state}"
+                f"  {mark} {console.strong(name.ljust(14))}"
+                f"{console.muted(route.model.ljust(24))}{state}"
             )
         console.line()
         self.render.notice("switch with /model <name>, for example /model gemini")
@@ -585,15 +607,15 @@ class Shell:
             self.console.line()
             self.console.line(f"  prompt profile: {current.name} ({source})")
             for label, value in prompting.describe(current):
-                self.console.line(f"    {label:<22} {self.console.dim(value)}")
+                self.console.line(f"    {label:<22} {self.console.muted(value)}")
             self.console.line()
             self.console.line(
-                "  " + self.console.dim(
+                "  " + self.console.muted(
                     "/profile <" + "|".join(sorted(prompting.PRESETS)) + ">"
                 )
             )
             self.console.line(
-                "  " + self.console.dim("/profile <dial> <on|off|value> to change one")
+                "  " + self.console.muted("/profile <dial> <on|off|value> to change one")
             )
             return
 
@@ -650,11 +672,11 @@ class Shell:
         for index, point in enumerate(found):
             marker = "now" if index == 0 else f"-{index}"
             self.console.line(
-                f"  {marker:>4}  {self.console.dim(point.short)}  {point.label[:64]}"
-                f"  {self.console.dim(point.when)}"
+                f"  {marker:>4}  {self.console.muted(point.short)}  {point.label[:64]}"
+                f"  {self.console.muted(point.when)}"
             )
         self.console.line()
-        self.console.line("  " + self.console.dim("/undo, or /undo <id> to go back to one"))
+        self.console.line("  " + self.console.muted("/undo, or /undo <id> to go back to one"))
 
     def _undo(self, argument: str) -> None:
         """Put the files back, after saying exactly what that would change."""
@@ -681,11 +703,11 @@ class Shell:
             return
 
         self.console.line()
-        self.console.line(f"  going back to {self.console.dim(target.short)} {target.label[:60]}")
+        self.console.line(f"  going back to {self.console.muted(target.short)} {target.label[:60]}")
         for path in changed[:12]:
             self.console.line(f"    {path}")
         if len(changed) > 12:
-            self.console.line(f"    {self.console.dim(f'and {len(changed) - 12} more')}")
+            self.console.line(f"    {self.console.muted(f'and {len(changed) - 12} more')}")
         # Asked rather than assumed, because the operator may have edited these
         # themselves between two turns and a silent restore would discard their
         # work with no way back to it.
@@ -973,7 +995,7 @@ class Shell:
             self._run_turn(self._expand(line))
 
         self._save_history()
-        self.console.line(self.console.dim("\n  bye"))
+        self.console.line(self.console.muted("\n  bye"))
         return 0
 
     def _credential_ready(self) -> bool:
@@ -1011,24 +1033,27 @@ class Shell:
 
         sep = console.glyphs.sep
         profile = self._profile()
-        head = "# " if art else "  "
-        console.line(head + console.bold(console.paint(f"AI-Yatra {version}", "38;5;189")))
+        # The header sits on the same grid as everything else and uses the
+        # same roles. It used to name three raw colours of its own, which is
+        # how a session came to look like two programs stacked on top of each
+        # other: a blue wordmark above an orange conversation.
+        pad = " " * GUTTER
+        console.line(pad + console.strong(f"AI-Yatra {version}"))
         console.line(
-            head
-            + console.paint(
+            pad
+            + console.muted(
                 f"model: {self.route.model} {sep} {self.mode.value} "
-                f"{sep} {profile.name} profile",
-                "38;5;153",
+                f"{sep} {profile.name} profile"
             )
         )
-        console.line(head + console.paint(_short(self.root), "38;5;110"))
+        console.line(pad + console.muted(_short(self.root)))
         console.line()
-        console.line("  " + console.dim("/help for commands, @file to include a file, !cmd to run one"))
+        console.line(pad + console.muted("/help for commands, @file to include a file, !cmd to run one"))
 
         if self.guessed_route:
             console.line(
                 "  "
-                + console.bad(
+                + console.failure(
                     f"{self.route.model!r} is not a configured route or model; "
                     f"sending it to route {self.guessed_route!r} "
                     f"({self.route.base_url}). Use --model <route> or "
@@ -1036,9 +1061,9 @@ class Shell:
                 )
             )
         for notice in self._startup_notices:
-            console.line("  " + console.bad(notice))
+            console.line("  " + console.failure(notice))
         if self.mode is Mode.FULL_AUTO:
-            console.line("  " + console.bad("full-auto: edits and commands run without asking"))
+            console.line("  " + console.failure("full-auto: edits and commands run without asking"))
 
 
 def _answer_dangling_calls(conversation: Conversation, reason: str) -> None:

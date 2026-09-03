@@ -49,6 +49,12 @@ Transport keys: `kind`, `model`, `base_url`, `api_key_env`, `script`, `stream`,
 `timeout_seconds`. Routing keys: `local`, `latency`, `quality`,
 `context_window`, `cost_per_1m_input`, `cost_per_1m_output`, `tool_support`.
 
+On a `kind: gmi_router` route, `model:` is the routing mode rather than a model
+id: `cost`, `balanced` or `quality`. The router chooses the model, so there is
+no id to name, and it prints which one it picked after each turn. `base_url` is
+optional there and overrides the router URL outright rather than being appended
+to. See docs/PROVIDERS.md.
+
 `stream: true` on an `openai_compatible` route shows the turn arriving
 instead of after it finishes. A blocking turn against a remote model shows
 nothing for however long it takes and then everything at once, which reads as

@@ -464,9 +464,9 @@
  ],
  "generated_by": "docs/atlas/scripts/scan_harness.py",
  "head": {
-  "date": "2026-09-01",
-  "sha": "00f8ef0",
-  "subject": "Merge pull request #3 from AI-Yatra/demo-tictactoe"
+  "date": "2026-09-03",
+  "sha": "cf74852",
+  "subject": "Merge pull request #11 from AI-Yatra/complete-and-clean"
  },
  "lanes": [
   {
@@ -540,6 +540,7 @@
     "models.auth",
     "models.llm_light",
     "models.model_router",
+    "models.prompting",
     "models.providers",
     "models.streaming"
    ],
@@ -564,6 +565,7 @@
    "blurb": "Workspace, policy gate, sandbox, the tools themselves.",
    "key": "execution",
    "modules": [
+    "execution.hooks",
     "execution.mcp",
     "execution.policy",
     "execution.process",
@@ -632,11 +634,15 @@
    "modules": [
     "repl.agent",
     "repl.approvals",
+    "repl.banner",
+    "repl.blocks",
+    "repl.checkpoints",
     "repl.conversation",
     "repl.model",
     "repl.prompt",
     "repl.render",
     "repl.shell",
+    "repl.theme",
     "repl.tools"
    ],
    "side": "harness",
@@ -796,7 +802,7 @@
    ],
    "api_count": 16,
    "classes": 16,
-   "commits": 0,
+   "commits": 4,
    "doc": "Provider-neutral contracts shared across the entire harness.",
    "doc_full": "Provider-neutral contracts shared across the entire harness.",
    "external": [
@@ -835,29 +841,33 @@
    ],
    "imports": [],
    "in_boundary": true,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "core",
    "lines": 285,
    "name": "core.contracts",
    "path": "harness/core/contracts.py",
    "side": "harness",
    "sloc": 235,
-   "test_cases": 301,
-   "test_sloc": 2896,
+   "test_cases": 409,
+   "test_sloc": 3697,
    "tests": [
     "test_atlas_scan.py",
+    "test_checkpoints.py",
     "test_context_budget.py",
     "test_delivery.py",
     "test_denied_approval.py",
     "test_evals.py",
+    "test_gmi.py",
     "test_goal.py",
     "test_instructions.py",
+    "test_plan_mode.py",
     "test_policy_denylist.py",
     "test_providers.py",
     "test_repl_agent.py",
     "test_repl_shell.py",
     "test_review_findings.py",
     "test_session.py",
+    "test_shared_tooling.py",
     "test_tools.py"
    ]
   },
@@ -936,7 +946,7 @@
    ],
    "api_count": 10,
    "classes": 0,
-   "commits": 0,
+   "commits": 1,
    "doc": "Shared deterministic and filesystem-safe helpers.",
    "doc_full": "Shared deterministic and filesystem-safe helpers.",
    "external": [
@@ -979,7 +989,7 @@
    ],
    "imports": [],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "core",
    "lines": 186,
    "name": "core.util",
@@ -1074,7 +1084,7 @@
    ],
    "api_count": 11,
    "classes": 0,
-   "commits": 0,
+   "commits": 2,
    "doc": "Small strict-validation helpers for versioned YAML/JSON contracts.",
    "doc_full": "Small strict-validation helpers for versioned YAML/JSON contracts.",
    "external": [
@@ -1090,7 +1100,7 @@
     "core.errors"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "core",
    "lines": 85,
    "name": "core.schema",
@@ -1132,30 +1142,16 @@
      "name": "WorkspaceError"
     },
     {
-     "doc": "A requested capability is not authorized.",
-     "kind": "class",
-     "line": 20,
-     "methods": [],
-     "name": "PolicyDenied"
-    },
-    {
-     "doc": "A requested capability requires an approval decision.",
-     "kind": "class",
-     "line": 24,
-     "methods": [],
-     "name": "ApprovalRequired"
-    },
-    {
      "doc": "A registered tool could not complete its request.",
      "kind": "class",
-     "line": 28,
+     "line": 20,
      "methods": [],
      "name": "ToolError"
     },
     {
      "doc": "Base class for provider failures.",
      "kind": "class",
-     "line": 32,
+     "line": 24,
      "methods": [
       "route_is_exhausted"
      ],
@@ -1164,67 +1160,60 @@
     {
      "doc": "Provider failure that may be retried or routed around.",
      "kind": "class",
-     "line": 59,
+     "line": 55,
      "methods": [],
      "name": "TransientProviderError"
     },
     {
      "doc": "Provider failure that should not be retried unchanged.",
      "kind": "class",
-     "line": 63,
+     "line": 59,
      "methods": [],
      "name": "PermanentProviderError"
     },
     {
      "doc": "All configured routes failed.",
      "kind": "class",
-     "line": 67,
+     "line": 63,
      "methods": [],
      "name": "ProviderExhausted"
     },
     {
      "doc": "A declared run budget has been exhausted.",
      "kind": "class",
-     "line": 71,
+     "line": 67,
      "methods": [],
      "name": "BudgetExceeded"
     },
     {
-     "doc": "The verifier itself could not execute safely.",
-     "kind": "class",
-     "line": 75,
-     "methods": [],
-     "name": "VerificationError"
-    },
-    {
      "doc": "Deterministic teaching fault raised after a durable checkpoint.",
      "kind": "class",
-     "line": 79,
+     "line": 71,
      "methods": [],
      "name": "InjectedCrash"
     },
     {
      "doc": "MCP transport, lifecycle, or tool invocation failure.",
      "kind": "class",
-     "line": 83,
+     "line": 75,
      "methods": [],
      "name": "MCPError"
     },
     {
      "doc": "LLM Light could not produce a valid route ordering from declared priorities.",
      "kind": "class",
-     "line": 87,
+     "line": 79,
      "methods": [],
      "name": "RoutingError"
     }
    ],
-   "api_count": 16,
-   "classes": 16,
-   "commits": 0,
+   "api_count": 13,
+   "classes": 13,
+   "commits": 4,
    "doc": "Typed harness failures used to make terminal behavior explicit.",
    "doc_full": "Typed harness failures used to make terminal behavior explicit.",
    "external": [],
-   "fan_in": 31,
+   "fan_in": 32,
    "fan_out": 0,
    "functions": 0,
    "imported_by": [
@@ -1237,6 +1226,7 @@
     "config",
     "core.schema",
     "doctor",
+    "execution.hooks",
     "execution.mcp",
     "execution.retrieval",
     "execution.sandbox",
@@ -1262,22 +1252,28 @@
    ],
    "imports": [],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "core",
-   "lines": 89,
+   "lines": 81,
    "name": "core.errors",
    "path": "harness/core/errors.py",
    "side": "harness",
-   "sloc": 52,
-   "test_cases": 418,
-   "test_sloc": 4003,
+   "sloc": 47,
+   "test_cases": 602,
+   "test_sloc": 5326,
    "tests": [
     "test_backlog.py",
     "test_compaction.py",
     "test_context_budget.py",
     "test_evals.py",
+    "test_failure_recovery.py",
+    "test_gmi.py",
+    "test_hooks.py",
     "test_llm_light.py",
+    "test_os_sandbox.py",
     "test_policy_denylist.py",
+    "test_policy_rules.py",
+    "test_prompt_profiles.py",
     "test_providers.py",
     "test_repl_agent.py",
     "test_repl_gemini.py",
@@ -1306,28 +1302,28 @@
     {
      "doc": "Raised for an unknown provider or an unusable credential store.",
      "kind": "class",
-     "line": 175,
+     "line": 206,
      "methods": [],
      "name": "AuthError"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 183,
+     "line": 214,
      "methods": [],
      "name": "get_provider"
     },
     {
      "doc": "The only representation of a key that may be printed or logged.",
      "kind": "function",
-     "line": 191,
+     "line": 222,
      "methods": [],
      "name": "redact"
     },
     {
      "doc": "What a key's prefix can and cannot tell us.",
      "kind": "class",
-     "line": 202,
+     "line": 233,
      "methods": [
       "certain"
      ],
@@ -1336,56 +1332,56 @@
     {
      "doc": "Which provider issued this key, as far as its prefix can say.",
      "kind": "function",
-     "line": 216,
+     "line": 247,
      "methods": [],
      "name": "identify"
     },
     {
      "doc": "The provider a key's prefix identifies, or None if it cannot say.",
      "kind": "function",
-     "line": 245,
+     "line": 276,
      "methods": [],
      "name": "detect"
     },
     {
      "doc": "User level, deliberately outside the repository.",
      "kind": "function",
-     "line": 250,
+     "line": 281,
      "methods": [],
      "name": "store_path"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 258,
+     "line": 289,
      "methods": [],
      "name": "load_store"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 271,
+     "line": 302,
      "methods": [],
      "name": "save_store"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 280,
+     "line": 311,
      "methods": [],
      "name": "put_key"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 299,
+     "line": 330,
      "methods": [],
      "name": "remove_key"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 314,
+     "line": 345,
      "methods": [
       "available"
      ],
@@ -1394,98 +1390,98 @@
     {
      "doc": "Resolve a provider's credential: environment first, then the store.",
      "kind": "function",
-     "line": 334,
+     "line": 365,
      "methods": [],
      "name": "resolve"
     },
     {
      "doc": "Resolve the credential a route asks for by environment variable name.",
      "kind": "function",
-     "line": 348,
+     "line": 379,
      "methods": [],
      "name": "resolve_env"
     },
     {
      "doc": "Map a route's endpoint back to a provider.",
      "kind": "function",
-     "line": 374,
+     "line": 405,
      "methods": [],
      "name": "provider_for_base_url"
     },
     {
      "doc": "Resolve the credential for a configured route.",
      "kind": "function",
-     "line": 401,
+     "line": 432,
      "methods": [],
      "name": "resolve_route"
     },
     {
      "doc": "Locate the .env to load: the override, else the nearest one above.",
      "kind": "function",
-     "line": 429,
+     "line": 460,
      "methods": [],
      "name": "env_file_path"
     },
     {
      "doc": "Parse the shapes people actually write in a .env.",
      "kind": "function",
-     "line": 451,
+     "line": 482,
      "methods": [],
      "name": "parse_env_file"
     },
     {
      "doc": "Load .env into the environment. Exported variables always win.",
      "kind": "function",
-     "line": 477,
+     "line": 508,
      "methods": [],
      "name": "load_env_file"
     },
     {
      "doc": "One row per provider: where its credential comes from, if anywhere.",
      "kind": "function",
-     "line": 500,
+     "line": 531,
      "methods": [],
      "name": "status"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 520,
+     "line": 551,
      "methods": [],
      "name": "VerifyResult"
     },
     {
      "doc": "The model ids this provider currently serves.",
      "kind": "function",
-     "line": 604,
+     "line": 635,
      "methods": [],
      "name": "list_models"
     },
     {
      "doc": "Does *key* actually work for *provider*? Returns (ok, detail).",
      "kind": "function",
-     "line": 647,
+     "line": 678,
      "methods": [],
      "name": "check_credential"
     },
     {
      "doc": "Prove the key works with a real call, not by checking a variable is set.",
      "kind": "function",
-     "line": 666,
+     "line": 697,
      "methods": [],
      "name": "verify"
     },
     {
      "doc": "Store a key under the provider it actually belongs to.",
      "kind": "function",
-     "line": 734,
+     "line": 765,
      "methods": [],
      "name": "add"
     }
    ],
    "api_count": 26,
    "classes": 5,
-   "commits": 0,
+   "commits": 2,
    "doc": "Credential storage and resolution for model providers.",
    "doc_full": "Credential storage and resolution for model providers.\n\nDesign rules, in priority order:\n\n1. **Never leak.** ``redact`` is the only printable form of a key. This module\n   is the only one that holds a raw secret, and it hands it to the provider\n   adapter and nowhere else. Keys never reach an event, artifact or summary.\n2. **Take any key.** ``harness auth add <key>`` infers the provider from the\n   key's prefix. Prefixes match longest-first, so ``sk-ant-api03-`` is not\n   swallowed by ``sk-``.\n3. **One precedence order, stated.** Environment variable first, then the\n   stored file. ``harness auth status`` prints which source won, so a stale\n   environment variable shadowing a stored key is visible rather than\n   mysterious.\n4. **Local servers need no key.** Ollama and vLLM resolve as ready without one.\n5. **Verification is a real call.** ``harness auth verify`` asks the provider to\n   list its models. A variable being set is not evidence that the key works.\n\nThe store lives outside the repository so it cannot be committed by accident.",
    "external": [
@@ -1496,22 +1492,24 @@
     "pathlib",
     "urllib"
    ],
-   "fan_in": 0,
+   "fan_in": 1,
    "fan_out": 2,
    "functions": 21,
-   "imported_by": [],
+   "imported_by": [
+    "record.redaction"
+   ],
    "imports": [
     "core.errors",
     "core.util"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "models",
-   "lines": 789,
+   "lines": 820,
    "name": "models.auth",
    "path": "harness/models/auth.py",
    "side": "model",
-   "sloc": 622,
+   "sloc": 640,
    "test_cases": 0,
    "test_sloc": 0,
    "tests": []
@@ -1521,7 +1519,7 @@
     {
      "doc": "",
      "kind": "class",
-     "line": 32,
+     "line": 33,
      "methods": [
       "complete"
      ],
@@ -1530,7 +1528,7 @@
     {
      "doc": "",
      "kind": "class",
-     "line": 38,
+     "line": 39,
      "methods": [
       "complete"
      ],
@@ -1539,32 +1537,53 @@
     {
      "doc": "",
      "kind": "class",
-     "line": 301,
-     "methods": [],
+     "line": 345,
+     "methods": [
+      "adapt_body"
+     ],
      "name": "OpenAICompatibleProvider"
+    },
+    {
+     "doc": "GMI Cloud's router, which picks the model instead of being told one.",
+     "kind": "class",
+     "line": 430,
+     "methods": [
+      "adapt_body",
+      "remember_routing",
+      "describe_routing"
+     ],
+     "name": "GmiRouterProvider"
+    },
+    {
+     "doc": "Render routing metadata for a human, tolerating a changing shape.",
+     "kind": "function",
+     "line": 500,
+     "methods": [],
+     "name": "describe_routing"
     },
     {
      "doc": "Native Anthropic Messages API adapter.",
      "kind": "class",
-     "line": 365,
+     "line": 521,
      "methods": [],
      "name": "AnthropicProvider"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 458,
+     "line": 614,
      "methods": [],
      "name": "provider_for"
     }
    ],
-   "api_count": 5,
-   "classes": 4,
-   "commits": 0,
+   "api_count": 7,
+   "classes": 5,
+   "commits": 8,
    "doc": "Provider adapters behind one normalized contract.",
    "doc_full": "Provider adapters behind one normalized contract.\n\nEvery provider returns the same :class:`ActionProposal` shape, so the agent loop\nnever learns which vendor it is talking to. Adapters own wire format; the loop\nowns orchestration.",
    "external": [
     "__future__",
+    "http",
     "json",
     "pathlib",
     "typing",
@@ -1573,7 +1592,7 @@
    ],
    "fan_in": 2,
    "fan_out": 5,
-   "functions": 1,
+   "functions": 2,
    "imported_by": [
     "models.model_router",
     "repl.model"
@@ -1586,17 +1605,19 @@
     "models.streaming"
    ],
    "in_boundary": true,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "models",
-   "lines": 466,
+   "lines": 624,
    "name": "models.providers",
    "path": "harness/models/providers.py",
    "side": "model",
-   "sloc": 394,
-   "test_cases": 70,
-   "test_sloc": 771,
+   "sloc": 506,
+   "test_cases": 142,
+   "test_sloc": 1329,
    "tests": [
     "test_auth_gateways.py",
+    "test_failure_recovery.py",
+    "test_gmi.py",
     "test_providers.py"
    ]
   },
@@ -1689,7 +1710,7 @@
    ],
    "api_count": 9,
    "classes": 7,
-   "commits": 0,
+   "commits": 2,
    "doc": "LLM Light: turn declared operator priorities into an ordered model-route plan.",
    "doc_full": "LLM Light: turn declared operator priorities into an ordered model-route plan.\n\nLLM Light owns exactly one decision: *in which order should routes be tried.*\nIt never transports a request, never retries, and never sees a credential. The\nexisting :mod:`harness.model_router` continues to own retries, backoff, and\ncircuit breaking on whatever order it is handed.\n\nThat split is deliberate and is the teaching point. Priorities are policy and\nchange per operator. Reliability is mechanism and changes per incident. Keeping\nthem apart means a new priority (say, \"prefer the cheapest route that supports\ntools\") never touches the retry code, and a new retry strategy never silently\nreorders an operator's preferences.\n\nA route is described to LLM Light only by decision attributes -- locality,\ncost, latency, quality, context window, tool support. Credentials and endpoints\nare stripped at the boundary, so a routing decision can be logged and replayed\nwithout leaking anything.",
    "external": [
@@ -1710,7 +1731,7 @@
     "core.errors"
    ],
    "in_boundary": true,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "models",
    "lines": 445,
    "name": "models.llm_light",
@@ -1739,21 +1760,21 @@
     {
      "doc": "Project a transport route onto its decision attributes.",
      "kind": "function",
-     "line": 206,
+     "line": 218,
      "methods": [],
      "name": "profile_from_route"
     },
     {
      "doc": "Build an LLM Light instance, or None when the feature is disabled.",
      "kind": "function",
-     "line": 224,
+     "line": 236,
      "methods": [],
      "name": "build_llm_light"
     }
    ],
    "api_count": 3,
    "classes": 1,
-   "commits": 0,
+   "commits": 4,
    "doc": "Retries, circuit breaking, and ordered provider fallback.",
    "doc_full": "Retries, circuit breaking, and ordered provider fallback.\n\nThis module owns *reliability*. The order in which routes are tried is decided\nby :mod:`harness.llm_light`, which owns *priority*. The split matters: an\noperator restating what they care about must not perturb retry behaviour, and a\nchange to retry behaviour must not silently reorder their preferences.",
    "external": [
@@ -1779,13 +1800,96 @@
     "models.providers"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "models",
-   "lines": 226,
+   "lines": 238,
    "name": "models.model_router",
    "path": "harness/models/model_router.py",
    "side": "model",
-   "sloc": 193,
+   "sloc": 201,
+   "test_cases": 0,
+   "test_sloc": 0,
+   "tests": []
+  },
+  {
+   "api": [
+    {
+     "doc": "Which optional blocks a route's system prompt is assembled from.",
+     "kind": "class",
+     "line": 45,
+     "methods": [
+      "validated",
+      "heading",
+      "close",
+      "block"
+     ],
+     "name": "PromptProfile"
+    },
+    {
+     "doc": "Look up a preset by name.",
+     "kind": "function",
+     "line": 165,
+     "methods": [],
+     "name": "get"
+    },
+    {
+     "doc": "The profile a route should use.",
+     "kind": "function",
+     "line": 173,
+     "methods": [],
+     "name": "for_route"
+    },
+    {
+     "doc": "The field a dial name sets, or \"\" if there is no such dial.",
+     "kind": "function",
+     "line": 211,
+     "methods": [],
+     "name": "dial"
+    },
+    {
+     "doc": "Label and value for each dial, for `/profile` to print.",
+     "kind": "function",
+     "line": 216,
+     "methods": [],
+     "name": "describe"
+    },
+    {
+     "doc": "A copy with individual dials moved, for a `/profile <dial> <value>`.",
+     "kind": "function",
+     "line": 229,
+     "methods": [],
+     "name": "with_overrides"
+    }
+   ],
+   "api_count": 6,
+   "classes": 1,
+   "commits": 1,
+   "doc": "Prompting practices as dials, resolved per route.",
+   "doc_full": "Prompting practices as dials, resolved per route.\n\nLives beside `auth` and `providers` rather than with the REPL because it is a\nfact about a model, not about a loop: which dials a route wants follows from\nwhat that model was trained on, and the batch loop would want the same answer.\nIt also has to be readable from `config`, which sits above this layer.\n\nThe published prompt-engineering guidance is mostly written for one model\nfamily, and the parts of it that are genuinely universal are a smaller set than\nthe parts that read as universal. `docs/research/prompting-practices.md` sorts\nthem; this module is what that sorting is for.\n\nThe design follows from one observation: the advice that matters most has to\nmove in opposite directions for different models. A strong model told to verify\nits work verifies twice and wastes a turn. A weak one told nothing never checks\nat all. A model trained on angle-bracket pseudo-tool-calls, shown a system\nprompt full of angle brackets, starts emitting `<function=name>` as message\ntext instead of calling anything. So none of this belongs hardcoded in one\nshared string. It belongs per route, next to the other facts about a model that\nthe config already records.\n\nWhat is *not* here is as deliberate as what is. Assistant-turn prefill,\n`budget_tokens` and `thinking` fields are provider API shape rather than\nprompting, and telling an arbitrary model its context will be compacted for it\nis a promise the harness, not the model, has to keep.",
+   "external": [
+    "__future__",
+    "dataclasses",
+    "typing"
+   ],
+   "fan_in": 3,
+   "fan_out": 1,
+   "functions": 5,
+   "imported_by": [
+    "config",
+    "repl.blocks",
+    "repl.prompt"
+   ],
+   "imports": [
+    "config"
+   ],
+   "in_boundary": false,
+   "last_touched": "2026-09-02",
+   "layer": "models",
+   "lines": 231,
+   "name": "models.prompting",
+   "path": "harness/models/prompting.py",
+   "side": "harness",
+   "sloc": 151,
    "test_cases": 0,
    "test_sloc": 0,
    "tests": []
@@ -1805,6 +1909,7 @@
      "line": 46,
      "methods": [
       "content",
+      "error",
       "feed",
       "tool_calls",
       "as_payload"
@@ -1814,7 +1919,7 @@
    ],
    "api_count": 2,
    "classes": 1,
-   "commits": 0,
+   "commits": 2,
    "doc": "Reassembling a streamed completion into the response the adapter expects.",
    "doc_full": "Reassembling a streamed completion into the response the adapter expects.\n\nA turn against a remote model is a blocking request. The operator sees\nnothing for however long it takes and then sees everything at once, which\nreads as a hang -- and a run that looks hung is a run someone kills, often\njust before it would have succeeded.\n\nStreaming fixes the appearance and creates a parsing problem. Server-sent\nevents split a completion at arbitrary boundaries: content arrives in\nfragments, tool-call arguments arrive as string pieces that are only valid\nJSON once concatenated, and the stream ends with a sentinel that is not JSON\nat all. This module is that reassembly, and nothing else.\n\nThe design constraint is at the bottom: `as_payload` produces exactly the\nshape a non-streamed response has, so every adapter, normalizer and test\ndownstream cannot tell the difference. Streaming is a transport detail and it\nshould not leak into the layer that decides what an action is.",
    "external": [
@@ -1830,16 +1935,17 @@
    ],
    "imports": [],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "models",
-   "lines": 138,
+   "lines": 166,
    "name": "models.streaming",
    "path": "harness/models/streaming.py",
    "side": "model",
-   "sloc": 109,
-   "test_cases": 53,
-   "test_sloc": 599,
+   "sloc": 131,
+   "test_cases": 100,
+   "test_sloc": 914,
    "tests": [
+    "test_gmi.py",
     "test_repl_gemini.py",
     "test_streaming.py"
    ]
@@ -1901,7 +2007,7 @@
    ],
    "api_count": 7,
    "classes": 1,
-   "commits": 0,
+   "commits": 2,
    "doc": "Spans: tying a run to the runs around it.",
    "doc_full": "Spans: tying a run to the runs around it.\n\nA run's ledger explains that run and stops there. A goal is several runs, a\nsession is many, and a delegation is a run inside a run -- and none of those\nrelationships were written down, so reconstructing what happened meant reading\ndirectory names and guessing at the order.\n\nSpans are recorded in the shape OpenTelemetry uses: a 32-hex trace id shared\nby everything in one pursuit, a 16-hex span id per unit of work, and a parent\nspan id linking them. The shape is what makes the data portable -- these lines\ncan be shipped to a collector by anything that can read JSON -- while an SDK\nin the hot path of a teaching harness would be a dependency, a version\nconstraint and a failure mode with no matching benefit.\n\nNothing here is allowed to end a run. A tracing failure that stops work trades\nthe record of the job for the job.",
    "external": [
@@ -1924,7 +2030,7 @@
    ],
    "imports": [],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "record",
    "lines": 147,
    "name": "record.tracing",
@@ -1935,61 +2041,6 @@
    "test_sloc": 114,
    "tests": [
     "test_tracing.py"
-   ]
-  },
-  {
-   "api": [
-    {
-     "doc": "",
-     "kind": "class",
-     "line": 15,
-     "methods": [
-      "snapshot_input",
-      "write_manifest",
-      "write_payload",
-      "write_verification",
-      "finalize"
-     ],
-     "name": "ArtifactStore"
-    }
-   ],
-   "api_count": 1,
-   "classes": 1,
-   "commits": 0,
-   "doc": "Evidence-bundle creation independent of transient model context.",
-   "doc_full": "Evidence-bundle creation independent of transient model context.",
-   "external": [
-    "__future__",
-    "pathlib",
-    "shutil",
-    "subprocess",
-    "typing"
-   ],
-   "fan_in": 3,
-   "fan_out": 3,
-   "functions": 0,
-   "imported_by": [
-    "cli",
-    "execution.tools",
-    "runtime"
-   ],
-   "imports": [
-    "core.contracts",
-    "core.util",
-    "record.redaction"
-   ],
-   "in_boundary": false,
-   "last_touched": "",
-   "layer": "record",
-   "lines": 110,
-   "name": "record.artifacts",
-   "path": "harness/record/artifacts.py",
-   "side": "harness",
-   "sloc": 93,
-   "test_cases": 6,
-   "test_sloc": 91,
-   "tests": [
-    "test_patch_recovery.py"
    ]
   },
   {
@@ -2008,7 +2059,7 @@
    ],
    "api_count": 1,
    "classes": 1,
-   "commits": 0,
+   "commits": 4,
    "doc": "Append-only, sequence-checked JSONL event ledger.",
    "doc_full": "Append-only, sequence-checked JSONL event ledger.",
    "external": [
@@ -2037,16 +2088,121 @@
     "record.redaction"
    ],
    "in_boundary": true,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "record",
-   "lines": 83,
+   "lines": 132,
    "name": "record.events",
    "path": "harness/record/events.py",
    "side": "harness",
-   "sloc": 73,
-   "test_cases": 0,
-   "test_sloc": 0,
-   "tests": []
+   "sloc": 114,
+   "test_cases": 25,
+   "test_sloc": 243,
+   "tests": [
+    "test_failure_recovery.py"
+   ]
+  },
+  {
+   "api": [
+    {
+     "doc": "",
+     "kind": "class",
+     "line": 14,
+     "methods": [
+      "write_manifest",
+      "write_payload",
+      "write_verification",
+      "finalize"
+     ],
+     "name": "ArtifactStore"
+    }
+   ],
+   "api_count": 1,
+   "classes": 1,
+   "commits": 3,
+   "doc": "Evidence-bundle creation independent of transient model context.",
+   "doc_full": "Evidence-bundle creation independent of transient model context.",
+   "external": [
+    "__future__",
+    "pathlib",
+    "subprocess",
+    "typing"
+   ],
+   "fan_in": 4,
+   "fan_out": 3,
+   "functions": 0,
+   "imported_by": [
+    "cli",
+    "execution.tools",
+    "repl.tools",
+    "runtime"
+   ],
+   "imports": [
+    "core.contracts",
+    "core.util",
+    "record.redaction"
+   ],
+   "in_boundary": false,
+   "last_touched": "2026-09-02",
+   "layer": "record",
+   "lines": 104,
+   "name": "record.artifacts",
+   "path": "harness/record/artifacts.py",
+   "side": "harness",
+   "sloc": 88,
+   "test_cases": 6,
+   "test_sloc": 91,
+   "tests": [
+    "test_patch_recovery.py"
+   ]
+  },
+  {
+   "api": [
+    {
+     "doc": "",
+     "kind": "class",
+     "line": 56,
+     "methods": [
+      "text",
+      "value"
+     ],
+     "name": "Redactor"
+    }
+   ],
+   "api_count": 1,
+   "classes": 1,
+   "commits": 3,
+   "doc": "Best-effort secret redaction before persistence or display.",
+   "doc_full": "Best-effort secret redaction before persistence or display.",
+   "external": [
+    "__future__",
+    "collections",
+    "re",
+    "typing"
+   ],
+   "fan_in": 3,
+   "fan_out": 1,
+   "functions": 0,
+   "imported_by": [
+    "record.artifacts",
+    "record.events",
+    "runtime"
+   ],
+   "imports": [
+    "models.auth"
+   ],
+   "in_boundary": false,
+   "last_touched": "2026-09-02",
+   "layer": "record",
+   "lines": 78,
+   "name": "record.redaction",
+   "path": "harness/record/redaction.py",
+   "side": "harness",
+   "sloc": 58,
+   "test_cases": 13,
+   "test_sloc": 105,
+   "tests": [
+    "test_redaction_coverage.py"
+   ]
   },
   {
    "api": [
@@ -2067,7 +2223,7 @@
    ],
    "api_count": 2,
    "classes": 1,
-   "commits": 0,
+   "commits": 2,
    "doc": "Side-effect-free reconstruction and integrity checking of a completed event ledger.",
    "doc_full": "Side-effect-free reconstruction and integrity checking of a completed event ledger.",
    "external": [
@@ -2086,58 +2242,13 @@
     "record.events"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "record",
    "lines": 58,
    "name": "record.replay",
    "path": "harness/record/replay.py",
    "side": "harness",
    "sloc": 50,
-   "test_cases": 0,
-   "test_sloc": 0,
-   "tests": []
-  },
-  {
-   "api": [
-    {
-     "doc": "",
-     "kind": "class",
-     "line": 20,
-     "methods": [
-      "text",
-      "value"
-     ],
-     "name": "Redactor"
-    }
-   ],
-   "api_count": 1,
-   "classes": 1,
-   "commits": 0,
-   "doc": "Best-effort secret redaction before persistence or display.",
-   "doc_full": "Best-effort secret redaction before persistence or display.",
-   "external": [
-    "__future__",
-    "collections",
-    "re",
-    "typing"
-   ],
-   "fan_in": 3,
-   "fan_out": 0,
-   "functions": 0,
-   "imported_by": [
-    "record.artifacts",
-    "record.events",
-    "runtime"
-   ],
-   "imports": [],
-   "in_boundary": false,
-   "last_touched": "",
-   "layer": "record",
-   "lines": 42,
-   "name": "record.redaction",
-   "path": "harness/record/redaction.py",
-   "side": "harness",
-   "sloc": 34,
    "test_cases": 0,
    "test_sloc": 0,
    "tests": []
@@ -2157,7 +2268,7 @@
    ],
    "api_count": 1,
    "classes": 1,
-   "commits": 0,
+   "commits": 2,
    "doc": "Atomic durable checkpoints and resume validation.",
    "doc_full": "Atomic durable checkpoints and resume validation.",
    "external": [
@@ -2178,7 +2289,7 @@
     "core.util"
    ],
    "in_boundary": true,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "record",
    "lines": 31,
    "name": "record.state",
@@ -2222,11 +2333,25 @@
      "line": 197,
      "methods": [],
      "name": "build_registry"
+    },
+    {
+     "doc": "The capabilities a loop opts into rather than always having.",
+     "kind": "function",
+     "line": 224,
+     "methods": [],
+     "name": "optional_tools"
+    },
+    {
+     "doc": "Discover one MCP server's tools as registerable pairs.",
+     "kind": "function",
+     "line": 1114,
+     "methods": [],
+     "name": "mcp_tools"
     }
    ],
-   "api_count": 4,
+   "api_count": 6,
    "classes": 2,
-   "commits": 0,
+   "commits": 11,
    "doc": "Typed tool registry and policy-governed native/MCP tool implementations.",
    "doc_full": "Typed tool registry and policy-governed native/MCP tool implementations.",
    "external": [
@@ -2244,11 +2369,13 @@
     "typing",
     "urllib"
    ],
-   "fan_in": 2,
+   "fan_in": 4,
    "fan_out": 12,
-   "functions": 2,
+   "functions": 4,
    "imported_by": [
     "cli",
+    "repl.shell",
+    "repl.tools",
     "runtime"
    ],
    "imports": [
@@ -2266,18 +2393,139 @@
     "record.artifacts"
    ],
    "in_boundary": true,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "execution",
-   "lines": 1088,
+   "lines": 1175,
    "name": "execution.tools",
    "path": "harness/execution/tools.py",
    "side": "harness",
-   "sloc": 960,
-   "test_cases": 38,
-   "test_sloc": 460,
+   "sloc": 1034,
+   "test_cases": 58,
+   "test_sloc": 632,
    "tests": [
     "test_patch_recovery.py",
     "test_review_findings.py",
+    "test_shared_tooling.py",
+    "test_tools.py"
+   ]
+  },
+  {
+   "api": [
+    {
+     "doc": "",
+     "kind": "class",
+     "line": 23,
+     "methods": [],
+     "name": "PolicyDecision"
+    },
+    {
+     "doc": "The spelling both the policy and the executor judge a command by.",
+     "kind": "function",
+     "line": 95,
+     "methods": [],
+     "name": "normalize_command"
+    },
+    {
+     "doc": "Every command that running *command* would actually execute.",
+     "kind": "function",
+     "line": 174,
+     "methods": [],
+     "name": "expand_command"
+    },
+    {
+     "doc": "The raw code strings a command hands to an interpreter.",
+     "kind": "function",
+     "line": 204,
+     "methods": [],
+     "name": "carried_code"
+    },
+    {
+     "doc": "The deny pattern *command* matches, or None.",
+     "kind": "function",
+     "line": 270,
+     "methods": [],
+     "name": "denied_pattern"
+    },
+    {
+     "doc": "One operator rule: which tool, which arguments, and what to do.",
+     "kind": "class",
+     "line": 307,
+     "methods": [
+      "text"
+     ],
+     "name": "PolicyRule"
+    },
+    {
+     "doc": "Parse one rule, or say why it is not one.",
+     "kind": "function",
+     "line": 325,
+     "methods": [],
+     "name": "parse_rule"
+    },
+    {
+     "doc": "The rule governing this call, or None when the operator wrote none.",
+     "kind": "function",
+     "line": 375,
+     "methods": [],
+     "name": "rule_for"
+    },
+    {
+     "doc": "",
+     "kind": "class",
+     "line": 404,
+     "methods": [
+      "evaluate"
+     ],
+     "name": "PolicyEngine"
+    }
+   ],
+   "api_count": 9,
+   "classes": 3,
+   "commits": 7,
+   "doc": "Capability authorization separate from technical tool availability.",
+   "doc_full": "Capability authorization separate from technical tool availability.",
+   "external": [
+    "__future__",
+    "collections",
+    "dataclasses",
+    "fnmatch",
+    "re",
+    "shlex",
+    "typing"
+   ],
+   "fan_in": 6,
+   "fan_out": 2,
+   "functions": 6,
+   "imported_by": [
+    "cli",
+    "config",
+    "execution.tools",
+    "repl.approvals",
+    "repl.tools",
+    "runtime"
+   ],
+   "imports": [
+    "config",
+    "core.contracts"
+   ],
+   "in_boundary": true,
+   "last_touched": "2026-09-03",
+   "layer": "execution",
+   "lines": 476,
+   "name": "execution.policy",
+   "path": "harness/execution/policy.py",
+   "side": "harness",
+   "sloc": 360,
+   "test_cases": 137,
+   "test_sloc": 1146,
+   "tests": [
+    "test_denied_approval.py",
+    "test_patch_recovery.py",
+    "test_policy_denylist.py",
+    "test_policy_evasion.py",
+    "test_policy_rules.py",
+    "test_review_findings.py",
+    "test_shared_tooling.py",
     "test_tools.py"
    ]
   },
@@ -2395,7 +2643,7 @@
    ],
    "api_count": 15,
    "classes": 6,
-   "commits": 0,
+   "commits": 2,
    "doc": "Retrieval: finding the relevant part of a repository too big to read.",
    "doc_full": "Retrieval: finding the relevant part of a repository too big to read.\n\n`search_repo` matches a literal string. That is exact, and useless when you do\nnot already know the identifier: \"where is the retry backoff decided\" finds\nnothing, because nobody wrote that sentence in the code. A model that cannot\nfind the right file reads the wrong ones, and a context budget is spent on\nmaterial that was never going to help.\n\nTwo backends, and the default is the one that always works. Lexical (BM25)\nranks by term statistics -- no key, no network, deterministic, and available\non a workshop laptop. Embedding ranks by cosine similarity against a\nprovider's vectors and finds things lexical search cannot, at the cost of a\ndependency on that provider being reachable and paid for.\n\nEverything that decides a ranking is a pure function over text, so the\nscoring is tested without a network and the provider's answers are recorded\npayloads. Retrieval that only works when someone has a key is retrieval that\nis never exercised in CI.",
    "external": [
@@ -2419,7 +2667,7 @@
     "core.errors"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "execution",
    "lines": 365,
    "name": "execution.retrieval",
@@ -2430,6 +2678,145 @@
    "test_sloc": 215,
    "tests": [
     "test_retrieval.py"
+   ]
+  },
+  {
+   "api": [
+    {
+     "doc": "",
+     "kind": "class",
+     "line": 43,
+     "methods": [],
+     "name": "SandboxConfig"
+    },
+    {
+     "doc": "",
+     "kind": "class",
+     "line": 65,
+     "methods": [
+      "run"
+     ],
+     "name": "Sandbox"
+    },
+    {
+     "doc": "The original behaviour: a process on this machine, in the workspace.",
+     "kind": "class",
+     "line": 88,
+     "methods": [
+      "run"
+     ],
+     "name": "LocalSandbox"
+    },
+    {
+     "doc": "A throwaway container with the workspace mounted and nothing else.",
+     "kind": "class",
+     "line": 109,
+     "methods": [
+      "run"
+     ],
+     "name": "DockerSandbox"
+    },
+    {
+     "doc": "Confinement from the kernel, without a container.",
+     "kind": "class",
+     "line": 137,
+     "methods": [
+      "run"
+     ],
+     "name": "OsSandbox"
+    },
+    {
+     "doc": "Which kernel sandbox is available here, and why not when there is none.",
+     "kind": "function",
+     "line": 182,
+     "methods": [],
+     "name": "detect_mechanism"
+    },
+    {
+     "doc": "An Apple Seatbelt profile allowing reads, writes only in the workspace.",
+     "kind": "function",
+     "line": 199,
+     "methods": [],
+     "name": "seatbelt_profile"
+    },
+    {
+     "doc": "The `sandbox-exec` invocation for one command. Pure, so it is testable.",
+     "kind": "function",
+     "line": 221,
+     "methods": [],
+     "name": "seatbelt_command"
+    },
+    {
+     "doc": "The `bwrap` invocation for one command.",
+     "kind": "function",
+     "line": 233,
+     "methods": [],
+     "name": "bubblewrap_command"
+    },
+    {
+     "doc": "The `docker run` invocation for one command.",
+     "kind": "function",
+     "line": 275,
+     "methods": [],
+     "name": "docker_command"
+    },
+    {
+     "doc": "",
+     "kind": "function",
+     "line": 336,
+     "methods": [],
+     "name": "build_sandbox"
+    },
+    {
+     "doc": "",
+     "kind": "function",
+     "line": 344,
+     "methods": [],
+     "name": "sandbox_config_from_dict"
+    }
+   ],
+   "api_count": 12,
+   "classes": 5,
+   "commits": 4,
+   "doc": "Where a tool command actually runs.",
+   "doc_full": "Where a tool command actually runs.\n\nPath containment and a command allowlist confine the model's *interface*.\nThey do not confine the operating system: an allowlisted test runner is still\nan ordinary process on the host, with the host's filesystem and the host's\nnetwork. docs/SECURITY.md has said so honestly for as long as it has existed,\nand recommended a container. This is that container.\n\nThe rules a sandbox has to enforce are the ones an application-level gate\ncannot: no network unless asked for, no new privileges, not root, bounded\nmemory and CPU, and nothing mounted except the run workspace. All of that\nlives in `docker_command`, which is a pure function -- so those rules are\nchecked on every machine, and only the test that genuinely starts a container\nneeds docker installed.\n\nLocal execution stays the default. A workshop laptop without docker must\nstill be able to run the harness, and a teaching tool that refuses to start\nteaches nothing.",
+   "external": [
+    "__future__",
+    "dataclasses",
+    "os",
+    "pathlib",
+    "shutil",
+    "sys",
+    "typing"
+   ],
+   "fan_in": 5,
+   "fan_out": 2,
+   "functions": 7,
+   "imported_by": [
+    "config",
+    "execution.tools",
+    "repl.shell",
+    "repl.tools",
+    "run.verifier"
+   ],
+   "imports": [
+    "core.errors",
+    "execution.process"
+   ],
+   "in_boundary": true,
+   "last_touched": "2026-09-03",
+   "layer": "execution",
+   "lines": 366,
+   "name": "execution.sandbox",
+   "path": "harness/execution/sandbox.py",
+   "side": "harness",
+   "sloc": 287,
+   "test_cases": 74,
+   "test_sloc": 563,
+   "tests": [
+    "test_os_sandbox.py",
+    "test_sandbox.py",
+    "test_shared_tooling.py"
    ]
   },
   {
@@ -2469,7 +2856,7 @@
    ],
    "api_count": 3,
    "classes": 2,
-   "commits": 0,
+   "commits": 6,
    "doc": "Per-run workspace lifecycle with canonical-path containment.",
    "doc_full": "Per-run workspace lifecycle with canonical-path containment.",
    "external": [
@@ -2480,13 +2867,14 @@
     "shutil",
     "subprocess"
    ],
-   "fan_in": 9,
+   "fan_in": 10,
    "fan_out": 2,
    "functions": 1,
    "imported_by": [
     "autonomy.delivery",
     "cli",
     "execution.tools",
+    "repl.checkpoints",
     "repl.prompt",
     "repl.shell",
     "repl.tools",
@@ -2499,26 +2887,35 @@
     "run.session"
    ],
    "in_boundary": true,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "execution",
    "lines": 332,
    "name": "execution.workspace",
    "path": "harness/execution/workspace.py",
    "side": "harness",
    "sloc": 278,
-   "test_cases": 250,
-   "test_sloc": 2840,
+   "test_cases": 441,
+   "test_sloc": 4351,
    "tests": [
+    "test_checkpoints.py",
     "test_context_budget.py",
     "test_deliver_cli.py",
     "test_delivery.py",
+    "test_failure_recovery.py",
+    "test_hooks.py",
     "test_instructions.py",
+    "test_interrupt.py",
     "test_patch_recovery.py",
+    "test_plan_mode.py",
+    "test_policy_evasion.py",
+    "test_policy_rules.py",
     "test_repl_agent.py",
     "test_repl_end_to_end.py",
     "test_repl_gemini.py",
+    "test_repl_tool_safety.py",
     "test_repl_tools.py",
     "test_session.py",
+    "test_shared_tooling.py",
     "test_tools.py",
     "test_workspace.py"
    ]
@@ -2579,7 +2976,7 @@
    ],
    "api_count": 7,
    "classes": 3,
-   "commits": 0,
+   "commits": 2,
    "doc": "Web search: what each backend needs asked, and how its answer is read.",
    "doc_full": "Web search: what each backend needs asked, and how its answer is read.\n\nSearch is the one capability that reaches post-training information, and it\nis also the one most likely to change under you: endpoints move, response\nshapes get new fields, and a scraped HTML page is rewritten without notice.\nSo the backend is configuration rather than code, and everything that can be\ndecided without a network -- building the request, reading the response --\nis a pure function over text. Those are the parts that break, and they are\ntested against recorded payloads rather than against a live search engine.\n\nThree backends ship. `brave` and `tavily` are JSON APIs and need a key.\n`duckduckgo` parses the HTML endpoint and needs none, so a workshop laptop\nhas a working search tool without anyone signing up for anything; it is also\nthe one most likely to break, and it says so.",
    "external": [
@@ -2602,7 +2999,7 @@
     "core.errors"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "execution",
    "lines": 236,
    "name": "execution.search",
@@ -2635,7 +3032,7 @@
    ],
    "api_count": 1,
    "classes": 1,
-   "commits": 0,
+   "commits": 3,
    "doc": "Minimal production-oriented MCP stdio client for tool discovery and calls.",
    "doc_full": "Minimal production-oriented MCP stdio client for tool discovery and calls.\n\nImplements the stable 2025-11-25 initialize \u2192 initialized \u2192 operation lifecycle\nover newline-delimited UTF-8 JSON-RPC 2.0. The version is configurable so a\nserver can negotiate a different supported revision explicitly.",
    "external": [
@@ -2660,7 +3057,7 @@
     "core.errors"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "execution",
    "lines": 205,
    "name": "execution.mcp",
@@ -2674,194 +3071,98 @@
   {
    "api": [
     {
-     "doc": "",
+     "doc": "One command, and when to run it.",
      "kind": "class",
-     "line": 36,
-     "methods": [],
-     "name": "SandboxConfig"
-    },
-    {
-     "doc": "",
-     "kind": "class",
-     "line": 58,
+     "line": 44,
      "methods": [
-      "run"
+      "applies",
+      "label"
      ],
-     "name": "Sandbox"
+     "name": "Hook"
     },
     {
-     "doc": "The original behaviour: a process on this machine, in the workspace.",
+     "doc": "What running the hooks produced, for the operator to see.",
      "kind": "class",
-     "line": 81,
-     "methods": [
-      "run"
-     ],
-     "name": "LocalSandbox"
+     "line": 65,
+     "methods": [],
+     "name": "HookReport"
     },
     {
-     "doc": "A throwaway container with the workspace mounted and nothing else.",
+     "doc": "Parse the `hooks` list, refusing anything that is not one.",
+     "kind": "function",
+     "line": 73,
+     "methods": [],
+     "name": "parse_hooks"
+    },
+    {
+     "doc": "Runs the configured hooks and keeps them out of the session's way.",
      "kind": "class",
-     "line": 102,
+     "line": 115,
      "methods": [
-      "run"
+      "fire"
      ],
-     "name": "DockerSandbox"
-    },
-    {
-     "doc": "The `docker run` invocation for one command.",
-     "kind": "function",
-     "line": 130,
-     "methods": [],
-     "name": "docker_command"
-    },
-    {
-     "doc": "",
-     "kind": "function",
-     "line": 191,
-     "methods": [],
-     "name": "build_sandbox"
-    },
-    {
-     "doc": "",
-     "kind": "function",
-     "line": 195,
-     "methods": [],
-     "name": "sandbox_config_from_dict"
+     "name": "HookRunner"
     }
    ],
-   "api_count": 7,
-   "classes": 4,
-   "commits": 0,
-   "doc": "Where a tool command actually runs.",
-   "doc_full": "Where a tool command actually runs.\n\nPath containment and a command allowlist confine the model's *interface*.\nThey do not confine the operating system: an allowlisted test runner is still\nan ordinary process on the host, with the host's filesystem and the host's\nnetwork. docs/SECURITY.md has said so honestly for as long as it has existed,\nand recommended a container. This is that container.\n\nThe rules a sandbox has to enforce are the ones an application-level gate\ncannot: no network unless asked for, no new privileges, not root, bounded\nmemory and CPU, and nothing mounted except the run workspace. All of that\nlives in `docker_command`, which is a pure function -- so those rules are\nchecked on every machine, and only the test that genuinely starts a container\nneeds docker installed.\n\nLocal execution stays the default. A workshop laptop without docker must\nstill be able to run the harness, and a teaching tool that refuses to start\nteaches nothing.",
+   "api_count": 4,
+   "classes": 3,
+   "commits": 2,
+   "doc": "Operator commands that run when the agent does something.",
+   "doc_full": "Operator commands that run when the agent does something.\n\nFormatting after every edit, a lint gate, a notification, an audit line. All of\nthese are things people already automate around a coding agent, and without a\nplace to put them they end up as instructions in the prompt, where they are\nadvice the model may skip rather than something that happens.\n\nThese observe, they do not decide. A hook that could veto a tool call would be\na second authority over the same question `Gate` already answers, and two\nplaces deciding one thing is how a permission system stops being trustworthy:\nthe operator reads the gate, the deny-list disagrees, and neither is wrong on\nits own. So a hook runs after the call, learns what happened, and cannot change\nit. If that ever needs to change, the honest shape is asymmetric, able to add a\nrefusal on top of an approval and never to grant one.\n\nA hook is an ordinary command from the operator's own config, which is the same\ntrust as the deny-list and the allowlist they already write there. It is not\nmodel input and the model cannot add one.",
    "external": [
     "__future__",
     "dataclasses",
+    "fnmatch",
+    "json",
     "os",
     "pathlib",
     "typing"
    ],
-   "fan_in": 3,
+   "fan_in": 2,
    "fan_out": 2,
-   "functions": 3,
+   "functions": 1,
    "imported_by": [
     "config",
-    "execution.tools",
-    "run.verifier"
+    "repl.agent"
    ],
    "imports": [
     "core.errors",
     "execution.process"
    ],
-   "in_boundary": true,
-   "last_touched": "",
+   "in_boundary": false,
+   "last_touched": "2026-09-03",
    "layer": "execution",
-   "lines": 217,
-   "name": "execution.sandbox",
-   "path": "harness/execution/sandbox.py",
+   "lines": 167,
+   "name": "execution.hooks",
+   "path": "harness/execution/hooks.py",
    "side": "harness",
-   "sloc": 169,
-   "test_cases": 27,
-   "test_sloc": 217,
+   "sloc": 128,
+   "test_cases": 23,
+   "test_sloc": 184,
    "tests": [
-    "test_sandbox.py"
+    "test_hooks.py"
    ]
   },
   {
    "api": [
-    {
-     "doc": "",
-     "kind": "class",
-     "line": 20,
-     "methods": [],
-     "name": "PolicyDecision"
-    },
-    {
-     "doc": "The spelling both the policy and the executor judge a command by.",
-     "kind": "function",
-     "line": 29,
-     "methods": [],
-     "name": "normalize_command"
-    },
-    {
-     "doc": "The deny pattern *command* matches, or None.",
-     "kind": "function",
-     "line": 40,
-     "methods": [],
-     "name": "denied_pattern"
-    },
     {
      "doc": "",
      "kind": "class",
      "line": 66,
-     "methods": [
-      "evaluate"
-     ],
-     "name": "PolicyEngine"
-    }
-   ],
-   "api_count": 4,
-   "classes": 2,
-   "commits": 0,
-   "doc": "Capability authorization separate from technical tool availability.",
-   "doc_full": "Capability authorization separate from technical tool availability.",
-   "external": [
-    "__future__",
-    "collections",
-    "dataclasses",
-    "typing"
-   ],
-   "fan_in": 4,
-   "fan_out": 2,
-   "functions": 2,
-   "imported_by": [
-    "cli",
-    "execution.tools",
-    "repl.approvals",
-    "runtime"
-   ],
-   "imports": [
-    "config",
-    "core.contracts"
-   ],
-   "in_boundary": true,
-   "last_touched": "",
-   "layer": "execution",
-   "lines": 134,
-   "name": "execution.policy",
-   "path": "harness/execution/policy.py",
-   "side": "harness",
-   "sloc": 98,
-   "test_cases": 60,
-   "test_sloc": 633,
-   "tests": [
-    "test_denied_approval.py",
-    "test_patch_recovery.py",
-    "test_policy_denylist.py",
-    "test_review_findings.py",
-    "test_tools.py"
-   ]
-  },
-  {
-   "api": [
-    {
-     "doc": "",
-     "kind": "class",
-     "line": 36,
      "methods": [],
      "name": "ProcessResult"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 44,
+     "line": 74,
      "methods": [],
      "name": "run_process"
     }
    ],
    "api_count": 2,
    "classes": 1,
-   "commits": 0,
+   "commits": 3,
    "doc": "Bounded subprocess execution without a shell and with process-group cleanup.",
    "doc_full": "Bounded subprocess execution without a shell and with process-group cleanup.",
    "external": [
@@ -2873,31 +3174,34 @@
     "signal",
     "subprocess"
    ],
-   "fan_in": 6,
+   "fan_in": 7,
    "fan_out": 1,
    "functions": 1,
    "imported_by": [
+    "execution.hooks",
     "execution.sandbox",
     "execution.tools",
+    "repl.checkpoints",
     "repl.prompt",
     "repl.shell",
-    "repl.tools",
     "run.verifier"
    ],
    "imports": [
     "core.util"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "execution",
-   "lines": 84,
+   "lines": 114,
    "name": "execution.process",
    "path": "harness/execution/process.py",
    "side": "harness",
-   "sloc": 73,
-   "test_cases": 0,
-   "test_sloc": 0,
-   "tests": []
+   "sloc": 99,
+   "test_cases": 25,
+   "test_sloc": 243,
+   "tests": [
+    "test_failure_recovery.py"
+   ]
   },
   {
    "api": [
@@ -2920,7 +3224,7 @@
    ],
    "api_count": 2,
    "classes": 2,
-   "commits": 0,
+   "commits": 7,
    "doc": "Bounded context compiler with deterministic compaction and artifact references.",
    "doc_full": "Bounded context compiler with deterministic compaction and artifact references.",
    "external": [
@@ -2945,7 +3249,7 @@
     "run.instructions"
    ],
    "in_boundary": true,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "run",
    "lines": 237,
    "name": "run.context",
@@ -3001,7 +3305,7 @@
    ],
    "api_count": 5,
    "classes": 2,
-   "commits": 0,
+   "commits": 4,
    "doc": "Delegation: a bounded sub-agent that reports back.",
    "doc_full": "Delegation: a bounded sub-agent that reports back.\n\nThe harness always had an independent checker -- the verifier -- and no way\nfor the agent to ask a *second agent* anything. Explore this area, review\nthis change, find where this is handled: all of it had to happen in the main\nagent's own context, which is the context most worth keeping small.\n\nA sub-agent here is read-only on purpose. Its deliverable is a report, not an\nedit, and a report needs no verifier because it changes nothing. That keeps\nthe completion gate exactly where it was: one agent makes changes, one\nverifier decides whether they worked, and delegation adds neither a second\nwriter nor a second opinion about whether the run is done.\n\nIt works from a copy of the parent's workspace rather than the workspace\nitself. A reviewing sub-agent that runs the test suite would otherwise leave\nbuild artifacts in the parent's diff, and the parent would be judged on them.\n\nEvery delegation is a full harness run with its own bundle, ledger and\ncheckpoints. A sub-agent that misbehaves is therefore as inspectable and as\nreplayable as the parent, which is the whole reason for running it through\nthe same machinery instead of a second, quieter code path.",
    "external": [
@@ -3024,7 +3328,7 @@
     "core.util"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "run",
    "lines": 206,
    "name": "run.subagents",
@@ -3091,7 +3395,7 @@
    ],
    "api_count": 6,
    "classes": 4,
-   "commits": 0,
+   "commits": 2,
    "doc": "How old observations are folded down when they leave the recent window.",
    "doc_full": "How old observations are folded down when they leave the recent window.\n\nTruncating an observation to its first few hundred characters keeps the shape\nof what happened -- which tool ran, whether it worked -- and discards the\ncontent. That is the right trade for a short run and the wrong one for a long\none, where what the model needs from turn three is the fact it established,\nnot the first line of the file it read.\n\nSo the strategy is chosen rather than assumed. Truncation is deterministic,\nfree, and always available. Summarization spends a model call to keep meaning\ninstead of shape, and it degrades to truncation whenever it cannot run:\ncompaction is a context optimisation, and taking a run down because the\nsummarizer is unwell trades a smaller context for no run at all.",
    "external": [
@@ -3113,7 +3417,7 @@
     "core.util"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "run",
    "lines": 164,
    "name": "run.compaction",
@@ -3156,7 +3460,7 @@
    ],
    "api_count": 3,
    "classes": 2,
-   "commits": 0,
+   "commits": 2,
    "doc": "Sessions: one workspace and one written memory across many messages.",
    "doc_full": "Sessions: one workspace and one written memory across many messages.\n\nEvery message produced a fresh workspace, so turn two could not build on\nturn one and did not know it had happened. A conversation that cannot\naccumulate anything is a sequence of unrelated runs wearing a chat prompt.\n\nA session gives it two things. A workspace that persists, so the second\nmessage edits what the first one wrote. And a record on disk of what has\nalready been tried and how it ended, because the model does not remember\nbetween runs and the filesystem does. The record deliberately keeps failures\nas well as successes: a memory that only holds what worked teaches the next\nturn to repeat what did not.\n\nThe record lives beside the session rather than inside its workspace. Written\ninto the workspace it would show up as an untracked file, and the verifier\nwould count the harness's own bookkeeping as the run's implementation diff.",
    "external": [
@@ -3178,7 +3482,7 @@
     "core.util"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "run",
    "lines": 120,
    "name": "run.session",
@@ -3205,7 +3509,7 @@
    ],
    "api_count": 1,
    "classes": 1,
-   "commits": 0,
+   "commits": 4,
    "doc": "Independent completion gate: commands, diff, and protected-path integrity.",
    "doc_full": "Independent completion gate: commands, diff, and protected-path integrity.",
    "external": [
@@ -3229,7 +3533,7 @@
     "execution.workspace"
    ],
    "in_boundary": true,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "run",
    "lines": 109,
    "name": "run.verifier",
@@ -3259,7 +3563,7 @@
    ],
    "api_count": 2,
    "classes": 1,
-   "commits": 0,
+   "commits": 2,
    "doc": "Repository instruction files, loaded into the model's system prompt.",
    "doc_full": "Repository instruction files, loaded into the model's system prompt.\n\nAn agent that has not read a repository's conventions invents them. `AGENTS.md`\nis where a repository writes those conventions down, so the harness reads it\nand puts it in front of the model rather than hoping the model goes looking.\n\nThese files are content inside the run workspace, which means a task can\ninfluence what the model is told. That is the point -- it is how a repository\ndescribes itself -- but it is also why the text is budgeted, labelled with the\nfile it came from, and placed after the harness's own instructions rather than\nbefore them. The authority boundary in docs/ARCHITECTURE.md still holds: this\ntext can inform the model, and it cannot enable a tool, widen the command\nallowlist, or satisfy the verifier.",
    "external": [
@@ -3278,7 +3582,7 @@
     "core.util"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "run",
    "lines": 74,
    "name": "run.instructions",
@@ -3306,7 +3610,7 @@
    ],
    "api_count": 1,
    "classes": 1,
-   "commits": 0,
+   "commits": 2,
    "doc": "Deterministic, checkpoint-aware fault injection for reliability exercises.",
    "doc_full": "Deterministic, checkpoint-aware fault injection for reliability exercises.",
    "external": [
@@ -3325,7 +3629,7 @@
     "core.errors"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "run",
    "lines": 52,
    "name": "run.faults",
@@ -3390,7 +3694,7 @@
    ],
    "api_count": 7,
    "classes": 3,
-   "commits": 0,
+   "commits": 3,
    "doc": "Turning a verified run into a commit, a pushed branch, and a pull request.",
    "doc_full": "Turning a verified run into a commit, a pushed branch, and a pull request.\n\nThis is the only part of the harness that reaches outside the machine, so it\nis deliberately the most reluctant. Delivery refuses a run the verifier did\nnot pass, refuses a run with nothing in it, and asks before every step whose\neffect another person can see. Each step is also independently retryable: a\ndeclined push leaves the commit alone so the next attempt has something to\nsend, and a declined pull request leaves the branch pushed.\n\nThe pull request body is assembled from the run's own evidence rather than\nfrom the model's description of its work. A model's account of what it did is\nexactly the thing the verifier exists not to trust.",
    "external": [
@@ -3415,7 +3719,7 @@
     "execution.workspace"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "autonomy",
    "lines": 338,
    "name": "autonomy.delivery",
@@ -3475,7 +3779,7 @@
    ],
    "api_count": 6,
    "classes": 4,
-   "commits": 0,
+   "commits": 2,
    "doc": "Evals: does the harness still do the job.",
    "doc_full": "Evals: does the harness still do the job.\n\nThe unit suite proves each part behaves. It cannot answer the question that\nmatters when a prompt, a model, a budget or a skill changes: does a run still\nfinish the task. That needs a set of cases, a recorded outcome for each, and a\nthreshold that fails CI when the number moves the wrong way.\n\nA case expected to *fail* is as important as one expected to pass. A suite\nwhere everything succeeds cannot tell a working harness from one whose\nverifier has quietly stopped verifying, and that is precisely the regression\nworth catching here -- every other test in this repository would still be\ngreen.",
    "external": [
@@ -3499,7 +3803,7 @@
     "core.util"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "autonomy",
    "lines": 203,
    "name": "autonomy.evals",
@@ -3517,56 +3821,48 @@
     {
      "doc": "A goal could not be pursued as stated.",
      "kind": "class",
-     "line": 43,
+     "line": 42,
      "methods": [],
      "name": "GoalError"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 48,
+     "line": 47,
      "methods": [],
      "name": "GoalRequest"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 64,
+     "line": 63,
      "methods": [],
      "name": "GoalAttempt"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 72,
+     "line": 71,
      "methods": [],
      "name": "GoalResult"
     },
     {
      "doc": "Attempt the goal until it is met, refused, or out of budget.",
      "kind": "function",
-     "line": 84,
+     "line": 83,
      "methods": [],
      "name": "pursue"
-    },
-    {
-     "doc": "",
-     "kind": "function",
-     "line": 200,
-     "methods": [],
-     "name": "load_goal_record"
     }
    ],
-   "api_count": 6,
+   "api_count": 5,
    "classes": 4,
-   "commits": 0,
+   "commits": 5,
    "doc": "Goal mode: attempt until the verifier passes, or stop and say why.",
    "doc_full": "Goal mode: attempt until the verifier passes, or stop and say why.\n\nA run is one attempt. A goal is \"keep attempting until this is true\", and\nturning the second into the first needs three things the runtime does not\nsupply on its own: a stopping condition that is not the model's opinion, a\nbudget that covers the whole pursuit rather than each try, and a way for the\nnext attempt to know why the last one failed.\n\nThe first of those is why an acceptance command is mandatory here even\nthough a plain run can go without one. A goal whose stopping condition is\n\"the model says it is finished\" does not terminate on success, it terminates\non confidence, and it will happily burn its whole budget being sure.\n\nThe runner is injected so the loop can be tested without a model. What is\nworth testing here is the decision structure -- when to retry, when to stop,\nwhat to carry forward -- and none of that needs a provider.",
    "external": [
     "__future__",
     "collections",
     "dataclasses",
-    "json",
     "pathlib",
     "shlex",
     "time",
@@ -3576,7 +3872,7 @@
    ],
    "fan_in": 2,
    "fan_out": 4,
-   "functions": 2,
+   "functions": 1,
    "imported_by": [
     "autonomy.loop",
     "cli"
@@ -3588,13 +3884,13 @@
     "record.tracing"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "autonomy",
-   "lines": 201,
+   "lines": 196,
    "name": "autonomy.goal",
    "path": "harness/autonomy/goal.py",
    "side": "harness",
-   "sloc": 161,
+   "sloc": 158,
    "test_cases": 18,
    "test_sloc": 186,
    "tests": [
@@ -3641,7 +3937,7 @@
    ],
    "api_count": 5,
    "classes": 3,
-   "commits": 0,
+   "commits": 4,
    "doc": "The self-feeding loop: work the backlog until it is done or stuck.",
    "doc_full": "The self-feeding loop: work the backlog until it is done or stuck.\n\nGoal mode still needs a person to say what the goal is. This is the rung\nabove it: read the backlog, take the next unfinished feature, pursue it,\nrecord the outcome against evidence, go round again.\n\nEverything interesting here is about stopping. A loop that cannot stop is not\nautonomous, it is unattended, and the difference is whether it can tell the\noperator why it stopped. So there are three endings and each one is named: the\nbacklog is finished, the feature budget is spent, or every remaining feature\nhas been tried and failed.\n\nA failed feature is skipped rather than retried immediately. Goal mode has\nalready retried it as many times as it was allowed to; going straight round\nagain would let one hard feature consume the entire budget while the rest of\nthe backlog stayed untouched.",
    "external": [
@@ -3665,7 +3961,7 @@
     "core.util"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "autonomy",
    "lines": 178,
    "name": "autonomy.loop",
@@ -3721,7 +4017,7 @@
    ],
    "api_count": 5,
    "classes": 2,
-   "commits": 0,
+   "commits": 2,
    "doc": "Scoring a review instead of reading one.",
    "doc_full": "Scoring a review instead of reading one.\n\nThe reviewing sub-agent's output is prose. Prose is fine to read and\nimpossible to gate on: two reviews of the same diff cannot be compared, and\nnothing can say \"not good enough\" without a person deciding, again, what good\nenough meant this time.\n\nA rubric fixes the dimensions in advance so the reviewer scores what it was\nasked to score rather than whatever it happened to notice, and a threshold\nturns the result into a verdict. Two decisions here are deliberate. An\nunscored dimension counts as zero, because defaulting it to full marks would\nlet a reviewer pass anything by saying less. And the verdict uses a floor per\ndimension rather than an average, because an average lets a perfect score\nsomewhere hide a total failure somewhere else -- which is exactly the shape of\nthe review a model writes about its own area of confidence.",
    "external": [
@@ -3739,7 +4035,7 @@
    ],
    "imports": [],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "autonomy",
    "lines": 166,
    "name": "autonomy.rubric",
@@ -3794,7 +4090,7 @@
    ],
    "api_count": 5,
    "classes": 1,
-   "commits": 0,
+   "commits": 2,
    "doc": "A backlog the harness can work through on its own.",
    "doc_full": "A backlog the harness can work through on its own.\n\n`harness goal` needs someone to say what the goal is. A loop that discovers\nits own next piece of work needs that list to live somewhere durable, and each\nitem has to carry how it will be checked -- otherwise \"done\" is decided by\nwhoever last read the diff, which is the judgement this whole harness exists\nto take away from the model.\n\nSo a feature without an acceptance command is refused at load. It cannot be\nworked autonomously: the loop would have nothing to stop on.\n\nMarking is the other half. A feature is only recorded complete against\nevidence -- the run id that produced it and the commands that passed -- and a\nfailure is written down rather than erased, because a backlog that forgets\nits failures sends the loop round the same wall until its budget runs out.",
    "external": [
@@ -3818,7 +4114,7 @@
     "core.util"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "autonomy",
    "lines": 146,
    "name": "autonomy.backlog",
@@ -3927,7 +4223,7 @@
    ],
    "api_count": 3,
    "classes": 0,
-   "commits": 15,
+   "commits": 16,
    "doc": "Operator CLI for task intake, execution, recovery, inspection, and replay.",
    "doc_full": "Operator CLI for task intake, execution, recovery, inspection, and replay.",
    "external": [
@@ -3970,7 +4266,7 @@
     "runtime"
    ],
    "in_boundary": false,
-   "last_touched": "2026-09-01",
+   "last_touched": "2026-09-02",
    "layer": "",
    "lines": 1028,
    "name": "cli",
@@ -4014,7 +4310,7 @@
    ],
    "api_count": 3,
    "classes": 1,
-   "commits": 13,
+   "commits": 14,
    "doc": "The observe \u2192 propose \u2192 act \u2192 observe \u2192 verify/retry harness runtime.",
    "doc_full": "The observe \u2192 propose \u2192 act \u2192 observe \u2192 verify/retry harness runtime.",
    "external": [
@@ -4056,7 +4352,7 @@
     "run.verifier"
    ],
    "in_boundary": false,
-   "last_touched": "2026-09-01",
+   "last_touched": "2026-09-02",
    "layer": "",
    "lines": 862,
    "name": "runtime",
@@ -4076,35 +4372,35 @@
     {
      "doc": "",
      "kind": "class",
-     "line": 42,
+     "line": 46,
      "methods": [],
      "name": "RouteConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 65,
+     "line": 73,
      "methods": [],
      "name": "ModelRouterConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 75,
+     "line": 83,
      "methods": [],
      "name": "PolicyConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 88,
+     "line": 101,
      "methods": [],
      "name": "MCPServerConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 97,
+     "line": 110,
      "methods": [
       "with_overrides"
      ],
@@ -4113,35 +4409,35 @@
     {
      "doc": "",
      "kind": "function",
-     "line": 185,
+     "line": 201,
      "methods": [],
      "name": "load_config"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 411,
+     "line": 432,
      "methods": [],
      "name": "reject_unknown_route_keys"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 539,
+     "line": 605,
      "methods": [],
      "name": "load_task"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 621,
+     "line": 687,
      "methods": [],
      "name": "load_skill"
     }
    ],
    "api_count": 9,
    "classes": 5,
-   "commits": 11,
+   "commits": 15,
    "doc": "Versioned, strict configuration/task/skill loading.",
    "doc_full": "Versioned, strict configuration/task/skill loading.",
    "external": [
@@ -4153,8 +4449,8 @@
     "typing",
     "yaml"
    ],
-   "fan_in": 16,
-   "fan_out": 8,
+   "fan_in": 17,
+   "fan_out": 11,
    "functions": 4,
    "imported_by": [
     "cli",
@@ -4162,6 +4458,7 @@
     "execution.policy",
     "execution.tools",
     "models.model_router",
+    "models.prompting",
     "models.providers",
     "repl.agent",
     "repl.approvals",
@@ -4177,40 +4474,55 @@
    "imports": [
     "core.contracts",
     "core.errors",
+    "execution.hooks",
+    "execution.policy",
     "execution.retrieval",
     "execution.sandbox",
     "execution.search",
     "models.llm_light",
+    "models.prompting",
     "run.compaction",
     "run.subagents"
    ],
    "in_boundary": true,
-   "last_touched": "2026-09-01",
+   "last_touched": "2026-09-03",
    "layer": "",
-   "lines": 636,
+   "lines": 702,
    "name": "config",
    "path": "harness/config.py",
    "side": "harness",
-   "sloc": 569,
-   "test_cases": 401,
-   "test_sloc": 4343,
+   "sloc": 618,
+   "test_cases": 689,
+   "test_sloc": 6514,
    "tests": [
+    "test_atlas_trace.py",
     "test_auth_gateways.py",
+    "test_checkpoints.py",
     "test_compaction.py",
     "test_context_budget.py",
     "test_demo_repo.py",
     "test_denied_approval.py",
+    "test_failure_recovery.py",
+    "test_gmi.py",
     "test_goal.py",
+    "test_hooks.py",
     "test_instructions.py",
+    "test_interrupt.py",
     "test_patch_recovery.py",
+    "test_plan_mode.py",
     "test_policy_denylist.py",
+    "test_policy_evasion.py",
+    "test_policy_rules.py",
+    "test_prompt_profiles.py",
     "test_providers.py",
     "test_repl_agent.py",
     "test_repl_end_to_end.py",
     "test_repl_gemini.py",
+    "test_repl_tool_safety.py",
     "test_repl_tools.py",
     "test_review_findings.py",
     "test_runtime.py",
+    "test_shared_tooling.py",
     "test_subagents.py",
     "test_tools.py",
     "test_workspace.py"
@@ -4235,7 +4547,7 @@
    ],
    "api_count": 2,
    "classes": 1,
-   "commits": 4,
+   "commits": 5,
    "doc": "Preflight diagnostics shared by operators and the CLI.",
    "doc_full": "Preflight diagnostics shared by operators and the CLI.",
    "external": [
@@ -4261,7 +4573,7 @@
     "models.model_router"
    ],
    "in_boundary": false,
-   "last_touched": "2026-09-01",
+   "last_touched": "2026-09-02",
    "layer": "",
    "lines": 142,
    "name": "doctor",
@@ -4277,21 +4589,21 @@
     {
      "doc": "`--model route:model` named a route the config does not define.",
      "kind": "class",
-     "line": 59,
+     "line": 71,
      "methods": [],
      "name": "UnknownRoute"
     },
     {
      "doc": "Everything the shell was started with.",
      "kind": "class",
-     "line": 67,
+     "line": 79,
      "methods": [],
      "name": "Options"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 81,
+     "line": 96,
      "methods": [
       "run"
      ],
@@ -4300,22 +4612,26 @@
    ],
    "api_count": 3,
    "classes": 3,
-   "commits": 0,
+   "commits": 8,
    "doc": "The interactive shell around the agent loop.",
    "doc_full": "The interactive shell around the agent loop.\n\nOwns everything the loop deliberately does not: reading a line, expanding\n`@path` and `!command`, slash commands, the banner, and turning Ctrl-C into\nan interrupted turn rather than a dead process.",
    "external": [
     "__future__",
+    "collections",
+    "contextlib",
     "dataclasses",
     "os",
     "pathlib",
     "re",
     "readline",
     "shlex",
+    "signal",
     "time",
+    "typing",
     "uuid"
    ],
    "fan_in": 0,
-   "fan_out": 12,
+   "fan_out": 16,
    "functions": 0,
    "imported_by": [],
    "imports": [
@@ -4324,25 +4640,30 @@
     "core.errors",
     "core.util",
     "execution.process",
+    "execution.sandbox",
+    "execution.tools",
     "execution.workspace",
     "repl.agent",
     "repl.approvals",
+    "repl.checkpoints",
     "repl.conversation",
     "repl.model",
     "repl.render",
+    "repl.theme",
     "repl.tools"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-03",
    "layer": "repl",
-   "lines": 799,
+   "lines": 1092,
    "name": "repl.shell",
    "path": "harness/repl/shell.py",
    "side": "harness",
-   "sloc": 702,
-   "test_cases": 82,
-   "test_sloc": 743,
+   "sloc": 937,
+   "test_cases": 93,
+   "test_sloc": 848,
    "tests": [
+    "test_interrupt.py",
     "test_repl_gemini.py",
     "test_repl_shell.py"
    ]
@@ -4352,14 +4673,14 @@
     {
      "doc": "What running a tool produced.",
      "kind": "class",
-     "line": 52,
+     "line": 57,
      "methods": [],
      "name": "ToolOutcome"
     },
     {
-     "doc": "The registry, bound to one workspace root and one config.",
+     "doc": "The conversational tool set, executed by the shared registry.",
      "kind": "class",
-     "line": 69,
+     "line": 152,
      "methods": [
       "specs",
       "dispatch",
@@ -4376,14 +4697,14 @@
     {
      "doc": "A diff for the approval prompt, so consent is informed by the change.",
      "kind": "function",
-     "line": 466,
+     "line": 725,
      "methods": [],
      "name": "unified_diff"
     }
    ],
    "api_count": 3,
    "classes": 2,
-   "commits": 0,
+   "commits": 5,
    "doc": "The tools a conversational session gives the model.",
    "doc_full": "The tools a conversational session gives the model.\n\nShaped for editing rather than for batch patching. The batch path's\n`apply_patch` takes a whole unified diff, which asks a model to get line\nnumbers and context right in one shot; the failure mode is a rejected hunk\nand a wasted turn. `edit_file` instead takes the exact text to replace and\nrefuses when that text is absent or ambiguous, so a mistake comes back as a\nspecific, fixable message rather than a corrupted file.\n\nEvery path goes through `Workspace.resolve`, so containment is the same code\nthe batch path uses. The difference is only where the workspace root points:\nhere it is the directory the operator launched in.",
    "external": [
@@ -4395,10 +4716,12 @@
     "os",
     "pathlib",
     "re",
+    "tempfile",
+    "time",
     "typing"
    ],
    "fan_in": 2,
-   "fan_out": 5,
+   "fan_out": 8,
    "functions": 1,
    "imported_by": [
     "repl.agent",
@@ -4408,24 +4731,148 @@
     "config",
     "core.contracts",
     "core.errors",
-    "execution.process",
-    "execution.workspace"
+    "execution.policy",
+    "execution.sandbox",
+    "execution.tools",
+    "execution.workspace",
+    "record.artifacts"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "repl",
-   "lines": 490,
+   "lines": 757,
    "name": "repl.tools",
    "path": "harness/repl/tools.py",
    "side": "harness",
-   "sloc": 423,
-   "test_cases": 113,
-   "test_sloc": 1403,
+   "sloc": 622,
+   "test_cases": 304,
+   "test_sloc": 2914,
    "tests": [
+    "test_checkpoints.py",
+    "test_failure_recovery.py",
+    "test_hooks.py",
+    "test_interrupt.py",
+    "test_plan_mode.py",
+    "test_policy_evasion.py",
+    "test_policy_rules.py",
     "test_repl_agent.py",
     "test_repl_end_to_end.py",
     "test_repl_gemini.py",
-    "test_repl_tools.py"
+    "test_repl_tool_safety.py",
+    "test_repl_tools.py",
+    "test_shared_tooling.py"
+   ]
+  },
+  {
+   "api": [
+    {
+     "doc": "",
+     "kind": "class",
+     "line": 53,
+     "methods": [
+      "for_stream"
+     ],
+     "name": "Glyphs"
+    },
+    {
+     "doc": "Colour, width, and the one place anything reaches the terminal.",
+     "kind": "class",
+     "line": 80,
+     "methods": [
+      "width",
+      "measure",
+      "paint",
+      "accent",
+      "muted",
+      "success",
+      "failure",
+      "strong",
+      "write",
+      "line"
+     ],
+     "name": "Console"
+    },
+    {
+     "doc": "A live \"working\" line that erases itself.",
+     "kind": "class",
+     "line": 153,
+     "methods": [
+      "stop"
+     ],
+     "name": "Spinner"
+    },
+    {
+     "doc": "Model prose, rendered a line at a time.",
+     "kind": "class",
+     "line": 201,
+     "methods": [
+      "wrote_anything",
+      "feed",
+      "close"
+     ],
+     "name": "Prose"
+    },
+    {
+     "doc": "Draws turns, tool cards, diffs and prompts, all on the one grid.",
+     "kind": "class",
+     "line": 342,
+     "methods": [
+      "assistant_text",
+      "assistant_delta",
+      "assistant_done",
+      "tool_start",
+      "tool_result",
+      "tool_denied",
+      "diff",
+      "notice",
+      "error",
+      "rule",
+      "ask"
+     ],
+     "name": "Renderer"
+    }
+   ],
+   "api_count": 5,
+   "classes": 5,
+   "commits": 1,
+   "doc": "What the operator sees.",
+   "doc_full": "What the operator sees.\n\nFour rules shape everything here.\n\n**The screen shows what happened, not what was sent to the model.** A 400-line\nfile read is one line on screen and 400 in the context.\n\n**Nothing is printed that the terminal cannot encode.** A Windows console in\ncp1252 raising mid-stream would end a session over decoration, so every glyph\nhas an ASCII fallback chosen once at startup.\n\n**One grid.** Every line in the session shares a two-column gutter: marks hang\nin it, content starts after it. Tool names, model prose and status lines all\nbegin at the same column, and nested detail sits exactly one gutter deeper.\nAlignment is the only part of the hierarchy that survives a pipe, `NO_COLOR`,\nor a monochrome terminal, so it carries the structure and colour only\nreinforces it. The palette itself is in `theme.py`, with the measurements.\n\n**Prose looks the same however it arrived.** Streamed text used to be written\nstraight to the terminal, unwrapped and unstyled, while a blocking response\nwent through the markdown renderer. The same model saying the same words\nproduced two different screens depending on a transport setting. `Prose` below\nis the single renderer both paths feed, so the only difference streaming makes\nis when the characters appear.",
+   "external": [
+    "__future__",
+    "dataclasses",
+    "os",
+    "re",
+    "shutil",
+    "sys",
+    "threading",
+    "time"
+   ],
+   "fan_in": 2,
+   "fan_out": 2,
+   "functions": 0,
+   "imported_by": [
+    "repl.banner",
+    "repl.shell"
+   ],
+   "imports": [
+    "repl.approvals",
+    "repl.theme"
+   ],
+   "in_boundary": false,
+   "last_touched": "2026-09-02",
+   "layer": "repl",
+   "lines": 489,
+   "name": "repl.render",
+   "path": "harness/repl/render.py",
+   "side": "harness",
+   "sloc": 368,
+   "test_cases": 138,
+   "test_sloc": 1127,
+   "tests": [
+    "test_banner.py",
+    "test_render.py",
+    "test_repl_gemini.py",
+    "test_repl_shell.py"
    ]
   },
   {
@@ -4433,7 +4880,7 @@
     {
      "doc": "One route, spoken to in whole conversations.",
      "kind": "class",
-     "line": 40,
+     "line": 46,
      "methods": [
       "streams",
       "converse"
@@ -4443,13 +4890,12 @@
     {
      "doc": "Several routes tried in order, so one exhausted quota is not the end.",
      "kind": "class",
-     "line": 301,
+     "line": 321,
      "methods": [
       "current",
       "route",
       "name",
       "streams",
-      "alternatives",
       "converse"
      ],
      "name": "RouteChain"
@@ -4457,12 +4903,13 @@
    ],
    "api_count": 2,
    "classes": 2,
-   "commits": 0,
+   "commits": 2,
    "doc": "Talking to a model in conversation shape.",
    "doc_full": "Talking to a model in conversation shape.\n\n`providers.complete` normalizes a response down to one `ActionProposal`,\nbecause that is what the batch loop consumes. A conversation needs the\nopposite: the prose and every tool call, with nothing discarded and no JSON\nenvelope demanded of a model that simply wants to answer.\n\nTransport is not reimplemented here. `_HTTPProvider.send` owns timeouts,\nstatus classification and the error vocabulary; this module owns the request\nbody and the reading of the reply.",
    "external": [
     "__future__",
     "collections",
+    "dataclasses",
     "json",
     "time",
     "typing"
@@ -4482,16 +4929,19 @@
     "repl.conversation"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "repl",
-   "lines": 366,
+   "lines": 382,
    "name": "repl.model",
    "path": "harness/repl/model.py",
    "side": "harness",
-   "sloc": 308,
-   "test_cases": 80,
-   "test_sloc": 1189,
+   "sloc": 319,
+   "test_cases": 161,
+   "test_sloc": 1793,
    "tests": [
+    "test_gmi.py",
+    "test_hooks.py",
+    "test_interrupt.py",
     "test_repl_agent.py",
     "test_repl_end_to_end.py",
     "test_repl_gemini.py"
@@ -4500,134 +4950,40 @@
   {
    "api": [
     {
-     "doc": "",
-     "kind": "class",
-     "line": 25,
-     "methods": [
-      "for_stream"
-     ],
-     "name": "Glyphs"
-    },
-    {
-     "doc": "Colour, width, and the one place anything reaches the terminal.",
-     "kind": "class",
-     "line": 50,
-     "methods": [
-      "width",
-      "paint",
-      "dim",
-      "bold",
-      "accent",
-      "good",
-      "bad",
-      "write",
-      "line"
-     ],
-     "name": "Console"
-    },
-    {
-     "doc": "A live \"working\" line that erases itself.",
-     "kind": "class",
-     "line": 104,
-     "methods": [
-      "stop"
-     ],
-     "name": "Spinner"
-    },
-    {
-     "doc": "Draws turns, tool cards, diffs and prompts.",
-     "kind": "class",
-     "line": 149,
-     "methods": [
-      "assistant_text",
-      "tool_start",
-      "tool_result",
-      "tool_denied",
-      "diff",
-      "notice",
-      "error",
-      "rule",
-      "ask"
-     ],
-     "name": "Renderer"
-    }
-   ],
-   "api_count": 4,
-   "classes": 4,
-   "commits": 0,
-   "doc": "What the operator sees.",
-   "doc_full": "What the operator sees.\n\nTwo rules shape everything here. The screen shows what happened, not what\nwas sent to the model: a 400-line file read is one line on screen and 400 in\nthe context. And nothing is ever printed that the terminal cannot encode --\na Windows console in cp1252 raising mid-stream would kill a session over\ndecoration, so every glyph has an ASCII fallback chosen once at startup.",
-   "external": [
-    "__future__",
-    "dataclasses",
-    "os",
-    "shutil",
-    "sys",
-    "threading",
-    "time"
-   ],
-   "fan_in": 1,
-   "fan_out": 1,
-   "functions": 0,
-   "imported_by": [
-    "repl.shell"
-   ],
-   "imports": [
-    "repl.approvals"
-   ],
-   "in_boundary": false,
-   "last_touched": "",
-   "layer": "repl",
-   "lines": 313,
-   "name": "repl.render",
-   "path": "harness/repl/render.py",
-   "side": "harness",
-   "sloc": 250,
-   "test_cases": 82,
-   "test_sloc": 743,
-   "tests": [
-    "test_repl_gemini.py",
-    "test_repl_shell.py"
-   ]
-  },
-  {
-   "api": [
-    {
      "doc": "The operator asked for the current turn to stop.",
      "kind": "class",
-     "line": 34,
+     "line": 36,
      "methods": [],
      "name": "Interrupted"
     },
     {
      "doc": "What bounds one turn, so a loop cannot run forever unattended.",
      "kind": "class",
-     "line": 39,
+     "line": 41,
      "methods": [],
      "name": "Limits"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 49,
+     "line": 51,
      "methods": [],
      "name": "TurnStats"
     },
     {
      "doc": "Everything the loop tells the outside world.",
      "kind": "class",
-     "line": 58,
+     "line": 60,
      "methods": [],
      "name": "Events"
     },
     {
      "doc": "One session: a thread, a working directory, a model and a gate.",
      "kind": "class",
-     "line": 74,
+     "line": 82,
      "methods": [
       "cancel",
       "send",
-      "resume_after_interrupt",
       "compact",
       "save"
      ],
@@ -4636,21 +4992,21 @@
     {
      "doc": "The route could not be reached, or refused the request.",
      "kind": "class",
-     "line": 266,
+     "line": 306,
      "methods": [],
      "name": "ModelUnavailable"
     },
     {
      "doc": "A one-line rendering of a call's arguments, for a tool card.",
      "kind": "function",
-     "line": 280,
+     "line": 320,
      "methods": [],
      "name": "describe_arguments"
     }
    ],
    "api_count": 7,
    "classes": 6,
-   "commits": 0,
+   "commits": 4,
    "doc": "The turn loop.",
    "doc_full": "The turn loop.\n\nOne user message starts a turn. A turn is: send the whole thread, read what\ncomes back, run whatever tools it asked for, append the results, and send\nagain. It ends when the model replies without asking for a tool -- or when a\nbound is hit, which is the difference between an agent and a runaway loop.",
    "external": [
@@ -4663,7 +5019,7 @@
     "typing"
    ],
    "fan_in": 1,
-   "fan_out": 7,
+   "fan_out": 9,
    "functions": 1,
    "imported_by": [
     "repl.shell"
@@ -4672,25 +5028,89 @@
     "config",
     "core.contracts",
     "core.errors",
+    "execution.hooks",
     "repl.approvals",
+    "repl.checkpoints",
     "repl.conversation",
     "repl.model",
     "repl.tools"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-03",
    "layer": "repl",
-   "lines": 293,
+   "lines": 333,
    "name": "repl.agent",
    "path": "harness/repl/agent.py",
    "side": "harness",
-   "sloc": 227,
-   "test_cases": 80,
-   "test_sloc": 1189,
+   "sloc": 253,
+   "test_cases": 139,
+   "test_sloc": 1666,
    "tests": [
+    "test_checkpoints.py",
+    "test_hooks.py",
+    "test_interrupt.py",
     "test_repl_agent.py",
     "test_repl_end_to_end.py",
     "test_repl_gemini.py"
+   ]
+  },
+  {
+   "api": [
+    {
+     "doc": "One recorded state of the working tree.",
+     "kind": "class",
+     "line": 59,
+     "methods": [
+      "short"
+     ],
+     "name": "Checkpoint"
+    },
+    {
+     "doc": "A shadow git repository over the operator's working directory.",
+     "kind": "class",
+     "line": 71,
+     "methods": [
+      "record",
+      "list",
+      "changed_since",
+      "restore"
+     ],
+     "name": "Checkpoints"
+    }
+   ],
+   "api_count": 2,
+   "classes": 2,
+   "commits": 1,
+   "doc": "Undo for a conversation, without touching the operator's history.",
+   "doc_full": "Undo for a conversation, without touching the operator's history.\n\nAn agent editing files in a real working directory needs an undo that is not\n\"hope it was committed\". Three shapes were considered and the third is here.\n\nCommitting to the operator's own repository, which is what Aider does, gives a\nperfect undo and puts the agent's intermediate states in the history the\noperator will publish. Snapshotting only through the edit tools, which is what\nClaude Code does, is cheap and misses everything a command changed, so a run\nthat formats the tree or regenerates a lockfile leaves nothing to go back to.\n\nA shadow repository gets both. It is an ordinary git repository whose work tree\nis the operator's directory and whose `.git` is somewhere else, so it records\nfull states of the tree without ever writing to the real history, and because\nit snapshots after tool calls rather than inside them it catches what commands\ndid as well as what edits did. It also works in a directory that is not a git\nrepository at all, which is where an undo is needed most.",
+   "external": [
+    "__future__",
+    "dataclasses",
+    "pathlib"
+   ],
+   "fan_in": 2,
+   "fan_out": 2,
+   "functions": 0,
+   "imported_by": [
+    "repl.agent",
+    "repl.shell"
+   ],
+   "imports": [
+    "execution.process",
+    "execution.workspace"
+   ],
+   "in_boundary": false,
+   "last_touched": "2026-09-03",
+   "layer": "repl",
+   "lines": 251,
+   "name": "repl.checkpoints",
+   "path": "harness/repl/checkpoints.py",
+   "side": "harness",
+   "sloc": 191,
+   "test_cases": 25,
+   "test_sloc": 188,
+   "tests": [
+    "test_checkpoints.py"
    ]
   },
   {
@@ -4714,21 +5134,21 @@
     {
      "doc": "A deliberately rough token count.",
      "kind": "function",
-     "line": 54,
+     "line": 60,
      "methods": [],
      "name": "estimate_tokens"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 65,
+     "line": 71,
      "methods": [],
      "name": "message_tokens"
     },
     {
      "doc": "One thread: a fixed system prompt and a growing list of turns.",
      "kind": "class",
-     "line": 76,
+     "line": 82,
      "methods": [
       "add_user",
       "add_assistant",
@@ -4747,7 +5167,7 @@
    ],
    "api_count": 5,
    "classes": 3,
-   "commits": 0,
+   "commits": 1,
    "doc": "The message history a session accumulates, and what to do when it fills.",
    "doc_full": "The message history a session accumulates, and what to do when it fills.\n\nMessages are held in the OpenAI chat shape because it is the one every route\nin this repository speaks natively except Anthropic, which `model.py`\nconverts on the way out. Holding one canonical shape means compaction,\npersistence and token accounting are written once.",
    "external": [
@@ -4769,16 +5189,18 @@
    ],
    "imports": [],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "repl",
-   "lines": 241,
+   "lines": 247,
    "name": "repl.conversation",
    "path": "harness/repl/conversation.py",
    "side": "harness",
-   "sloc": 187,
-   "test_cases": 126,
-   "test_sloc": 1454,
+   "sloc": 188,
+   "test_cases": 160,
+   "test_sloc": 1743,
    "tests": [
+    "test_hooks.py",
+    "test_interrupt.py",
     "test_repl_agent.py",
     "test_repl_end_to_end.py",
     "test_repl_gemini.py",
@@ -4790,7 +5212,7 @@
     {
      "doc": "How much the gate asks about.",
      "kind": "class",
-     "line": 36,
+     "line": 43,
      "methods": [
       "label"
      ],
@@ -4799,14 +5221,14 @@
     {
      "doc": "",
      "kind": "class",
-     "line": 55,
+     "line": 66,
      "methods": [],
      "name": "Verdict"
     },
     {
      "doc": "A side effect waiting on a decision, described for a human.",
      "kind": "class",
-     "line": 62,
+     "line": 73,
      "methods": [
       "always_key"
      ],
@@ -4815,14 +5237,14 @@
     {
      "doc": "",
      "kind": "class",
-     "line": 91,
+     "line": 102,
      "methods": [],
      "name": "Decision"
     },
     {
      "doc": "The approval gate for one session.",
      "kind": "class",
-     "line": 101,
+     "line": 112,
      "methods": [
       "remember",
       "forget_all",
@@ -4834,9 +5256,9 @@
    ],
    "api_count": 5,
    "classes": 5,
-   "commits": 0,
+   "commits": 3,
    "doc": "Deciding what the model is allowed to actually do.",
-   "doc_full": "Deciding what the model is allowed to actually do.\n\nThe REPL edits the operator's real working directory, so this is the module\nthat stands between a proposed side effect and the filesystem. Three rules,\nin order:\n\n1. The deny-list is absolute. A command matching it is refused and is never\n   offered for approval, because a human clicking yes on a prompt is exactly\n   the mistake the deny-list exists to prevent.\n2. Reads never ask.\n3. Everything else asks, unless the mode says otherwise or the operator has\n   already said \"don't ask again\" for this shape of action.\n\nThe modes mirror the three that coding agents have converged on: ask about\neverything, ask only about running commands, ask about nothing.",
+   "doc_full": "Deciding what the model is allowed to actually do.\n\nThe REPL edits the operator's real working directory, so this is the module\nthat stands between a proposed side effect and the filesystem. The order is\nfrom least negotiable to most:\n\n1. The deny-list is absolute. A command matching it is refused and is never\n   offered for approval, because a human clicking yes on a prompt is exactly\n   the mistake the deny-list exists to prevent.\n2. An operator rule decides one specific thing, so it outranks the mode, which\n   is only a default for everything. A deny rule holds in every mode including\n   full-auto; an ask rule asks in a mode that would not have; an allow rule\n   waves through what a mode would have asked about. No rule can reach past\n   the deny-list.\n3. Reads never ask, unless a rule says to ask about that one.\n4. Plan mode refuses anything that would change something, rather than\n   offering to approve it one at a time.\n5. Everything else asks, unless the mode says otherwise or the operator has\n   already said \"don't ask again\" for this shape of action.\n\nThe modes mirror what coding agents have converged on: read without changing,\nask about everything, ask only about running commands, ask about nothing.",
    "external": [
     "__future__",
     "collections",
@@ -4859,16 +5281,22 @@
     "execution.policy"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-03",
    "layer": "repl",
-   "lines": 212,
+   "lines": 265,
    "name": "repl.approvals",
    "path": "harness/repl/approvals.py",
    "side": "harness",
-   "sloc": 156,
-   "test_cases": 126,
-   "test_sloc": 1454,
+   "sloc": 184,
+   "test_cases": 266,
+   "test_sloc": 2416,
    "tests": [
+    "test_hooks.py",
+    "test_interrupt.py",
+    "test_plan_mode.py",
+    "test_policy_evasion.py",
+    "test_policy_rules.py",
+    "test_prompt_profiles.py",
     "test_repl_agent.py",
     "test_repl_end_to_end.py",
     "test_repl_gemini.py",
@@ -4880,14 +5308,14 @@
     {
      "doc": "The full system prompt for a session rooted at *root*.",
      "kind": "function",
-     "line": 53,
+     "line": 27,
      "methods": [],
      "name": "build"
     }
    ],
    "api_count": 1,
    "classes": 0,
-   "commits": 0,
+   "commits": 3,
    "doc": "The system prompt, assembled once per session.",
    "doc_full": "The system prompt, assembled once per session.\n\nKept stable and at the front of every request. Providers cache on prompt\nprefixes, so the difference between building this once and rebuilding it per\nturn is a cache hit on the entire conversation history.",
    "external": [
@@ -4897,27 +5325,162 @@
     "typing"
    ],
    "fan_in": 0,
-   "fan_out": 5,
+   "fan_out": 7,
    "functions": 1,
    "imported_by": [],
    "imports": [
     "config",
     "execution.process",
     "execution.workspace",
+    "models.prompting",
     "repl.approvals",
+    "repl.blocks",
     "run.instructions"
    ],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-02",
    "layer": "repl",
-   "lines": 147,
+   "lines": 133,
    "name": "repl.prompt",
    "path": "harness/repl/prompt.py",
    "side": "harness",
-   "sloc": 124,
+   "sloc": 114,
    "test_cases": 0,
    "test_sloc": 0,
    "tests": []
+  },
+  {
+   "api": [
+    {
+     "doc": "The word as five equal-length rows, drawn with *fill*.",
+     "kind": "function",
+     "line": 80,
+     "methods": [],
+     "name": "render"
+    },
+    {
+     "doc": "",
+     "kind": "function",
+     "line": 92,
+     "methods": [],
+     "name": "width"
+    },
+    {
+     "doc": "The painted rows, or an empty list when there is no room for them.",
+     "kind": "function",
+     "line": 97,
+     "methods": [],
+     "name": "draw"
+    }
+   ],
+   "api_count": 3,
+   "classes": 0,
+   "commits": 1,
+   "doc": "The wordmark drawn at the top of a session.",
+   "doc_full": "The wordmark drawn at the top of a session.\n\nA block font rather than an image, because the one thing a terminal banner has\nto survive is being a terminal: no truecolor, no Unicode, eighty columns, a\npipe instead of a tty. Each of those degrades here rather than breaking.\n\nThe block character is U+2588, which is not in cp1252, so a legacy Windows\nconsole cannot encode it and `console.write` would swallow the whole line. The\nfont is therefore rendered with whatever fill the stream can actually take, and\nthe layout is identical either way.",
+   "external": [
+    "__future__"
+   ],
+   "fan_in": 0,
+   "fan_out": 2,
+   "functions": 3,
+   "imported_by": [],
+   "imports": [
+    "repl.render",
+    "repl.theme"
+   ],
+   "in_boundary": false,
+   "last_touched": "2026-09-02",
+   "layer": "repl",
+   "lines": 107,
+   "name": "repl.banner",
+   "path": "harness/repl/banner.py",
+   "side": "harness",
+   "sloc": 85,
+   "test_cases": 0,
+   "test_sloc": 0,
+   "tests": []
+  },
+  {
+   "api": [
+    {
+     "doc": "The instruction half of the prompt, assembled from the dials.",
+     "kind": "function",
+     "line": 76,
+     "methods": [],
+     "name": "compose"
+    }
+   ],
+   "api_count": 1,
+   "classes": 0,
+   "commits": 1,
+   "doc": "The text the system prompt is assembled from, one block per dial.",
+   "doc_full": "The text the system prompt is assembled from, one block per dial.\n\nSplit out from `prompt.py` so the wording sits on its own, away from the\nmachinery that arranges it. Every block here is a piece of published prompting\nguidance reduced to the part that survives leaving Claude: it says what to do,\nnever which tag to wrap it in, so the same sentence reads correctly whether the\nroute draws headings as Markdown, XML or plain labels.\n\n`docs/research/prompting-practices.md` records where each came from and why the\nmechanism was dropped.",
+   "external": [
+    "__future__"
+   ],
+   "fan_in": 1,
+   "fan_out": 1,
+   "functions": 1,
+   "imported_by": [
+    "repl.prompt"
+   ],
+   "imports": [
+    "models.prompting"
+   ],
+   "in_boundary": false,
+   "last_touched": "2026-09-02",
+   "layer": "repl",
+   "lines": 103,
+   "name": "repl.blocks",
+   "path": "harness/repl/blocks.py",
+   "side": "harness",
+   "sloc": 67,
+   "test_cases": 0,
+   "test_sloc": 0,
+   "tests": []
+  },
+  {
+   "api": [
+    {
+     "doc": "Five roles. Each value is an SGR parameter list, not a colour name.",
+     "kind": "class",
+     "line": 54,
+     "methods": [],
+     "name": "Theme"
+    }
+   ],
+   "api_count": 1,
+   "classes": 1,
+   "commits": 0,
+   "doc": "One palette and one layout grid, so the session looks like one program.",
+   "doc_full": "One palette and one layout grid, so the session looks like one program.\n\nColour here is information, not decoration, so there are five roles and no\nmore. Anything that does not carry meaning is left at the terminal's own\nforeground, which is the only colour guaranteed to be readable.\n\n**The colours are measured, not chosen by eye.** A terminal's background is\nunknown and unknowable: it may be white, black, or Solarized Dark, and the\nprogram cannot ask. So each role's colour was picked by maximising its *worst*\nWCAG contrast ratio across all three. The arithmetic ceiling for a single\ncolour that must work on both white and black is sqrt(21), about 4.58, reached\nonly at relative luminance 0.179; every colour below is within 0.9 of that\nceiling. The numbers are in the comments and reproducible from the constants.\n\nThree findings from terminal practice shaped the rest.\n\n**SGR 2 (`dim`/faint) is not used anywhere.** Support is inconsistent: some\nterminals ignore it, leaving no hierarchy at all, and others render it so faint\nit is unreadable on a dark background. The old renderer used it for the\nmajority of its output, which meant most of the interface was at the mercy of a\ncode that had no defined appearance. A measured grey replaces it.\n\n**The 16 ANSI colours are not used either.** They have no standard: each\nterminal theme picks its own, so `blue` may be anything and is famously\nillegible on black in several popular themes. The 256-colour cube is fixed, so\na chosen colour is the colour that appears.\n\n**Nothing depends on colour alone.** Piped output, `NO_COLOR`, and a dumb\nterminal all lose every code here, so the layout below has to carry the\nstructure by itself. That is what the grid is for.",
+   "external": [
+    "__future__",
+    "dataclasses"
+   ],
+   "fan_in": 3,
+   "fan_out": 0,
+   "functions": 0,
+   "imported_by": [
+    "repl.banner",
+    "repl.render",
+    "repl.shell"
+   ],
+   "imports": [],
+   "in_boundary": false,
+   "last_touched": "",
+   "layer": "repl",
+   "lines": 97,
+   "name": "repl.theme",
+   "path": "harness/repl/theme.py",
+   "side": "harness",
+   "sloc": 43,
+   "test_cases": 35,
+   "test_sloc": 277,
+   "tests": [
+    "test_render.py"
+   ]
   }
  ],
  "primitives": [
@@ -4940,10 +5503,10 @@
     "modules": [
      "repl.agent"
     ],
-    "sloc": 227,
-    "tests": 80
+    "sloc": 253,
+    "tests": 139
    },
-   "sloc": 1008
+   "sloc": 1034
   },
   {
    "asks": "what the model sees, and what happens when it stops fitting",
@@ -4967,22 +5530,22 @@
      "repl.conversation",
      "repl.prompt"
     ],
-    "sloc": 311,
-    "tests": 126
+    "sloc": 302,
+    "tests": 160
    },
-   "sloc": 700
+   "sloc": 691
   },
   {
    "asks": "typed capabilities, validated arguments, legible failures",
    "batch": {
-    "api": 15,
+    "api": 17,
     "missing": [],
     "modules": [
      "execution.tools",
      "core.schema"
     ],
-    "sloc": 1019,
-    "tests": 38
+    "sloc": 1093,
+    "tests": 58
    },
    "key": "execution.tools",
    "name": "Tool design",
@@ -4992,10 +5555,10 @@
     "modules": [
      "repl.tools"
     ],
-    "sloc": 423,
-    "tests": 113
+    "sloc": 622,
+    "tests": 304
    },
-   "sloc": 1442
+   "sloc": 1715
   },
   {
    "asks": "capability sets declared outside the code that runs them",
@@ -5006,8 +5569,8 @@
      "execution.mcp",
      "config"
     ],
-    "sloc": 749,
-    "tests": 401
+    "sloc": 798,
+    "tests": 689
    },
    "key": "skills",
    "name": "Skills and MCP",
@@ -5018,18 +5581,18 @@
     "sloc": 0,
     "tests": 0
    },
-   "sloc": 749
+   "sloc": 798
   },
   {
    "asks": "who may do what, and what may never be authorized at all",
    "batch": {
-    "api": 4,
+    "api": 9,
     "missing": [],
     "modules": [
      "execution.policy"
     ],
-    "sloc": 98,
-    "tests": 60
+    "sloc": 360,
+    "tests": 137
    },
    "key": "permissions",
    "name": "Permissions",
@@ -5039,10 +5602,10 @@
     "modules": [
      "repl.approvals"
     ],
-    "sloc": 156,
-    "tests": 126
+    "sloc": 184,
+    "tests": 266
    },
-   "sloc": 254
+   "sloc": 544
   },
   {
    "asks": "what survives a turn, a crash, and a session",
@@ -5065,22 +5628,22 @@
     "modules": [
      "repl.conversation"
     ],
-    "sloc": 187,
-    "tests": 126
+    "sloc": 188,
+    "tests": 160
    },
-   "sloc": 431
+   "sloc": 432
   },
   {
    "asks": "breaking work up, and pursuing it across attempts",
    "batch": {
-    "api": 16,
+    "api": 15,
     "missing": [],
     "modules": [
      "autonomy.goal",
      "autonomy.loop",
      "run.subagents"
     ],
-    "sloc": 469,
+    "sloc": 466,
     "tests": 78
    },
    "key": "planning",
@@ -5092,20 +5655,20 @@
     "sloc": 0,
     "tests": 0
    },
-   "sloc": 469
+   "sloc": 466
   },
   {
    "asks": "where a command runs and what it can reach",
    "batch": {
-    "api": 12,
+    "api": 17,
     "missing": [],
     "modules": [
      "execution.sandbox",
      "execution.process",
      "execution.workspace"
     ],
-    "sloc": 520,
-    "tests": 277
+    "sloc": 664,
+    "tests": 540
    },
    "key": "execution.sandbox",
    "name": "Sandbox and execution",
@@ -5115,15 +5678,15 @@
     "modules": [
      "repl.tools"
     ],
-    "sloc": 423,
-    "tests": 113
+    "sloc": 622,
+    "tests": 304
    },
-   "sloc": 943
+   "sloc": 1286
   },
   {
    "asks": "which model, which credential, what if it fails",
    "batch": {
-    "api": 45,
+    "api": 47,
     "missing": [],
     "modules": [
      "models.providers",
@@ -5132,8 +5695,8 @@
      "models.auth",
      "models.streaming"
     ],
-    "sloc": 1697,
-    "tests": 164
+    "sloc": 1857,
+    "tests": 283
    },
    "key": "routing",
    "name": "Model access and routing",
@@ -5143,10 +5706,10 @@
     "modules": [
      "repl.model"
     ],
-    "sloc": 308,
-    "tests": 80
+    "sloc": 319,
+    "tests": 161
    },
-   "sloc": 2005
+   "sloc": 2176
   },
   {
    "asks": "who decides the work is done, and on what evidence",
@@ -5158,7 +5721,7 @@
      "record.artifacts",
      "autonomy.delivery"
     ],
-    "sloc": 459,
+    "sloc": 454,
     "tests": 36
    },
    "key": "verification",
@@ -5170,7 +5733,7 @@
     "sloc": 0,
     "tests": 0
    },
-   "sloc": 459
+   "sloc": 454
   },
   {
    "asks": "what was recorded, and can it be replayed",
@@ -5183,8 +5746,8 @@
      "record.replay",
      "record.redaction"
     ],
-    "sloc": 277,
-    "tests": 16
+    "sloc": 342,
+    "tests": 54
    },
    "key": "observability",
    "name": "Observability and tracing",
@@ -5195,7 +5758,7 @@
     "sloc": 0,
     "tests": 0
    },
-   "sloc": 277
+   "sloc": 342
   },
   {
    "asks": "where a person is asked, and how the answer is remembered",
@@ -5211,16 +5774,16 @@
    "key": "hitl",
    "name": "Human in the loop",
    "repl": {
-    "api": 7,
+    "api": 8,
     "missing": [],
     "modules": [
      "repl.shell",
      "repl.render"
     ],
-    "sloc": 952,
-    "tests": 164
+    "sloc": 1305,
+    "tests": 231
    },
-   "sloc": 1859
+   "sloc": 2212
   },
   {
    "asks": "does the harness still do the job after a change",
@@ -5248,15 +5811,15 @@
   {
    "asks": "retries, fallback, deliberate failure injection",
    "batch": {
-    "api": 20,
+    "api": 17,
     "missing": [],
     "modules": [
      "models.model_router",
      "run.faults",
      "core.errors"
     ],
-    "sloc": 287,
-    "tests": 418
+    "sloc": 290,
+    "tests": 602
    },
    "key": "reliability",
    "name": "Reliability",
@@ -5266,10 +5829,10 @@
     "modules": [
      "repl.model"
     ],
-    "sloc": 308,
-    "tests": 80
+    "sloc": 319,
+    "tests": 161
    },
-   "sloc": 595
+   "sloc": 609
   },
   {
    "asks": "finding the relevant part of a repository too big to read",
@@ -5291,10 +5854,10 @@
     "modules": [
      "repl.tools"
     ],
-    "sloc": 423,
-    "tests": 113
+    "sloc": 622,
+    "tests": 304
    },
-   "sloc": 923
+   "sloc": 1122
   }
  ],
  "repo": "yatra-harness",
@@ -5511,6 +6074,15 @@
    "lines": 277,
    "sloc": 228
   },
+  "test_atlas_trace.py": {
+   "cases": 17,
+   "covers": [
+    "config",
+    "models"
+   ],
+   "lines": 190,
+   "sloc": 139
+  },
   "test_auth.py": {
    "cases": 41,
    "covers": [
@@ -5545,6 +6117,28 @@
    ],
    "lines": 169,
    "sloc": 129
+  },
+  "test_banner.py": {
+   "cases": 21,
+   "covers": [
+    "repl",
+    "repl.render"
+   ],
+   "lines": 144,
+   "sloc": 107
+  },
+  "test_checkpoints.py": {
+   "cases": 25,
+   "covers": [
+    "config",
+    "core.contracts",
+    "execution.workspace",
+    "repl.agent",
+    "repl.checkpoints",
+    "repl.tools"
+   ],
+   "lines": 234,
+   "sloc": 188
   },
   "test_compaction.py": {
    "cases": 21,
@@ -5617,6 +6211,34 @@
    "lines": 232,
    "sloc": 191
   },
+  "test_failure_recovery.py": {
+   "cases": 25,
+   "covers": [
+    "config",
+    "core.errors",
+    "execution.process",
+    "execution.workspace",
+    "models.providers",
+    "record.events",
+    "repl.tools"
+   ],
+   "lines": 309,
+   "sloc": 243
+  },
+  "test_gmi.py": {
+   "cases": 47,
+   "covers": [
+    "config",
+    "core.contracts",
+    "core.errors",
+    "models",
+    "models.providers",
+    "models.streaming",
+    "repl.model"
+   ],
+   "lines": 401,
+   "sloc": 315
+  },
   "test_goal.py": {
    "cases": 18,
    "covers": [
@@ -5626,6 +6248,22 @@
    ],
    "lines": 238,
    "sloc": 186
+  },
+  "test_hooks.py": {
+   "cases": 23,
+   "covers": [
+    "config",
+    "core.errors",
+    "execution.hooks",
+    "execution.workspace",
+    "repl.agent",
+    "repl.approvals",
+    "repl.conversation",
+    "repl.model",
+    "repl.tools"
+   ],
+   "lines": 229,
+   "sloc": 184
   },
   "test_instructions.py": {
    "cases": 18,
@@ -5638,6 +6276,21 @@
    ],
    "lines": 201,
    "sloc": 157
+  },
+  "test_interrupt.py": {
+   "cases": 11,
+   "covers": [
+    "config",
+    "execution.workspace",
+    "repl.agent",
+    "repl.approvals",
+    "repl.conversation",
+    "repl.model",
+    "repl.shell",
+    "repl.tools"
+   ],
+   "lines": 131,
+   "sloc": 105
   },
   "test_llm_light.py": {
    "cases": 23,
@@ -5657,6 +6310,15 @@
    "lines": 217,
    "sloc": 165
   },
+  "test_os_sandbox.py": {
+   "cases": 27,
+   "covers": [
+    "core.errors",
+    "execution.sandbox"
+   ],
+   "lines": 224,
+   "sloc": 174
+  },
   "test_patch_recovery.py": {
    "cases": 6,
    "covers": [
@@ -5669,6 +6331,19 @@
    "lines": 120,
    "sloc": 91
   },
+  "test_plan_mode.py": {
+   "cases": 16,
+   "covers": [
+    "config",
+    "core.contracts",
+    "execution.workspace",
+    "repl",
+    "repl.approvals",
+    "repl.tools"
+   ],
+   "lines": 166,
+   "sloc": 126
+  },
   "test_policy_denylist.py": {
    "cases": 12,
    "covers": [
@@ -5680,6 +6355,43 @@
    "lines": 138,
    "sloc": 107
   },
+  "test_policy_evasion.py": {
+   "cases": 28,
+   "covers": [
+    "config",
+    "execution.policy",
+    "execution.workspace",
+    "repl.approvals",
+    "repl.tools"
+   ],
+   "lines": 192,
+   "sloc": 140
+  },
+  "test_policy_rules.py": {
+   "cases": 29,
+   "covers": [
+    "config",
+    "core.errors",
+    "execution.policy",
+    "execution.workspace",
+    "repl.approvals",
+    "repl.tools"
+   ],
+   "lines": 259,
+   "sloc": 201
+  },
+  "test_prompt_profiles.py": {
+   "cases": 33,
+   "covers": [
+    "config",
+    "core.errors",
+    "models",
+    "repl",
+    "repl.approvals"
+   ],
+   "lines": 260,
+   "sloc": 206
+  },
   "test_providers.py": {
    "cases": 22,
    "covers": [
@@ -5690,6 +6402,24 @@
    ],
    "lines": 373,
    "sloc": 323
+  },
+  "test_redaction_coverage.py": {
+   "cases": 13,
+   "covers": [
+    "models",
+    "record.redaction"
+   ],
+   "lines": 136,
+   "sloc": 105
+  },
+  "test_render.py": {
+   "cases": 35,
+   "covers": [
+    "repl.render",
+    "repl.theme"
+   ],
+   "lines": 370,
+   "sloc": 277
   },
   "test_repl_agent.py": {
    "cases": 38,
@@ -5751,6 +6481,16 @@
    ],
    "lines": 340,
    "sloc": 265
+  },
+  "test_repl_tool_safety.py": {
+   "cases": 14,
+   "covers": [
+    "config",
+    "execution.workspace",
+    "repl.tools"
+   ],
+   "lines": 194,
+   "sloc": 152
   },
   "test_repl_tools.py": {
    "cases": 33,
@@ -5837,6 +6577,21 @@
    "lines": 160,
    "sloc": 126
   },
+  "test_shared_tooling.py": {
+   "cases": 20,
+   "covers": [
+    "config",
+    "core.contracts",
+    "execution",
+    "execution.policy",
+    "execution.sandbox",
+    "execution.tools",
+    "execution.workspace",
+    "repl.tools"
+   ],
+   "lines": 215,
+   "sloc": 172
+  },
   "test_streaming.py": {
    "cases": 17,
    "covers": [
@@ -5904,10 +6659,48 @@
   },
   {
    "arguments": [
+    "query",
+    "limit"
+   ],
+   "description": "Find the parts of the workspace most relevant to a question, ranked, as excerpts with their file and line range.",
+   "line": 247,
+   "name": "retrieve",
+   "required": [
+    "query"
+   ],
+   "risk": "read"
+  },
+  {
+   "arguments": [
+    "query",
+    "limit"
+   ],
+   "description": "Search the web and return ranked results with their URLs.",
+   "line": 264,
+   "name": "web_search",
+   "required": [
+    "query"
+   ],
+   "risk": "network"
+  },
+  {
+   "arguments": [
+    "url"
+   ],
+   "description": "Fetch one URL and return its readable text.",
+   "line": 278,
+   "name": "browser_fetch",
+   "required": [
+    "url"
+   ],
+   "risk": "network"
+  },
+  {
+   "arguments": [
     "max_entries"
    ],
    "description": "List a bounded tree of files in the run workspace.",
-   "line": 236,
+   "line": 306,
    "name": "repo_tree",
    "required": [],
    "risk": "read"
@@ -5918,7 +6711,7 @@
     "max_matches"
    ],
    "description": "Search UTF-8 text files in the workspace for a literal string.",
-   "line": 245,
+   "line": 315,
    "name": "search_repo",
    "required": [
     "query"
@@ -5932,7 +6725,7 @@
     "end_line"
    ],
    "description": "Read a UTF-8 file inside the run workspace.",
-   "line": 257,
+   "line": 327,
    "name": "read_file",
    "required": [
     "path"
@@ -5944,7 +6737,7 @@
     "patch"
    ],
    "description": "Apply a unified git patch inside the run workspace.",
-   "line": 273,
+   "line": 343,
    "name": "apply_patch",
    "required": [
     "patch"
@@ -5956,7 +6749,7 @@
     "command"
    ],
    "description": "Run an allowlisted command without a shell in the workspace.",
-   "line": 282,
+   "line": 352,
    "name": "run_command",
    "required": [
     "command"
@@ -5969,7 +6762,7 @@
     "arguments"
    ],
    "description": "Run a workspace-relative Python script in isolated interpreter mode.",
-   "line": 293,
+   "line": 363,
    "name": "python_run",
    "required": [
     "path"
@@ -5979,7 +6772,7 @@
   {
    "arguments": [],
    "description": "Return the current workspace diff and changed paths.",
-   "line": 308,
+   "line": 378,
    "name": "git_diff",
    "required": [],
    "risk": "read"
@@ -5989,7 +6782,7 @@
     "url"
    ],
    "description": "Fetch one allowlisted public HTTP(S) URL without following redirects.",
-   "line": 317,
+   "line": 387,
    "name": "browser_fetch",
    "required": [
     "url"
@@ -6002,7 +6795,7 @@
     "limit"
    ],
    "description": "Find the parts of the workspace most relevant to a question, ranked, as excerpts with their file and line range.",
-   "line": 326,
+   "line": 396,
    "name": "retrieve",
    "required": [
     "query"
@@ -6014,7 +6807,7 @@
     "query"
    ],
    "description": "Search the public web and return titles, URLs and snippets.",
-   "line": 338,
+   "line": 408,
    "name": "web_search",
    "required": [
     "query"
@@ -6026,7 +6819,7 @@
     "summary"
    ],
    "description": "Submit a completion claim. The harness will independently verify it.",
-   "line": 347,
+   "line": 417,
    "name": "finish",
    "required": [
     "summary"
@@ -6035,17 +6828,17 @@
   }
  ],
  "totals": {
-  "api": 260,
+  "api": 288,
   "commands": 20,
-  "commits": 15,
-  "edges": 178,
-  "lines": 13690,
-  "modules": 49,
-  "sloc": 11512,
-  "test_cases": 785,
-  "test_files": 36,
-  "test_sloc": 7289,
-  "tools": 12
+  "commits": 16,
+  "edges": 202,
+  "lines": 16452,
+  "modules": 55,
+  "sloc": 13526,
+  "test_cases": 1169,
+  "test_files": 52,
+  "test_sloc": 10123,
+  "tools": 15
  },
  "transitions": [
   {
