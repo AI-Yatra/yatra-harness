@@ -105,10 +105,26 @@ class MechanismTests(unittest.TestCase):
         self.assertEqual(mechanism, "")
         self.assertIn("docker", reason)
 
-    def test_the_mechanism_matches_what_is_installed(self) -> None:
-        mechanism, _ = detect_mechanism()
+    def test_the_mechanism_matches_what_can_actually_run(self) -> None:
+        """Installed is not the same as usable, which is the whole point.
+
+        This test used to assert that finding `bwrap` on PATH meant the
+        mechanism was bubblewrap. That is the assumption that hid a sandbox
+        which failed every command on any host that cannot unshare a network
+        namespace, so the assertion now follows the probe rather than the
+        which.
+        """
+        from harness.execution.sandbox import probe_bubblewrap
+
+        mechanism, reason = detect_mechanism()
         if sys.platform.startswith("linux"):
-            self.assertEqual(mechanism, "bubblewrap" if shutil.which("bwrap") else "")
+            if not shutil.which("bwrap"):
+                self.assertEqual(mechanism, "")
+            elif probe_bubblewrap().usable:
+                self.assertEqual(mechanism, "bubblewrap")
+            else:
+                self.assertEqual(mechanism, "")
+                self.assertIn("cannot run here", reason)
         elif sys.platform == "darwin":
             self.assertEqual(mechanism, "seatbelt" if shutil.which("sandbox-exec") else "")
 

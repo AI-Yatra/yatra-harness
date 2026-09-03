@@ -224,9 +224,17 @@ class Probe:
 
 
 def _bwrap_ok(*flags: str) -> tuple[bool, str]:
+    """Ask bubblewrap to do one thing and report whether it could.
+
+    `--dev-bind / /` rather than `--ro-bind / /`: the probe is asking whether
+    the *namespace* can be created, not whether a particular layout works, so
+    it should not fail for a reason the real command would not hit. Binding
+    the root read-only over itself is not a valid root and made the probe
+    answer "unusable" on a host where bubblewrap was fine.
+    """
     try:
         result = subprocess.run(  # noqa: S603 - fixed argv, no shell
-            ["bwrap", *flags, "--ro-bind", "/", "/", "true"],
+            ["bwrap", "--dev-bind", "/", "/", *flags, "true"],
             capture_output=True, text=True, timeout=15, check=False,
         )
     except (OSError, subprocess.SubprocessError) as exc:
