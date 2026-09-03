@@ -405,6 +405,19 @@ uninterrupted run, so nothing is executed twice.
 prints a SHA-256 of the ledger. Edit one event and the hash changes. Delete one
 and the sequence check names the gap.
 
+## Three demos to try it on
+
+Each is a small repository broken on purpose, with the exact prompt to paste in
+its README. No flags: `ay` works in the directory you start it in.
+
+| | what it teaches | run |
+|---|---|---|
+| [demo/tictactoe](demo/tictactoe) | a logic flaw and a missing feature, judged by tests | `cd demo/tictactoe && ay` |
+| [demo/loginpage](demo/loginpage) | a UI you can look at: enumeration, labels, an invisible error | `cd demo/loginpage && ay` |
+| [demo/inventory](demo/inventory) | the harness itself: plan mode, approvals, `/undo`, cost | `cd demo/inventory && ay` |
+
+Put any of them back with `git checkout -- demo/`.
+
 ## Finding things in a large repository
 
 `grep` and `glob`, and deliberately nothing more.

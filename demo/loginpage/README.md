@@ -5,13 +5,52 @@ A sign-in page, used as the second worked example for the
 functions with no UI, this one has a screen: the point is to change something
 you can look at, and then look at it.
 
+## Run it
+
 ```
-python -m unittest discover -s tests     # what the harness judges
-python app.py                            # then open http://localhost:8000
+cd demo/loginpage
+ay
 ```
 
-Sign in as `ada` with `difference-engine`, or `grace` with `nanosecond`.
+No flags. `ay` works in the directory you started it in and reads the
+`AGENTS.md` here on its own.
+
+Then type this at the `>` prompt:
+
+```
+The sign-in page is broken in three ways and the tests prove it. Run the
+tests to see the eight failures, then fix all three: in auth.py every failed
+sign-in must return the same message so the page does not reveal which
+usernames exist; in page.py both inputs need real labels and the error needs
+to be announceable; in static/style.css the error colour is invisible against
+the card. Read README.md and AGENTS.md first. Do not edit anything under
+tests/. Run the tests again at the end.
+```
+
+Eight tests fail before, thirty-five pass after. It takes about a minute.
+
+## Then look at it
+
+```
+python app.py
+```
+
+Open http://localhost:8000 and sign in as `ada` with the **wrong** password.
+
+**Before the fix** the page reloads and nothing appears to change. **After**,
+a readable message appears that does not say whether `ada` exists, both fields
+carry visible labels, and a screen reader announces the failure.
+
+Sign in properly with `ada` / `difference-engine`, or `grace` / `nanosecond`.
 Standard library only. No build step, no framework, no network.
+
+Put it back with `git checkout -- demo/loginpage`.
+
+## Checking by hand
+
+```
+python -m unittest discover -s tests
+```
 
 The repository is **deliberately broken**, in three ways that look unrelated
 and are not.

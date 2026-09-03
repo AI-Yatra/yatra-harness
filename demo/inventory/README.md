@@ -7,6 +7,8 @@ The first two demos are about the code. **This one is about the harness.** The
 bug is deliberately dull — `remove` does not check anything — because the point
 is the session you run, not the puzzle you solve.
 
+## Run it
+
 ```
 cd demo/inventory
 ay
@@ -107,6 +109,18 @@ leave the workspace. All fourteen tests should pass.
 
 Tokens in and out, how full the context window is, what you blanket-approved
 this session, and every tool the model can call.
+
+## If you only want it fixed
+
+Skip the tour and type this instead:
+
+```
+The tests are failing. Run them, fix inventory.py so every test passes, then
+run them again. Do not edit anything under tests/, and do not edit
+data/stock.json.
+```
+
+Four tests fail before, fourteen pass after.
 
 ## Other things worth trying
 
