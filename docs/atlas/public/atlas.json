@@ -465,8 +465,8 @@
  "generated_by": "docs/atlas/scripts/scan_harness.py",
  "head": {
   "date": "2026-09-03",
-  "sha": "979eda0",
-  "subject": "Tell the agent what its own edit broke"
+  "sha": "0355212",
+  "subject": "Treat a committed settings file as somebody else's input"
  },
  "lanes": [
   {
@@ -1266,8 +1266,8 @@
    "path": "harness/core/errors.py",
    "side": "harness",
    "sloc": 47,
-   "test_cases": 708,
-   "test_sloc": 5963,
+   "test_cases": 719,
+   "test_sloc": 6041,
    "tests": [
     "test_backlog.py",
     "test_compaction.py",
@@ -4808,8 +4808,8 @@
    "path": "harness/config.py",
    "side": "harness",
    "sloc": 634,
-   "test_cases": 830,
-   "test_sloc": 7351,
+   "test_cases": 841,
+   "test_sloc": 7429,
    "tests": [
     "test_atlas_trace.py",
     "test_auth_gateways.py",
@@ -4852,77 +4852,76 @@
     {
      "doc": "One settings file that was found, and what it said.",
      "kind": "class",
-     "line": 68,
+     "line": 94,
      "methods": [],
      "name": "Layer"
     },
     {
      "doc": "The nearest directory above *start* holding a `.yatra` or a `.git`.",
      "kind": "function",
-     "line": 77,
+     "line": 103,
      "methods": [],
      "name": "find_project_root"
     },
     {
      "doc": "Every settings layer that applies, lowest precedence first.",
      "kind": "function",
-     "line": 93,
+     "line": 119,
      "methods": [],
      "name": "discover"
     },
     {
      "doc": "Fold every layer onto *base*, lowest precedence first.",
      "kind": "function",
-     "line": 119,
+     "line": 151,
      "methods": [],
      "name": "apply"
     },
     {
+     "doc": "A layer's values with anything it is not allowed to set removed.",
+     "kind": "function",
+     "line": 160,
+     "methods": [],
+     "name": "trusted"
+    },
+    {
+     "doc": "The keys a committed file tried to set and was not allowed to.",
+     "kind": "function",
+     "line": 175,
+     "methods": [],
+     "name": "refused"
+    },
+    {
      "doc": "Deep-merge *overlay* onto *base*, without mutating either.",
      "kind": "function",
-     "line": 127,
+     "line": 202,
      "methods": [],
      "name": "merge"
     },
     {
      "doc": "One line per layer, for `/config` to print.",
      "kind": "function",
-     "line": 183,
+     "line": 258,
      "methods": [],
      "name": "describe"
     },
     {
-     "doc": "Where a project's settings belong, for a writer to create.",
-     "kind": "function",
-     "line": 196,
-     "methods": [],
-     "name": "project_settings_path"
-    },
-    {
      "doc": "Keep the machine-local file out of the repository.",
      "kind": "function",
-     "line": 201,
+     "line": 271,
      "methods": [],
      "name": "ignore_local_settings"
-    },
-    {
-     "doc": "`YATRA_PROJECT_DIR`, for a test or a wrapper that knows better.",
-     "kind": "function",
-     "line": 215,
-     "methods": [],
-     "name": "env_root"
     }
    ],
    "api_count": 9,
    "classes": 1,
-   "commits": 1,
+   "commits": 2,
    "doc": "Settings that follow the project rather than the install.",
    "doc_full": "Settings that follow the project rather than the install.\n\n`ay` read one config, from its own install directory, and nothing from the\ndirectory you started it in. So a rule could not be scoped to one repository:\neither every session got it or none did. Writing a demo that needed one deny\nrule in one folder is what made the gap concrete -- the constraint had to\nbecome a sentence in AGENTS.md that the model chooses to obey, instead of a\ngate that stops it.\n\nThe precedence chain is the one every comparable tool settled on, and the\norder is the point rather than the file names:\n\n    explicit --config          what the operator typed wins outright\n    .yatra/settings.local.yaml machine-local, gitignored, not shared\n    .yatra/settings.yaml       the project's, committed, shared with the team\n    ~/.yatra-harness/settings.yaml   personal defaults for every project\n    configs/ay.yaml            what ships\n\n**Permission rules do not follow that order.** They merge across every layer,\nand a `deny` written at any layer survives all of them. Overriding is right\nfor a model choice and wrong for a refusal: if a project bans `git push` a\npersonal file must not quietly re-enable it, and the operator who wrote the\nnarrower rule is usually the one who knows why. Everything else is last\nwriter wins.\n\nDiscovery walks up from the working directory, so a session started three\nfolders inside a repository still finds the repository's settings. It stops at\na `.git` directory or the filesystem root, because past that point the files\nbelong to somebody else's project.",
    "external": [
     "__future__",
     "collections",
     "dataclasses",
-    "os",
     "pathlib",
     "typing",
     "yaml"
@@ -4937,11 +4936,11 @@
    "in_boundary": false,
    "last_touched": "2026-09-03",
    "layer": "",
-   "lines": 218,
+   "lines": 283,
    "name": "settings",
    "path": "harness/settings.py",
    "side": "harness",
-   "sloc": 162,
+   "sloc": 200,
    "test_cases": 0,
    "test_sloc": 0,
    "tests": []
@@ -5007,21 +5006,21 @@
     {
      "doc": "`--model route:model` named a route the config does not define.",
      "kind": "class",
-     "line": 71,
+     "line": 73,
      "methods": [],
      "name": "UnknownRoute"
     },
     {
      "doc": "Everything the shell was started with.",
      "kind": "class",
-     "line": 79,
+     "line": 81,
      "methods": [],
      "name": "Options"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 96,
+     "line": 98,
      "methods": [
       "run"
      ],
@@ -5030,7 +5029,7 @@
    ],
    "api_count": 3,
    "classes": 3,
-   "commits": 10,
+   "commits": 11,
    "doc": "The interactive shell around the agent loop.",
    "doc_full": "The interactive shell around the agent loop.\n\nOwns everything the loop deliberately does not: reading a line, expanding\n`@path` and `!command`, slash commands, the banner, and turning Ctrl-C into\nan interrupted turn rather than a dead process.",
    "external": [
@@ -5073,11 +5072,11 @@
    "in_boundary": false,
    "last_touched": "2026-09-03",
    "layer": "repl",
-   "lines": 1103,
+   "lines": 1145,
    "name": "repl.shell",
    "path": "harness/repl/shell.py",
    "side": "harness",
-   "sloc": 941,
+   "sloc": 977,
    "test_cases": 93,
    "test_sloc": 848,
    "tests": [
@@ -5707,8 +5706,8 @@
    "path": "harness/repl/approvals.py",
    "side": "harness",
    "sloc": 184,
-   "test_cases": 307,
-   "test_sloc": 2654,
+   "test_cases": 318,
+   "test_sloc": 2732,
    "tests": [
     "test_hooks.py",
     "test_interrupt.py",
@@ -5765,8 +5764,8 @@
    "path": "harness/repl/prompt.py",
    "side": "harness",
    "sloc": 131,
-   "test_cases": 41,
-   "test_sloc": 238,
+   "test_cases": 52,
+   "test_sloc": 316,
    "tests": [
     "test_settings_and_memory.py"
    ]
@@ -5953,7 +5952,7 @@
      "repl.prompt"
     ],
     "sloc": 319,
-    "tests": 201
+    "tests": 212
    },
    "sloc": 708
   },
@@ -5992,7 +5991,7 @@
      "config"
     ],
     "sloc": 814,
-    "tests": 830
+    "tests": 841
    },
    "key": "skills",
    "name": "Skills and MCP",
@@ -6025,7 +6024,7 @@
      "repl.approvals"
     ],
     "sloc": 184,
-    "tests": 307
+    "tests": 318
    },
    "sloc": 561
   },
@@ -6202,10 +6201,10 @@
      "repl.shell",
      "repl.render"
     ],
-    "sloc": 1309,
+    "sloc": 1345,
     "tests": 231
    },
-   "sloc": 2216
+   "sloc": 2252
   },
   {
    "asks": "does the harness still do the job after a change",
@@ -6241,7 +6240,7 @@
      "core.errors"
     ],
     "sloc": 290,
-    "tests": 708
+    "tests": 719
    },
    "key": "reliability",
    "name": "Reliability",
@@ -7016,7 +7015,7 @@
    "sloc": 126
   },
   "test_settings_and_memory.py": {
-   "cases": 41,
+   "cases": 52,
    "covers": [
     "config",
     "core.errors",
@@ -7024,8 +7023,8 @@
     "repl.approvals",
     "repl.prompt"
    ],
-   "lines": 318,
-   "sloc": 238
+   "lines": 414,
+   "sloc": 316
   },
   "test_shared_tooling.py": {
    "cases": 20,
@@ -7294,12 +7293,12 @@
   "commands": 20,
   "commits": 17,
   "edges": 209,
-  "lines": 17716,
+  "lines": 17823,
   "modules": 60,
-  "sloc": 14439,
-  "test_cases": 1275,
+  "sloc": 14513,
+  "test_cases": 1286,
   "test_files": 54,
-  "test_sloc": 10743,
+  "test_sloc": 10821,
   "tools": 16
  },
  "transitions": [
