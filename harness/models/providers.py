@@ -7,6 +7,7 @@ owns orchestration.
 
 from __future__ import annotations
 
+import http.client
 import json
 import urllib.error
 import urllib.request
@@ -92,6 +93,29 @@ USER_AGENT = "yatra-harness/1.0"
 ANTHROPIC_VERSION = "2023-06-01"
 
 
+def _retry_after(exc: urllib.error.HTTPError) -> float:
+    """Seconds from a Retry-After header, or 0 when there is none.
+
+    A rate limiter that says how long to wait knows better than our doubling
+    backoff does, and ignoring it means either hammering the endpoint or
+    sleeping far longer than needed. Only the delta-seconds form is read; the
+    HTTP-date form is rare from these providers and guessing wrong about clock
+    skew is worse than falling back to our own backoff.
+    """
+    try:
+        raw = exc.headers.get("Retry-After") if exc.headers else None
+    except AttributeError:
+        return 0.0
+    if not raw:
+        return 0.0
+    try:
+        seconds = float(str(raw).strip())
+    except ValueError:
+        return 0.0
+    # A provider asking for an hour is not worth honouring inside one turn.
+    return min(max(seconds, 0.0), 120.0)
+
+
 class _HTTPProvider:
     """Shared transport for HTTP providers.
 
@@ -152,15 +176,30 @@ class _HTTPProvider:
             # itself is wrong and will be wrong again.
             if exc.code == 429 or exc.code >= 500:
                 raise TransientProviderError(
-                    f"provider HTTP {exc.code}: {detail}", exc.code
+                    f"provider HTTP {exc.code}: {detail}", exc.code, _retry_after(exc)
                 ) from exc
             raise PermanentProviderError(
                 f"provider HTTP {exc.code}: {detail}", exc.code
             ) from exc
         except (urllib.error.URLError, TimeoutError) as exc:
             raise TransientProviderError(f"provider request failed: {exc}") from exc
-        except json.JSONDecodeError as exc:
-            raise TransientProviderError("provider returned invalid JSON") from exc
+        except http.client.HTTPException as exc:
+            # A connection dropped part-way through a response raises
+            # IncompleteRead, which is an HTTPException and not an OSError, so
+            # it slipped past every handler here and past the router, which
+            # only knows the provider error types. The turn died instead of
+            # failing over, on the failure a fallback route exists for.
+            raise TransientProviderError(
+                f"provider connection failed mid-response: {type(exc).__name__}"
+            ) from exc
+        except OSError as exc:
+            # A reset socket inside the response body, rather than during the
+            # handshake where URLError would have wrapped it.
+            raise TransientProviderError(f"provider connection failed: {exc}") from exc
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            # A 200 carrying an HTML error page, or a truncated body. Transient
+            # because the same request to a healthy endpoint would parse.
+            raise TransientProviderError("provider returned a malformed response") from exc
         if not isinstance(payload, dict):
             raise PermanentProviderError("provider response was not a JSON object")
         return payload

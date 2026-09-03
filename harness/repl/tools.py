@@ -17,15 +17,20 @@ from __future__ import annotations
 import fnmatch
 import os
 import re
-from collections.abc import Iterator
-from dataclasses import dataclass
+import tempfile
+import time
+from collections.abc import Iterator, Sequence
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from harness.core.contracts import RiskLevel, ToolSpec
 from harness.core.errors import ToolError, WorkspaceError
-from harness.execution.process import run_process
+from harness.execution.policy import ANY_COMMAND, PolicyEngine
+from harness.execution.sandbox import build_sandbox
+from harness.execution.tools import ToolRegistry
 from harness.execution.workspace import Workspace
+from harness.record.artifacts import ArtifactStore
 
 # Guarded because `config` is the composition root: it imports every
 # module it configures, so importing it back at runtime would close a
@@ -66,10 +71,110 @@ class ToolOutcome:
 Handler = Any
 
 
-class ReplToolset:
-    """The registry, bound to one workspace root and one config."""
+#: A quantified group that is itself quantified, the classic exponential
+#: backtracking shape. `(a+)+` matches; `(abc)+` and `(a|b)+` do not, because
+#: neither repeats anything inside the group.
+_NESTED_QUANTIFIER = re.compile(r"\([^()]*[+*][^()]*\)\s*[+*{]")
 
-    def __init__(self, workspace: Workspace, config: HarnessConfig) -> None:
+#: Alphabets a runaway pattern is timed against. A pattern built from digits
+#: does not backtrack on letters, and `(a|ab)*` needs a two-character cycle
+#: before it misbehaves at all.
+_PROBE_UNITS = ("a", "ab", "0", "a1")
+
+#: Probe lengths, shortest first, and deliberately short. A single match
+#: cannot be interrupted, so the probe's own worst case is the ceiling on how
+#: long this check can take: at 22 characters an exponential pattern costs
+#: about 2^22 steps, which is a fraction of a second. Longer probes would
+#: detect more shapes and could themselves hang, which is the thing being
+#: defended against.
+_PROBE_LENGTHS = (16, 22)
+
+#: A pattern needing longer than this on a probe this short is backtracking
+#: exponentially. An honest pattern answers in microseconds, so the two
+#: populations sit orders of magnitude apart and the threshold is not delicate.
+_PROBE_BUDGET_SECONDS = 0.01
+
+
+def _backtracks(expression: re.Pattern[str]) -> bool:
+    r"""Whether *expression* blows up on a short string.
+
+    Timing rather than reading the pattern, because a structural check cannot
+    see every shape: `(a|a)*` repeats nothing inside its group and is still
+    exponential. Measuring catches it however it is written.
+
+    This has to happen before the search rather than during it. Matching runs
+    inside C and does not release the GIL, so a worker thread cannot be joined
+    with a timeout and a signal cannot be delivered. Once a catastrophic match
+    starts, nothing in the process can stop it, and the only usable defence is
+    to decline to start.
+
+    The same constraint bounds how good this can be. Detecting a shape whose
+    blow-up only appears on longer input would need a longer probe, and that
+    probe could itself hang. `(\d|\d\d)*$` is the documented survivor. The
+    complete fix is to match in a separate process that can be killed; that is
+    not done here because the pattern comes from the model rather than from an
+    attacker, and the shapes a model actually writes are covered.
+    """
+    for length in _PROBE_LENGTHS:
+        for unit in _PROBE_UNITS:
+            probe = (unit * (length // len(unit) + 1))[:length] + "!"
+            started = time.perf_counter()
+            try:
+                expression.search(probe)
+            except (re.error, RecursionError):
+                return True
+            if time.perf_counter() - started > _PROBE_BUDGET_SECONDS:
+                return True
+    return False
+
+
+class _EphemeralArtifacts:
+    """Somewhere for oversized output to go when there is no run directory.
+
+    The batch loop writes artifacts under the run it belongs to. A
+    conversation may not have one, and dropping the overflow instead would
+    make the truncation notice a dead end: the model is told the output was
+    cut and neither it nor the operator can see the rest.
+
+    The directory is made on first use, so a session that never overflows
+    never creates one.
+    """
+
+    def __init__(self) -> None:
+        self._store: ArtifactStore | None = None
+
+    def write_payload(self, name: str, content: str) -> str:
+        if self._store is None:
+            self._store = ArtifactStore(Path(tempfile.mkdtemp(prefix="ay-artifacts-")))
+        return self._store.write_payload(name, content)
+
+
+class ReplToolset:
+    """The conversational tool set, executed by the shared registry.
+
+    The tools here are shaped for a conversation, but running them is not a
+    separate mechanism. Every call goes through `ToolRegistry`, which is the
+    same object the batch loop uses, so a conversation gets the things that
+    were previously only wired to `harness run`: arguments validated against
+    the declared schema before a handler sees them, oversized output spilled to
+    an artifact instead of into the context, every decision written to the
+    event ledger, and an unexpected exception isolated to the call rather than
+    the session.
+
+    It also means a tool only has to be registered once to be available to
+    both. `extra_tools` is how MCP servers, retrieval and delegation reach a
+    conversation, rather than by being reimplemented here.
+    """
+
+    def __init__(
+        self,
+        workspace: Workspace,
+        config: HarnessConfig,
+        *,
+        artifacts: ArtifactStore | None = None,
+        event_callback: Any = None,
+        extra_tools: Sequence[tuple[ToolSpec, Any]] = (),
+    ) -> None:
         self.workspace = workspace
         self.config = config
         self._handlers: dict[str, Handler] = {
@@ -81,10 +186,104 @@ class ReplToolset:
             "edit_file": self.edit_file,
             "run_command": self.run_command,
         }
+        self.registry = self._build_registry(artifacts, event_callback, extra_tools)
+
+    def _build_registry(
+        self,
+        artifacts: ArtifactStore | None,
+        event_callback: Any,
+        extra_tools: Sequence[tuple[ToolSpec, Any]],
+    ) -> ToolRegistry:
+        """Assemble the shared registry for a conversation.
+
+        Two parts of the shared policy are stood down here, both because the
+        operator is present and neither because a conversation deserves less
+        care.
+
+        Approval is left to `Gate`. A second approver inside the registry would
+        prompt twice, or refuse what the operator had just allowed.
+
+        The command allowlist steps aside for the reason `configs/ay.yaml`
+        already gives: this loop asks about commands rather than requiring them
+        to be listed in advance, and a list written to cover everything the
+        operator might agree to stops meaning anything. The deny-list, the
+        network rule and the schema check all still apply, and they are the
+        same code the batch loop runs, so a refusal cannot be reached by going
+        around the gate.
+        """
+        specs = self._native_specs() + tuple(spec for spec, _ in extra_tools)
+        policy = PolicyEngine(
+            replace(
+                self.config.policy,
+                approval_mode="never",
+                allowed_commands=(ANY_COMMAND,),
+            ),
+            tuple(spec.name for spec in specs),
+        )
+        registry = ToolRegistry(
+            policy,
+            max_output_chars=self.config.budgets.max_output_chars,
+            artifacts=artifacts or _EphemeralArtifacts(),
+            event_callback=event_callback,
+        )
+        for spec in self._native_specs():
+            registry.register(spec, self._adapt(spec.name))
+        for spec, handler in extra_tools:
+            registry.register(spec, handler)
+        return registry
+
+    def _repair(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        """Fix the argument shapes models reliably get wrong, before validation.
+
+        The declared schema says what the model should send, and it should keep
+        saying that: widening it to accept a string would teach every model
+        that a string is fine, and would have to survive whatever each provider
+        does with a union type.
+
+        Repairing beforehand keeps both. A model that sends `"pytest -q"`
+        instead of `["pytest", "-q"]` gets what it meant, and one that sends
+        shell syntax is told plainly that there is no shell, rather than having
+        a pipe character handed to a program as a filename.
+        """
+        if name != "run_command":
+            return arguments
+        command = arguments.get("command")
+        if not isinstance(command, str):
+            return arguments
+        if any(character in command for character in "|&;<>$`"):
+            raise ToolError(
+                "command must be an array of arguments and cannot use shell syntax "
+                "(pipes, redirection, substitution). Run the pieces separately."
+            )
+        return {**arguments, "command": command.split()}
+
+    def _adapt(self, name: str) -> Any:
+        """Wrap a conversational handler in the registry's calling convention.
+
+        The registry deals in `(content, metadata)` and decides success by
+        whether the handler raised. A conversation needs more than that: a
+        failing test command has useful output and a non-zero exit, and is not
+        a tool failure. The screen labels travel the same way, so the terminal
+        can show `Read(game.py)` while the model receives the file.
+        """
+
+        def handler(arguments: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+            outcome = self._handlers[name](arguments)
+            return outcome.content, {
+                "display": outcome.display,
+                "detail": outcome.detail,
+                "ok": outcome.ok,
+            }
+
+        return handler
 
     # ------------------------------------------------------------ declaration
 
     def specs(self) -> tuple[ToolSpec, ...]:
+        """Every tool this conversation may call, natives and extras alike."""
+        return self.registry.specs()
+
+    def _native_specs(self) -> tuple[ToolSpec, ...]:
         obj = _object_schema
         return (
             ToolSpec(
@@ -169,18 +368,31 @@ class ReplToolset:
             ),
         )
 
-    def dispatch(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
-        handler = self._handlers.get(name)
-        if handler is None:
-            return ToolOutcome(f"No such tool: {name}", ok=False)
+    def dispatch(self, name: str, arguments: dict[str, Any], call_id: str = "") -> ToolOutcome:
+        """Run one tool call and describe what happened.
+
+        Arguments that never parsed are answered before the registry sees
+        them, because a schema check on a JSON fragment the provider truncated
+        would report a missing field rather than the truncation.
+        """
         if "__parse_error__" in arguments:
             return ToolOutcome(str(arguments["__parse_error__"]), ok=False)
         try:
-            return handler(arguments)
-        except (ToolError, WorkspaceError) as exc:
+            arguments = self._repair(name, arguments)
+        except ToolError as exc:
             return ToolOutcome(str(exc), ok=False)
-        except OSError as exc:
-            return ToolOutcome(f"{type(exc).__name__}: {exc}", ok=False)
+        result = self.registry.execute(call_id or name, name, arguments)
+        metadata = result.metadata or {}
+        if not result.ok:
+            # A refusal or a raised error. The registry has already turned it
+            # into a sentence; the model reads that and tries something else.
+            return ToolOutcome(result.error or "tool failed", ok=False)
+        return ToolOutcome(
+            result.content,
+            display=str(metadata.get("display", "")),
+            detail=str(metadata.get("detail", "")),
+            ok=bool(metadata.get("ok", True)),
+        )
 
     # ------------------------------------------------------------------ reads
 
@@ -251,10 +463,25 @@ class ReplToolset:
         raw = str(arguments.get("pattern") or "")
         if not raw:
             raise ToolError("grep needs a pattern")
+        if _NESTED_QUANTIFIER.search(raw):
+            # Rejected before it runs rather than after it hangs. A quantified
+            # group that is itself quantified is the classic shape whose
+            # backtracking is exponential in the length of the line.
+            raise ToolError(
+                f"the pattern {raw!r} nests a quantifier inside a quantified group, which "
+                "can take exponential time on a long line. Rewrite it without the nesting, "
+                "for example (a+)+ as a+."
+            )
         try:
             expression = re.compile(raw)
         except re.error as exc:
             raise ToolError(f"not a valid regular expression: {exc}") from exc
+        if _backtracks(expression):
+            raise ToolError(
+                f"the pattern {raw!r} backtracks exponentially: it took too long on a "
+                "22-character probe, so on a real line it would not finish. Rewrite it "
+                "without nested or overlapping repetition."
+            )
         limit = int(arguments.get("limit") or 100)
         scope = self.workspace.root
         if arguments.get("path"):
@@ -262,26 +489,31 @@ class ReplToolset:
         file_glob = str(arguments.get("glob") or "")
         hits: list[str] = []
         files = 0
-        for path in _walk(scope):
-            relative = self._relative(path)
-            if file_glob and not (
-                fnmatch.fnmatch(relative, file_glob) or fnmatch.fnmatch(path.name, file_glob)
-            ):
-                continue
-            try:
-                text = _read_text(path)
-            except (ToolError, OSError):
-                continue
-            matched = False
-            for number, line in enumerate(text.splitlines(), start=1):
-                if expression.search(line):
-                    matched = True
-                    hits.append(f"{relative}:{number}: {line.strip()[:300]}")
-                    if len(hits) >= limit:
-                        break
-            files += 1 if matched else 0
-            if len(hits) >= limit:
-                break
+
+        def search() -> None:
+            nonlocal files
+            for path in _walk(scope):
+                relative = self._relative(path)
+                if file_glob and not (
+                    fnmatch.fnmatch(relative, file_glob) or fnmatch.fnmatch(path.name, file_glob)
+                ):
+                    continue
+                try:
+                    text = _read_text(path)
+                except (ToolError, OSError):
+                    continue
+                matched = False
+                for number, line in enumerate(text.splitlines(), start=1):
+                    if expression.search(line):
+                        matched = True
+                        hits.append(f"{relative}:{number}: {line.strip()[:300]}")
+                        if len(hits) >= limit:
+                            break
+                files += 1 if matched else 0
+                if len(hits) >= limit:
+                    break
+
+        search()
         if not hits:
             return ToolOutcome(f"No matches for {raw}", display=raw, detail="no matches")
         body = "\n".join(hits)
@@ -297,7 +529,19 @@ class ReplToolset:
         if not isinstance(content, str):
             raise ToolError("write_file needs a string content")
         existed = path.exists()
-        before = _read_text(path) if existed and path.is_file() else ""
+        if existed and path.is_dir():
+            raise ToolError(f"{self._relative(path)} is a directory, not a file")
+        # The old contents are read only to count the change, so failing to
+        # read them must not fail the write. A file that is binary or in
+        # another encoding is exactly the one a caller most wants to replace,
+        # and refusing with an error about the file being overwritten reads as
+        # though the new content were at fault.
+        before = ""
+        if existed and path.is_file():
+            try:
+                before = _read_text(path)
+            except (ToolError, OSError, UnicodeDecodeError):
+                before = ""
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         added, removed = _count_changes(before, content)
@@ -314,6 +558,16 @@ class ReplToolset:
         new = arguments.get("new_string")
         if not isinstance(old, str) or not isinstance(new, str):
             raise ToolError("edit_file needs string old_string and new_string")
+        if not old:
+            # `"".count()` is one per character plus one, and replacing the
+            # empty string interleaves the replacement throughout the file.
+            # Without this guard the edit reports success on a file it has
+            # destroyed, which is the worst shape a failure can take.
+            raise ToolError(
+                "old_string is empty. It must be the exact text to replace. To create a "
+                "file use write_file; to add to one, include the surrounding line in "
+                "old_string and repeat it in new_string."
+            )
         if old == new:
             raise ToolError("old_string and new_string are identical; nothing to do")
         before = _read_text(path)
@@ -355,12 +609,17 @@ class ReplToolset:
         if not isinstance(command, list) or not command or not all(isinstance(p, str) for p in command):
             raise ToolError("command must be a non-empty array of strings")
         timeout = float(arguments.get("timeout") or self.config.policy.command_timeout_seconds)
-        result = run_process(
+        # The same execution path the batch loop uses, so the sandbox is a
+        # configuration choice rather than a property of which entry point the
+        # operator happened to start. `kind: local` runs on this machine, which
+        # is what a conversation in the operator's own directory wants;
+        # `kind: docker` puts the same call in a container with no network.
+        result = build_sandbox(self.config.sandbox).run(
             command,
-            cwd=self.workspace.root,
+            workspace=self.workspace.root,
             timeout=timeout,
             max_output_chars=self.config.budgets.max_output_chars,
-            environment=_command_environment(),
+            environment=_command_environment(self.config),
         )
         printable = " ".join(command)
         if result.timed_out:
@@ -479,12 +738,20 @@ def unified_diff(before: str, after: str, path: str, context: int = 3) -> str:
     )
 
 
-def _command_environment() -> dict[str, str]:
+def _command_environment(config: HarnessConfig) -> dict[str, str] | None:
     """The environment a model-run command gets.
 
-    Inherited rather than stripped: the point of this REPL is to run the
-    operator's real toolchain in their real directory, and a command without
-    PATH, HOME or a virtualenv is not that. Secrets are the operator's own
-    and were already readable by anything they ran themselves.
+    Inherited rather than stripped when the sandbox is local: the point of this
+    REPL is to run the operator's real toolchain in their real directory, and a
+    command without PATH, HOME or a virtualenv is not that. The secrets in it
+    are the operator's own and were already readable by anything they ran
+    themselves.
+
+    Under a real sandbox that reasoning does not hold, because the whole point
+    is that the command is not trusted with the operator's environment.
+    Returning None hands the decision to the sandbox, which builds a minimal
+    one of its own.
     """
+    if config.sandbox.kind != "local":
+        return None
     return dict(os.environ)

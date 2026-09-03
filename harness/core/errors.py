@@ -38,8 +38,12 @@ class ProviderError(HarnessError):
     route is out of budget and another one may not be.
     """
 
-    def __init__(self, message: str, status: int = 0) -> None:
+    def __init__(self, message: str, status: int = 0, retry_after: float = 0.0) -> None:
         super().__init__(message)
+        #: Seconds the provider asked us to wait, from its Retry-After header.
+        #: Zero when it did not say, which is when the caller's own backoff is
+        #: the best available guess.
+        self.retry_after = max(0.0, float(retry_after))
         self.status = status
 
     @property
