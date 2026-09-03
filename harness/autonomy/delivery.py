@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -139,8 +140,18 @@ def _pull_request(
     body_path = _write_body(request, workspace, base)
     if not approve(f"open a pull request from {branch} into {base}"):
         raise DeliveryError(f"pull request declined; {branch} is pushed and can be opened by hand")
+    # Resolved rather than named. `subprocess` on Windows asks CreateProcess,
+    # which appends only `.exe`, so a `gh.cmd` shim -- what winget and scoop
+    # install -- was invisible here even though `gh` worked in the operator's
+    # own shell. `shutil.which` honours PATHEXT and finds it.
+    executable = shutil.which("gh")
+    if executable is None:
+        raise DeliveryError(
+            "the GitHub CLI `gh` is not installed or not on PATH; "
+            "the branch is pushed, so the pull request can be opened by hand"
+        )
     command = [
-        "gh", "pr", "create",
+        executable, "pr", "create",
         "--base", base,
         "--head", branch,
         "--title", subject(request.objective),

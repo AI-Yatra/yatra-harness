@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import os
-import stat
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -17,6 +17,7 @@ from pathlib import Path
 from harness.autonomy.delivery import DeliveryError, DeliveryRequest, deliver
 from harness.core.contracts import RunStatus
 from harness.execution.workspace import WorkspaceManager, git_environment
+from tests.support import install_gh_stub
 
 GIT_ENV = git_environment({"GIT_AUTHOR_NAME": "Fixture", "GIT_COMMITTER_NAME": "Fixture"})
 
@@ -80,16 +81,7 @@ class DeliveryTestCase(unittest.TestCase):
     def stub_gh(self, *, url: str = "https://example.invalid/pr/1", exit_code: int = 0) -> None:
         """Put a fake `gh` on PATH that records how it was called."""
         binaries = self.base / "bin"
-        binaries.mkdir(exist_ok=True)
-        script = binaries / "gh"
-        script.write_text(
-            "#!/bin/sh\n"
-            f'printf "%s\\n" "$*" >> "{self.gh_calls}"\n'
-            f'echo "{url}"\n'
-            f"exit {exit_code}\n",
-            encoding="utf-8",
-        )
-        script.chmod(script.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+        install_gh_stub(binaries, self.gh_calls, url=url, exit_code=exit_code)
         previous = os.environ.get("PATH", "")
         os.environ["PATH"] = f"{binaries}{os.pathsep}{previous}"
         self.addCleanup(lambda: os.environ.__setitem__("PATH", previous))
@@ -241,11 +233,14 @@ class PullRequestTests(DeliveryTestCase):
         empty = self.base / "empty-bin"
         empty.mkdir(exist_ok=True)
         # git still has to resolve, so keep its directory and drop everything
-        # else; the point is that `gh` is not on the path.
-        git_dir = subprocess.run(
-            ["sh", "-c", "command -v git"], capture_output=True, text=True, check=True
-        ).stdout.strip()
-        os.environ["PATH"] = f"{empty}{os.pathsep}{Path(git_dir).parent}"
+        # else; the point is that `gh` is not on the path. Located with
+        # `shutil.which` rather than `sh -c "command -v git"`: on Windows that
+        # returns a POSIX path like /mingw64/bin/git, which is not a directory
+        # Windows can put on PATH, so git vanished too and delivery failed for
+        # the wrong reason.
+        git_path = shutil.which("git")
+        assert git_path is not None, "git is required to run these tests"
+        os.environ["PATH"] = f"{empty}{os.pathsep}{Path(git_path).parent}"
         self.addCleanup(lambda: os.environ.__setitem__("PATH", previous))
         with self.assertRaises(DeliveryError) as caught:
             deliver(self.request("pr"), approve=self.approve())
