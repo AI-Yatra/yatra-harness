@@ -667,13 +667,21 @@ class Shell:
         console = self.console
         self.render.notice(f"in use: {self.route.name} ({self.route.model})")
         console.line()
-        for name, route in sorted(self.config.router.routes.items()):
+        routes = sorted(self.config.router.routes.items())
+        # Measured, not guessed. The widths were fixed at 14 and 24, and a
+        # model id exactly 24 characters long printed as
+        # `IFM/K2-Horizon-375B-A23Bno key`, with the status welded to the name.
+        # A column wide enough for today's longest id is one route away from
+        # being too narrow.
+        name_width = max((len(name) for name, _ in routes), default=0) + 2
+        model_width = max((len(route.model) for _, route in routes), default=0) + 2
+        for name, route in routes:
             ready = self._has_credential(route)
             mark = console.accent("*") if name == self.route.name else " "
             state = console.muted("ready") if ready else console.failure("no key")
             console.line(
-                f"  {mark} {console.strong(name.ljust(14))}"
-                f"{console.muted(route.model.ljust(24))}{state}"
+                f"  {mark} {console.strong(name.ljust(name_width))}"
+                f"{console.muted(route.model.ljust(model_width))}{state}"
             )
         console.line()
         self.render.notice("switch with /model <name>, for example /model gemini")

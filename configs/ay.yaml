@@ -188,6 +188,43 @@ model_router:
       quality: 4.0
       context_window: 131072
       tool_support: false
+    # IFM, serving MBZUAI's K2 models. Ordinary OpenAI shape.
+    # Key: `ay auth add --provider ifm <key>` from platform.ifm.ai/api-keys.
+    #
+    # What was checked here without a key: `GET /v1/models` answers 200 and
+    # lists exactly these two ids, and `/v1/chat/completions` answers 401
+    # naming the Bearer scheme. Tool calling and streaming are documented and
+    # are *not* verified against a live key, unlike the GMI routes above. Run
+    # `ay auth verify ifm` once a key is stored, which completes for real.
+    #
+    # K2-Horizon is the flagship: a 375B mixture-of-experts with 23B active
+    # per token, a 524,288-token context, and tool calling in its serving
+    # config. It is the one built for agentic work, so it is the default here.
+    ifm:
+      kind: openai_compatible
+      model: IFM/K2-Horizon-375B-A23B
+      base_url: https://api.ifm.ai/v1
+      api_key_env: IFM_API_KEY
+      timeout_seconds: 180
+      stream: true
+      local: false
+      latency: medium
+      quality: 4.0
+      context_window: 524288
+    # The reasoning sibling: 70B dense, 260k context, long chains of thought
+    # for maths, code and science. A separate route rather than a note,
+    # because switching is `/model ifm-think` either way.
+    ifm-think:
+      kind: openai_compatible
+      model: IFM/K2-Think-v2
+      base_url: https://api.ifm.ai/v1
+      api_key_env: IFM_API_KEY
+      timeout_seconds: 240
+      stream: true
+      local: false
+      latency: high
+      quality: 3.5
+      context_window: 262144
     # OpenCode Zen: one key, many vendors' models.
     # Key: `ay auth add --provider opencode <key>` from opencode.ai/auth.
     opencode:
