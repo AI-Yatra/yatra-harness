@@ -25,6 +25,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
@@ -223,22 +224,31 @@ class Probe:
     reason: str = ""
 
 
-def _bwrap_ok(*flags: str) -> tuple[bool, str]:
-    """Ask bubblewrap to do one thing and report whether it could.
+def _bwrap_ok(*, network: bool) -> tuple[bool, str]:
+    """Run the real sandbox command over a scratch directory and see if it works.
 
-    `--dev-bind / /` rather than `--ro-bind / /`: the probe is asking whether
-    the *namespace* can be created, not whether a particular layout works, so
-    it should not fail for a reason the real command would not hit. Binding
-    the root read-only over itself is not a valid root and made the probe
-    answer "unusable" on a host where bubblewrap was fine.
+    Built from `bubblewrap_command` rather than hand-written, because every
+    hand-written probe so far has been wrong in a different direction. The
+    first used `--ro-bind / /`, which is not a valid root, so bubblewrap
+    refused it for a reason the real command never hits. The second used
+    `--dev-bind / /`, which asks for *more* privilege than the real command --
+    device access across the whole root -- and failed with "setting up uid
+    map: Permission denied" on a host where the real command is fine.
+
+    A probe that does not run what the sandbox runs is answering a different
+    question. This one runs `true` through exactly the argv a tool call would
+    get, so a pass means tool calls will work and a failure is the failure.
     """
-    try:
-        result = subprocess.run(  # noqa: S603 - fixed argv, no shell
-            ["bwrap", "--dev-bind", "/", "/", *flags, "true"],
-            capture_output=True, text=True, timeout=15, check=False,
+    with tempfile.TemporaryDirectory() as scratch:
+        argv = bubblewrap_command(
+            SandboxConfig(kind="os"), ["true"], workspace=Path(scratch), network=network
         )
-    except (OSError, subprocess.SubprocessError) as exc:
-        return False, f"{type(exc).__name__}: {exc}"
+        try:
+            result = subprocess.run(  # noqa: S603 - argv built by this module, no shell
+                argv, capture_output=True, text=True, timeout=15, check=False
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            return False, f"{type(exc).__name__}: {exc}"
     if result.returncode == 0:
         return True, ""
     message = (result.stderr or result.stdout).strip().splitlines()
@@ -262,10 +272,10 @@ def probe_bubblewrap() -> Probe:
     confine files but not sockets still gets file confinement, and is told in
     those words rather than left to assume it got both.
     """
-    full, reason = _bwrap_ok("--unshare-net", "--unshare-pid")
+    full, reason = _bwrap_ok(network=True)
     if full:
         return Probe(usable=True, network=True)
-    partial, plain_reason = _bwrap_ok("--unshare-pid")
+    partial, plain_reason = _bwrap_ok(network=False)
     if partial:
         return Probe(usable=True, network=False, reason=reason)
     return Probe(usable=False, network=False, reason=plain_reason or reason)
