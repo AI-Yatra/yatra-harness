@@ -147,8 +147,17 @@ class StylesheetTests(unittest.TestCase):
         both edges. It is the most common layout bug there is, and unlike the
         other three faults here it needs no test to notice.
         """
-        rule = re.search(r"\*\s*\{([^}]*)\}", self.css)
-        universal = rule.group(1) if rule else ""
+        # Any rule whose selector carries a bare `*`, however it is written.
+        # The earlier pattern demanded the exact spelling `* {`, so the common
+        # idiom `*, *::before, *::after { ... }` did not count and an agent
+        # that wrote the standard reset was told it had not fixed anything.
+        # Comments come off first: this file opens with one full of asterisks.
+        body = re.sub(r"/\*.*?\*/", "", self.css, flags=re.DOTALL)
+        universal = " ".join(
+            declarations
+            for selector, declarations in re.findall(r"([^{}]*)\{([^}]*)\}", body)
+            if "*" in selector
+        )
         control = self.css[self.css.index(".control"):] if ".control" in self.css else ""
         applied = "border-box" in universal or "border-box" in control[:400]
         self.assertTrue(

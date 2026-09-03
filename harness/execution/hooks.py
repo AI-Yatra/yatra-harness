@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from harness.core.errors import ConfigurationError
-from harness.execution.process import run_process
+from harness.execution.process import NOT_FOUND, run_process
 
 #: When a hook can run. Deliberately few: these are the moments with something
 #: worth reacting to, and a longer list would be surface nobody asked for.
@@ -148,6 +148,14 @@ class HookRunner:
         if result.timed_out:
             self._broken.add(hook.label)
             return HookReport(hook, False, f"timed out after {hook.timeout:g}s")
+        # A hook whose program does not exist can never succeed, so it is
+        # disabled for the session like any other broken one. `run_process`
+        # reports that as exit 127 now instead of raising, and without this it
+        # would fall through to the branch below and be retried on every edit
+        # for the rest of the session.
+        if result.returncode == NOT_FOUND:
+            self._broken.add(hook.label)
+            return HookReport(hook, False, result.output.strip())
         if result.returncode != 0:
             # Not disabled on a non-zero exit: a lint hook failing is the hook
             # working, and it should keep reporting on the next edit too.

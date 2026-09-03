@@ -30,6 +30,42 @@ def denied(*command: str) -> str | None:
     return denied_pattern(command, PATTERNS)
 
 
+class WhitespaceHeadTests(unittest.TestCase):
+    """One space after the program name used to walk through the deny list.
+
+    Found in a real session, where a model wrapped its command in newlines.
+    Windows resolves "rm ", "rm." and "RM.EXE" to the same program it resolves
+    `rm` to, and `subprocess` runs "cmd " happily, so the padded spelling
+    executed while the rule that says it cannot run with or without approval
+    never matched it.
+    """
+
+    def test_a_trailing_space_does_not_escape_a_deny_rule(self) -> None:
+        self.assertIsNotNone(denied("rm ", "-rf", "/"))
+
+    def test_a_trailing_dot_does_not_escape_a_deny_rule(self) -> None:
+        self.assertIsNotNone(denied("rm.", "-rf", "/"))
+
+    def test_a_leading_newline_does_not_escape_a_deny_rule(self) -> None:
+        self.assertIsNotNone(denied("\nrm", "-rf", "/"))
+
+    def test_a_leading_tab_does_not_escape_a_deny_rule(self) -> None:
+        self.assertIsNotNone(denied("\trm", "-rf", "/"))
+
+    def test_padding_a_path_does_not_escape_a_deny_rule(self) -> None:
+        self.assertIsNotNone(denied("/usr/bin/rm ", "-rf", "/"))
+
+    def test_padding_does_not_escape_a_two_word_rule(self) -> None:
+        self.assertIsNotNone(denied("git ", "push"))
+
+    def test_a_legitimate_name_keeps_its_dots(self) -> None:
+        """The strip is for surrounding padding, not for names with dots."""
+        self.assertEqual(normalize_command(("a.out",))[0], "a.out")
+
+    def test_a_dotted_relative_path_still_reduces(self) -> None:
+        self.assertEqual(normalize_command((".venv/Scripts/python.exe",))[0], "python")
+
+
 class NormalizationTests(unittest.TestCase):
     def test_an_absolute_path_is_reduced_to_the_program(self) -> None:
         self.assertEqual(normalize_command(("/usr/bin/rm", "-rf")), ("rm", "-rf"))
