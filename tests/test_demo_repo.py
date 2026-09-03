@@ -149,6 +149,52 @@ class ExampleBacklogTests(unittest.TestCase):
         self.assertFalse(any(feature.get("passes") for feature in value))
 
 
+class LoginPageFixtureTests(unittest.TestCase):
+    """The exercise has to accept every reasonable way to fix it.
+
+    An agent wrote `*, *::before, *::after { box-sizing: border-box; }`, which
+    is the standard reset, and the check demanded the exact spelling `* {`. It
+    was told it had not fixed anything. It then spent twenty tool calls and
+    five scratch files reverse-engineering the regular expression, and
+    contorted the stylesheet until the pattern matched. A demo that punishes
+    the idiomatic answer teaches the wrong lesson.
+    """
+
+    def _passes(self, css: str) -> bool:
+        source = LOGINPAGE / "static" / "style.css"
+        original = source.read_text(encoding="utf-8")
+        try:
+            source.write_text(css, encoding="utf-8")
+            done = subprocess.run(
+                [sys.executable, "-m", "unittest", "tests.test_style", "-k", "fields_fit"],
+                cwd=LOGINPAGE, capture_output=True, text=True, timeout=120,
+            )
+            return done.returncode == 0
+        finally:
+            source.write_text(original, encoding="utf-8")
+
+    def _seeded(self) -> str:
+        return (LOGINPAGE / "static" / "style.css").read_text(encoding="utf-8")
+
+    def test_the_seeded_stylesheet_fails(self) -> None:
+        self.assertFalse(self._passes(self._seeded()))
+
+    def test_the_standard_reset_is_accepted(self) -> None:
+        self.assertTrue(
+            self._passes("*, *::before, *::after { box-sizing: border-box; }\n" + self._seeded())
+        )
+
+    def test_a_bare_universal_selector_is_accepted(self) -> None:
+        self.assertTrue(self._passes("* { box-sizing: border-box; }\n" + self._seeded()))
+
+    def test_setting_it_on_the_control_is_accepted(self) -> None:
+        """The route the README describes."""
+        css = self._seeded().replace(
+            ".control {\n  width: 100%;", ".control {\n  box-sizing: border-box;\n  width: 100%;"
+        )
+        self.assertTrue(self._passes(css))
+
+
 class LoginPageServerTests(unittest.TestCase):
     """The sign-in demo has to show the fix, not just pass its tests.
 

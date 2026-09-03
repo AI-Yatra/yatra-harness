@@ -62,6 +62,36 @@ def _taskkill(pid: int, *, force: bool) -> bool:
     return completed.returncode in (0, 128)
 
 
+#: Things `cmd` interprets itself rather than loading from disk. A model on
+#: Windows reaches for these constantly, and none of them is a file, so
+#: executing directly finds nothing to run.
+CMD_BUILTINS = frozenset({
+    "del", "dir", "copy", "move", "ren", "rename", "erase", "type", "cls",
+    "echo", "md", "mkdir", "rd", "rmdir", "set", "start", "call", "ver",
+})
+
+#: The conventional exit code for a command that could not be found.
+NOT_FOUND = 127
+
+
+def _not_found(program: str) -> str:
+    """Why nothing ran, in terms the caller can act on.
+
+    An agent asked to tidy up ran `del`, got "unexpected tool failure:
+    FileNotFoundError: [WinError 2] The system cannot find the file
+    specified", tried again with absolute paths, got the same, and gave up --
+    leaving the files it was deleting behind. The error named no program and
+    called routine a thing that happens whenever a model guesses a name.
+    """
+    if os.name == "nt" and program.strip().lower() in CMD_BUILTINS:
+        return (
+            f"{program!r} is not a program. Windows runs it inside cmd, and commands here "
+            f"are executed directly with no shell, so there is nothing to interpret it. "
+            f"Run 'cmd /c {program} ...' if you need it, or use the file tools."
+        )
+    return f"{program!r} is not a program on this system, or is not on PATH."
+
+
 @dataclass(frozen=True, slots=True)
 class ProcessResult:
     command: tuple[str, ...]
@@ -81,17 +111,37 @@ def run_process(
     environment: Mapping[str, str] | None = None,
 ) -> ProcessResult:
     normalized = tuple(str(part) for part in command)
-    process = subprocess.Popen(
-        normalized,
-        cwd=cwd,
-        env=dict(environment) if environment is not None else None,
-        stdin=subprocess.PIPE if input_text is not None else subprocess.DEVNULL,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        shell=False,
-        start_new_session=os.name == "posix",
-    )
+    if not normalized:
+        # Windows raises a bare OSError 87 for this rather than the
+        # FileNotFoundError the empty case morally deserves.
+        return ProcessResult(
+            command=(), returncode=NOT_FOUND, output="no command was given.",
+            timed_out=False, truncated=False,
+        )
+    try:
+        process = subprocess.Popen(
+            normalized,
+            cwd=cwd,
+            env=dict(environment) if environment is not None else None,
+            stdin=subprocess.PIPE if input_text is not None else subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            shell=False,
+            start_new_session=os.name == "posix",
+        )
+    except (FileNotFoundError, NotADirectoryError):
+        # A name that is not a program is ordinary information, the same shape
+        # as any other failing command, so every caller already knows how to
+        # read it. Raising sent it to the loop's catch-all instead, which
+        # reports "unexpected tool failure" and names nothing.
+        return ProcessResult(
+            command=normalized,
+            returncode=NOT_FOUND,
+            output=_not_found(normalized[0] if normalized else ""),
+            timed_out=False,
+            truncated=False,
+        )
     timed_out = False
     try:
         output, _ = process.communicate(input=input_text, timeout=timeout)

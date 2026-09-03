@@ -122,6 +122,12 @@ class Handler(BaseHTTPRequestHandler):
         # One tidy line per request instead of the default's timestamp noise.
         print(f"  {self.command} {self.path} -> {args[1] if len(args) > 1 else ''}")
 
+    def log_error(self, fmt: str, *args: object) -> None:
+        # Silent, because `send_error` also logs the response through
+        # `log_message`. Both firing printed every 404 twice, once as "Not
+        # Found" and once as "404", which reads like two requests.
+        return
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Serve the sign-in page.")

@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any
 
 from harness.core.errors import ConfigurationError
-from harness.execution.process import run_process
+from harness.execution.process import NOT_FOUND, run_process
 
 #: Long enough for a type checker on one file, short enough that a hung
 #: checker does not become a hung turn.
@@ -127,6 +127,13 @@ def check(config: DiagnosticsConfig, root: Path, path: str) -> Report:
         return Report(f"{type(exc).__name__}: {exc}", broken=True)
     if result.timed_out:
         return Report(f"the checker did not finish in {config.timeout:g}s", broken=True)
+    # A checker that is not installed is the operator's problem, the same as
+    # one that crashed. `run_process` reports a missing program as exit 127
+    # rather than raising, so this is where that case has to be caught: read
+    # as a finding it would attach "'ruff' is not a program" to every edit and
+    # send the model off to install a linter.
+    if result.returncode == NOT_FOUND:
+        return Report(result.output.strip(), broken=True)
     # The exit code is the signal, not the output. Checkers announce success
     # in prose -- ruff prints "All checks passed!", mypy "Success: no issues
     # found" -- and reading that as a finding would attach a report to every
