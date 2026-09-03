@@ -322,8 +322,12 @@ def describe_arguments(call: ToolCall, limit: int = 60) -> str:
     if call.name == "run_command":
         command = call.arguments.get("command")
         if isinstance(command, list):
-            return " ".join(str(p) for p in command)[:limit]
-        return str(command)[:limit]
+            text = " ".join(str(p) for p in command)
+        else:
+            text = str(command)
+        # Collapsed, because a model sometimes wraps the command in newlines
+        # and a tool card that grows to three lines is not a card.
+        return " ".join(text.split())[:limit]
     for key in ("path", "pattern", "query"):
         value = call.arguments.get(key)
         if isinstance(value, str) and value:

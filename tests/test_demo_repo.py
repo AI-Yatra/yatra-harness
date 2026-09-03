@@ -13,18 +13,23 @@ and the test demanded a block.
 
 from __future__ import annotations
 
+import importlib
 import json
 import re
 import subprocess
 import sys
+import threading
 import unittest
+from http.server import ThreadingHTTPServer
 from pathlib import Path
+from urllib.request import urlopen
 
 from harness.autonomy.backlog import load_backlog
 from harness.config import load_task
 
 ROOT = Path(__file__).resolve().parents[1]
 DEMO = ROOT / "demo" / "tictactoe"
+LOGINPAGE = ROOT / "demo" / "loginpage"
 
 
 def run_tests(target: str) -> subprocess.CompletedProcess[str]:
@@ -142,6 +147,62 @@ class ExampleBacklogTests(unittest.TestCase):
         value = json.loads((ROOT / "examples" / "feature_list.json").read_text(encoding="utf-8"))
         self.assertTrue(value)
         self.assertFalse(any(feature.get("passes") for feature in value))
+
+
+class LoginPageServerTests(unittest.TestCase):
+    """The sign-in demo has to show the fix, not just pass its tests.
+
+    `app.py` imports `auth` and `page` once at startup. Python binds a module
+    the first time it is imported, so a server started for the README's "look
+    at it first" step went on serving the code it read at startup: an agent
+    fixed all five faults, every test passed, and the browser showed the same
+    broken page. The operator's report was "did not fix anything at all", and
+    they were right about what they could see.
+
+    This drives the real server over a socket, because the failure was
+    invisible to anything that imported the modules fresh.
+    """
+
+    def test_an_edit_reaches_the_browser_without_a_restart(self) -> None:
+        source = LOGINPAGE / "page.py"
+        original = source.read_text(encoding="utf-8")
+        server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        url = f"http://127.0.0.1:{server.server_address[1]}/"
+        try:
+            self.assertNotIn("MARKER-NOT-YET", urlopen(url, timeout=10).read().decode())
+            source.write_text(original.replace("Sign in", "MARKER-NOT-YET", 1), encoding="utf-8")
+            self.assertIn("MARKER-NOT-YET", urlopen(url, timeout=10).read().decode())
+        finally:
+            source.write_text(original, encoding="utf-8")
+            server.shutdown()
+            server.server_close()
+
+    def test_nothing_is_served_from_a_cache(self) -> None:
+        """A stylesheet held in the browser hides a fix as well as a stale module."""
+        text = (LOGINPAGE / "app.py").read_text(encoding="utf-8")
+        self.assertEqual(text.count('"Cache-Control", "no-store"'), 3)
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        # `python app.py` puts this directory on the path, and `reload` needs
+        # it there to find the modules again. Held for the whole class so the
+        # server behaves the way the README's instructions produce.
+        sys.path.insert(0, str(LOGINPAGE))
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        sys.path.remove(str(LOGINPAGE))
+        for name in ("app", "page", "auth"):
+            sys.modules.pop(name, None)
+
+    def _handler(self):
+        """The demo's own handler, imported from its own directory."""
+        import app
+
+        importlib.reload(app)
+        return app.Handler
 
 
 if __name__ == "__main__":

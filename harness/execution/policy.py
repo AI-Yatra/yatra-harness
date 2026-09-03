@@ -99,10 +99,16 @@ def normalize_command(command: tuple[str, ...]) -> tuple[str, ...]:
     binds `/bin/rm`, `C:\\Windows\\System32\\rm.exe` and `RM.EXE`. Version
     suffixes fold too: `python3` and `python` run the same interpreter, so a
     rule written for one has to bind the other.
+
+    Surrounding whitespace and trailing dots come off first. Windows resolves
+    `"rm "` and `"rm."` to the same program it resolves `rm` to, so a model
+    that puts one space after the program name would otherwise walk straight
+    through a deny rule that says it cannot run with or without approval.
+    Nothing legitimate spells a program that way.
     """
     if not command:
         return command
-    head = command[0].replace("\\", "/").rsplit("/", 1)[-1].lower()
+    head = command[0].strip().replace("\\", "/").rsplit("/", 1)[-1].lower().rstrip(". ")
     for suffix in (".exe", ".cmd", ".bat", ".com", ".ps1"):
         if head.endswith(suffix):
             head = head[: -len(suffix)]

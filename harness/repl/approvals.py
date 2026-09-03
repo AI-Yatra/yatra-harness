@@ -244,6 +244,13 @@ class Gate:
     def _describe(self, tool: ToolSpec, arguments: dict[str, Any]) -> Request:
         if tool.name == "run_command":
             command = arguments.get("command")
+            # Split the string form the same way the refusal check and the
+            # tool do. Describing the raw argument instead meant a model that
+            # sent a string got a question spanning several lines and the
+            # words "run any ? command for the rest of this session", where
+            # the "always" it offered was keyed on nothing.
+            if isinstance(command, str):
+                command = command.split()
             printable = " ".join(command) if isinstance(command, list) else str(command)
             head = normalize_command(tuple(command))[0] if isinstance(command, list) and command else "?"
             return Request(

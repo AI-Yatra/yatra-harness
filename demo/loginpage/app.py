@@ -7,11 +7,18 @@ you can see rather than only something a test reports.
 
 Sessions are a dictionary in memory. Restarting the server signs everyone out,
 which is the correct amount of session management for a demonstration.
+
+`auth` and `page` are reloaded on every request. Python binds an imported
+module once, so a server started before the fix would keep serving the code it
+imported at startup: you would edit the page, reload the browser, and see the
+broken version staring back with nothing to tell you why. The whole point of
+this demo is watching a change land, so the change has to actually land.
 """
 
 from __future__ import annotations
 
 import argparse
+import importlib
 import secrets
 from http import HTTPStatus
 from http.cookies import SimpleCookie
@@ -26,10 +33,20 @@ ROOT = Path(__file__).resolve().parent
 SESSIONS: dict[str, str] = {}
 
 
+def reload_sources() -> None:
+    """Pick up edits to the files the exercise is about, without a restart.
+
+    `auth` first: if `page` ever imports it, it should import the new one.
+    """
+    importlib.reload(auth)
+    importlib.reload(page)
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "yatra-loginpage/1.0"
 
     def do_GET(self) -> None:  # noqa: N802 - the name BaseHTTPRequestHandler wants
+        reload_sources()
         if self.path.startswith("/static/"):
             self._serve_static()
             return
@@ -43,6 +60,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:  # noqa: N802
+        reload_sources()
         if self.path != "/login":
             self.send_error(HTTPStatus.NOT_FOUND)
             return
@@ -63,6 +81,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self.send_header("Set-Cookie", f"session={token}; Path=/; HttpOnly; SameSite=Lax")
         self.end_headers()
         self.wfile.write(body)
@@ -86,6 +105,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", kind)
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
@@ -94,6 +114,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
