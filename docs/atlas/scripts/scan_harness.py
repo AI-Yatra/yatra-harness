@@ -610,7 +610,12 @@ def main() -> int:
         return 0
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(payload, encoding="utf-8")
+    # newline="" so the bytes written are the payload's own, rather than the
+    # platform's. Without it a scan on Windows rewrites every line as CRLF and
+    # the artifact shows up as changed in full, hiding the handful of lines
+    # that actually moved -- and `--check` then fails on a file it just wrote.
+    with args.out.open("w", encoding="utf-8", newline="") as handle:
+        handle.write(payload)
     data = json.loads(payload)
     t = data["totals"]
     print(
