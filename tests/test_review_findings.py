@@ -184,29 +184,44 @@ class LoopRecordTests(unittest.TestCase):
 
 
 class IndexCacheTests(unittest.TestCase):
-    """The retrieval index cache is bounded.
+    """The retriever cache is bounded, and evicting closes the database.
 
     Keyed by workspace path, it gained an entry per run and dropped none. A
-    `harness loop` over a long backlog would hold every workspace's chunks --
-    and with the embedding backend, every workspace's vectors -- for the life
-    of the process.
+    `harness loop` over a long backlog would hold every workspace's retriever
+    for the life of the process. Now that each one owns an open SQLite handle
+    the cost is worse than memory: an abandoned handle keeps a WAL file open,
+    and on Windows that makes the workspace directory undeletable.
     """
 
-    def test_the_cache_keeps_only_the_most_recent_workspaces(self) -> None:
-        from harness.execution.tools import _INDEX_CACHE, _remember_index
+    def retrievers(self, count: int) -> tuple[dict, list[Path]]:
+        import tempfile
 
-        _INDEX_CACHE.clear()
-        for index in range(12):
-            _remember_index((f"/ws/{index}", "lexical"), (0, 0), object())
-        self.assertLessEqual(len(_INDEX_CACHE), 4)
+        from harness.config import load_config
+        from harness.execution.tools import _RETRIEVERS, _retriever
+        from harness.execution.workspace import Workspace
+
+        for retriever in list(_RETRIEVERS.values()):
+            retriever.close()
+        _RETRIEVERS.clear()
+        self.addCleanup(_RETRIEVERS.clear)
+        root_dir = Path(__file__).resolve().parents[1]
+        config = load_config(root_dir / "configs" / "teaching.yaml")
+        roots = []
+        for _ in range(count):
+            root = Path(tempfile.mkdtemp())
+            roots.append(root)
+            found = _retriever(Workspace(root, ()), config)
+            self.addCleanup(found.close)
+        return _RETRIEVERS, roots
+
+    def test_the_cache_keeps_only_the_most_recent_workspaces(self) -> None:
+        cache, _ = self.retrievers(12)
+        self.assertLessEqual(len(cache), 4)
 
     def test_the_newest_entry_survives(self) -> None:
-        from harness.execution.tools import _INDEX_CACHE, _remember_index
-
-        _INDEX_CACHE.clear()
-        for index in range(12):
-            _remember_index((f"/ws/{index}", "lexical"), (0, 0), object())
-        self.assertIn(("/ws/11", "lexical"), _INDEX_CACHE)
+        """Evicting the workspace being used would defeat the cache entirely."""
+        cache, roots = self.retrievers(12)
+        self.assertIn((str(roots[-1]), "lexical"), cache)
 
 
 if __name__ == "__main__":

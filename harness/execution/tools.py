@@ -23,13 +23,11 @@ from harness.execution.mcp import MCPStdioClient
 from harness.execution.policy import PolicyEngine
 from harness.execution.process import run_process
 from harness.execution.retrieval import (
-    BM25Index,
-    EmbeddingIndex,
+    Retriever,
     embedding_request,
-    iter_chunks,
+    local_embedder,
     parse_embeddings,
     render_hits,
-    workspace_signature,
 )
 from harness.execution.sandbox import build_sandbox
 from harness.execution.search import build_request, parse_results, render
@@ -246,8 +244,16 @@ def optional_tools(
             (
                 ToolSpec(
                     "retrieve",
-                    "Find the parts of the workspace most relevant to a question, "
-                    "ranked, as excerpts with their file and line range.",
+                    # Written to be chosen. The old description said what the
+                    # tool did and not when to reach for it, so a model with
+                    # grep and read_file in front of it never picked this one.
+                    "Search the workspace by meaning. Ask a plain question and "
+                    "get back the most relevant excerpts, ranked, each with its "
+                    "file, line range and enclosing function. Use this first to "
+                    "find where something lives when you do not already know "
+                    "the file or the identifier; it replaces listing "
+                    "directories and opening files to look around. Use grep "
+                    "instead when you know the exact string.",
                     object_schema(
                         {"query": {"type": "string"}, "limit": {"type": "integer"}},
                         ("query",),
@@ -739,8 +745,13 @@ def _apply_patch(
                 "already_applied": False,
                 "applied_via": "three_way_merge",
             }
+        # Named a conflict, because that is what it is and what the operator
+        # has to act on. git's own wording for the same state varies by
+        # version -- "patch does not apply", "patch failed" -- and none of it
+        # tells the reader the file has moved on since the patch was written.
         raise ToolError(
-            f"patch failed validation: {check.output.strip()}"
+            "patch conflicts with the current contents and was not applied; "
+            f"re-read the file and rewrite the patch (git: {check.output.strip()})"
         )
     # The first apply succeeds, so write the patch file again to apply it
     # (the previous temp file was deleted after the check).
@@ -977,25 +988,32 @@ def _browser_fetch(arguments: dict[str, Any], config: HarnessConfig) -> tuple[st
         raise ToolError(f"HTTP request failed: {exc.reason}") from exc
 
 
-# Keyed by workspace and backend, and invalidated by a cheap signature of the
-# tree. The agent patches files as it works, so an index built on turn two is
-# wrong by turn four.
-_INDEX_CACHE: dict[tuple[str, str], tuple[tuple[int, int], Any]] = {}
+# One open retriever per workspace. The index itself is on disk now, so this
+# only avoids reopening SQLite and reloading the embedding model; correctness
+# no longer depends on it, because `Retriever.search` syncs per file before
+# every query rather than trusting a whole-tree fingerprint.
+_RETRIEVERS: dict[tuple[str, str], Retriever] = {}
 # Bounded because the process outlives the run. `harness loop` and
 # `harness goal` create a workspace per feature or per attempt, and an
-# unbounded cache would hold every one of their chunk sets -- with the
-# embedding backend, every one of their vector sets -- until the process
-# exited. A run only ever queries its own workspace, so a handful is plenty.
+# unbounded cache would hold an open database handle for every one of them.
 _INDEX_CACHE_LIMIT = 4
 
 
-def _remember_index(
-    key: tuple[str, str], signature: tuple[int, int], index: Any
-) -> None:
-    _INDEX_CACHE[key] = (signature, index)
-    while len(_INDEX_CACHE) > _INDEX_CACHE_LIMIT:
-        # Insertion-ordered, so the oldest workspace leaves first.
-        _INDEX_CACHE.pop(next(iter(_INDEX_CACHE)))
+def _retriever(workspace: Workspace, config: HarnessConfig) -> Retriever:
+    settings = config.retrieval
+    key = (str(workspace.root), settings.kind)
+    found = _RETRIEVERS.get(key)
+    if found is None:
+        embed = local_embedder(settings.local_model) if settings.kind == "hybrid" else None
+        found = Retriever(workspace.root, settings, embed=embed)
+        _RETRIEVERS[key] = found
+        while len(_RETRIEVERS) > _INDEX_CACHE_LIMIT:
+            # Insertion-ordered, so the oldest workspace leaves first. Closed
+            # rather than dropped: an abandoned SQLite handle keeps a WAL file
+            # open, and on Windows that also keeps the directory undeletable.
+            oldest = next(iter(_RETRIEVERS))
+            _RETRIEVERS.pop(oldest).close()
+    return found
 
 
 def _retrieve(
@@ -1008,22 +1026,11 @@ def _retrieve(
     re-embed all of it -- for each question the agent asks.
     """
     settings = config.retrieval
-    key = (str(workspace.root), settings.kind)
-    signature = workspace_signature(workspace.root, settings)
-    cached = _INDEX_CACHE.get(key)
-    if cached is not None and cached[0] == signature:
-        index = cached[1]
-    else:
-        chunks = iter_chunks(workspace.root, settings)
-        if settings.kind == "embedding":
-            index = EmbeddingIndex(chunks, lambda texts: _embed(texts, config))
-        else:
-            index = BM25Index(chunks)
-        _remember_index(key, signature, index)
+    retriever = _retriever(workspace, config)
     limit = int(arguments.get("limit") or settings.limit)
-    hits = index.search(str(arguments["query"]), limit=max(1, min(limit, 20)))
+    hits = retriever.search(str(arguments["query"]), limit=max(1, min(limit, 20)))
     return render_hits(hits), {
-        "backend": settings.kind,
+        "backend": "lexical" if retriever.degraded else settings.kind,
         "query": str(arguments["query"]),
         "hits": len(hits),
         "paths": [f"{hit.chunk.path}:{hit.chunk.start_line}" for hit in hits],
