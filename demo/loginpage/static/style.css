@@ -1,0 +1,90 @@
+/* The sign-in page.
+ *
+ * Plain CSS, no build step: what is in this file is what the browser gets.
+ */
+
+:root {
+  --ink: #16202c;
+  --paper: #ffffff;
+  --page: #eef2f7;
+  --line: #c8d2de;
+  --accent: #0069c2;
+  --danger: #f4f6f8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--page);
+  color: var(--ink);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.card {
+  width: 100%;
+  max-width: 22rem;
+  padding: 2rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+}
+
+.hint {
+  margin: 0 0 1.5rem;
+  color: #5b6875;
+  font-size: 0.875rem;
+}
+
+.field {
+  margin-bottom: 1rem;
+}
+
+.control {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.control:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+/* The failure message. */
+.error {
+  margin: 0 0 1rem;
+  min-height: 1.25rem;
+  font-size: 0.875rem;
+  color: var(--danger);
+}
+
+.submit {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--paper);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.submit:hover { background: #00549b; }
+
+a { color: var(--accent); }
