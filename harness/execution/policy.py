@@ -335,22 +335,34 @@ def parse_rule(text: str, effect: str) -> PolicyRule:
     return PolicyRule(effect, match.group("tool"), match.group("pattern") or "", text)
 
 
-def _glob_tokens(pattern: tuple[str, ...], tokens: tuple[str, ...]) -> bool:
+def _glob_tokens(
+    pattern: tuple[str, ...], tokens: tuple[str, ...], *, open_ended: bool = False
+) -> bool:
     """Match a token pattern where `*` stands for any run of tokens.
 
     Tokens rather than characters, because a command is a list and matching it
     as a string would let `git pushed` satisfy a rule written for `git push`.
+
+    `open_ended` lets the subject carry extra trailing tokens the pattern did
+    not mention. Without it a rule had to name every argument: `run_command(rm*)`
+    matched a bare `rm` and not `rm -rf data`, so the most obvious deny rule
+    anyone would write silently caught nothing. It is passed only for `deny`
+    and `ask`, never for `allow` -- widening a refusal is safe, and widening a
+    permission grants something the operator did not write.
     """
     if not pattern:
-        return not tokens
+        return open_ended or not tokens
     head, rest = pattern[0], pattern[1:]
     if head == "*":
         if not rest:
             return True
-        return any(_glob_tokens(rest, tokens[index:]) for index in range(len(tokens) + 1))
+        return any(
+            _glob_tokens(rest, tokens[index:], open_ended=open_ended)
+            for index in range(len(tokens) + 1)
+        )
     if not tokens or (tokens[0] != head and not fnmatch.fnmatch(tokens[0], head)):
         return False
-    return _glob_tokens(rest, tokens[1:])
+    return _glob_tokens(rest, tokens[1:], open_ended=open_ended)
 
 
 def _subjects(tool: str, arguments: dict[str, Any]) -> list[tuple[str, ...]]:
@@ -390,9 +402,24 @@ def rule_for(
                 continue
             if not rule.pattern:
                 return rule
-            wanted = tuple(shlex.split(rule.pattern)) if rule.pattern.strip() else ()
-            if any(_glob_tokens(normalize_command(wanted), subject) for subject in subjects):
-                return rule
+            # A command pattern and a path pattern are matched differently, and
+            # conflating them was a hole rather than a nicety. `normalize_command`
+            # strips the directory off an executable so a rule for `rm` also
+            # covers `/bin/rm`. Applied to a path pattern it strips the
+            # directory there too, so `edit_file(data/**)` normalized to `**`
+            # and denied every edit in the repository -- the operator writes
+            # the most natural rule there is and locks the agent out entirely.
+            if tool == "run_command":
+                wanted = tuple(shlex.split(rule.pattern)) if rule.pattern.strip() else ()
+                # A pattern ending in a glob means "and whatever follows",
+                # which is what an operator writing `rm*` intends.
+                open_ended = bool(wanted) and wanted[-1].endswith("*") and effect != "allow"
+                if any(
+                    _glob_tokens(normalize_command(wanted), subject, open_ended=open_ended)
+                    for subject in subjects
+                ):
+                    return rule
+                continue
             if any(
                 len(subject) == 1 and fnmatch.fnmatch(subject[0], rule.pattern)
                 for subject in subjects
