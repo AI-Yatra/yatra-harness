@@ -465,8 +465,8 @@
  "generated_by": "docs/atlas/scripts/scan_harness.py",
  "head": {
   "date": "2026-09-03",
-  "sha": "cf74852",
-  "subject": "Merge pull request #11 from AI-Yatra/complete-and-clean"
+  "sha": "583d8ee",
+  "subject": "Find `gh` the way a shell does, and fix the tests that hid it"
  },
  "lanes": [
   {
@@ -565,7 +565,9 @@
    "blurb": "Workspace, policy gate, sandbox, the tools themselves.",
    "key": "execution",
    "modules": [
+    "execution.chunking",
     "execution.hooks",
+    "execution.indexing",
     "execution.mcp",
     "execution.policy",
     "execution.process",
@@ -849,7 +851,7 @@
    "side": "harness",
    "sloc": 235,
    "test_cases": 409,
-   "test_sloc": 3697,
+   "test_sloc": 3702,
    "tests": [
     "test_atlas_scan.py",
     "test_checkpoints.py",
@@ -1259,8 +1261,8 @@
    "path": "harness/core/errors.py",
    "side": "harness",
    "sloc": 47,
-   "test_cases": 602,
-   "test_sloc": 5326,
+   "test_cases": 638,
+   "test_sloc": 5544,
    "tests": [
     "test_backlog.py",
     "test_compaction.py",
@@ -1481,7 +1483,7 @@
    ],
    "api_count": 26,
    "classes": 5,
-   "commits": 2,
+   "commits": 3,
    "doc": "Credential storage and resolution for model providers.",
    "doc_full": "Credential storage and resolution for model providers.\n\nDesign rules, in priority order:\n\n1. **Never leak.** ``redact`` is the only printable form of a key. This module\n   is the only one that holds a raw secret, and it hands it to the provider\n   adapter and nowhere else. Keys never reach an event, artifact or summary.\n2. **Take any key.** ``harness auth add <key>`` infers the provider from the\n   key's prefix. Prefixes match longest-first, so ``sk-ant-api03-`` is not\n   swallowed by ``sk-``.\n3. **One precedence order, stated.** Environment variable first, then the\n   stored file. ``harness auth status`` prints which source won, so a stale\n   environment variable shadowing a stored key is visible rather than\n   mysterious.\n4. **Local servers need no key.** Ollama and vLLM resolve as ready without one.\n5. **Verification is a real call.** ``harness auth verify`` asks the provider to\n   list its models. A variable being set is not evidence that the key works.\n\nThe store lives outside the repository so it cannot be committed by accident.",
    "external": [
@@ -1503,7 +1505,7 @@
     "core.util"
    ],
    "in_boundary": false,
-   "last_touched": "2026-09-02",
+   "last_touched": "2026-09-03",
    "layer": "models",
    "lines": 820,
    "name": "models.auth",
@@ -1578,7 +1580,7 @@
    ],
    "api_count": 7,
    "classes": 5,
-   "commits": 8,
+   "commits": 9,
    "doc": "Provider adapters behind one normalized contract.",
    "doc_full": "Provider adapters behind one normalized contract.\n\nEvery provider returns the same :class:`ActionProposal` shape, so the agent loop\nnever learns which vendor it is talking to. Adapters own wire format; the loop\nowns orchestration.",
    "external": [
@@ -1605,7 +1607,7 @@
     "models.streaming"
    ],
    "in_boundary": true,
-   "last_touched": "2026-09-02",
+   "last_touched": "2026-09-03",
    "layer": "models",
    "lines": 624,
    "name": "models.providers",
@@ -1919,7 +1921,7 @@
    ],
    "api_count": 2,
    "classes": 1,
-   "commits": 2,
+   "commits": 3,
    "doc": "Reassembling a streamed completion into the response the adapter expects.",
    "doc_full": "Reassembling a streamed completion into the response the adapter expects.\n\nA turn against a remote model is a blocking request. The operator sees\nnothing for however long it takes and then sees everything at once, which\nreads as a hang -- and a run that looks hung is a run someone kills, often\njust before it would have succeeded.\n\nStreaming fixes the appearance and creates a parsing problem. Server-sent\nevents split a completion at arbitrary boundaries: content arrives in\nfragments, tool-call arguments arrive as string pieces that are only valid\nJSON once concatenated, and the stream ends with a sentinel that is not JSON\nat all. This module is that reassembly, and nothing else.\n\nThe design constraint is at the bottom: `as_payload` produces exactly the\nshape a non-streamed response has, so every adapter, normalizer and test\ndownstream cannot tell the difference. Streaming is a transport detail and it\nshould not leak into the layer that decides what an action is.",
    "external": [
@@ -1935,7 +1937,7 @@
    ],
    "imports": [],
    "in_boundary": false,
-   "last_touched": "2026-09-02",
+   "last_touched": "2026-09-03",
    "layer": "models",
    "lines": 166,
    "name": "models.streaming",
@@ -2305,14 +2307,14 @@
     {
      "doc": "",
      "kind": "class",
-     "line": 52,
+     "line": 50,
      "methods": [],
      "name": "RegisteredTool"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 57,
+     "line": 55,
      "methods": [
       "register",
       "specs",
@@ -2323,35 +2325,35 @@
     {
      "doc": "",
      "kind": "function",
-     "line": 136,
+     "line": 134,
      "methods": [],
      "name": "validate_json_schema"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 197,
+     "line": 195,
      "methods": [],
      "name": "build_registry"
     },
     {
      "doc": "The capabilities a loop opts into rather than always having.",
      "kind": "function",
-     "line": 224,
+     "line": 222,
      "methods": [],
      "name": "optional_tools"
     },
     {
      "doc": "Discover one MCP server's tools as registerable pairs.",
      "kind": "function",
-     "line": 1114,
+     "line": 1121,
      "methods": [],
      "name": "mcp_tools"
     }
    ],
    "api_count": 6,
    "classes": 2,
-   "commits": 11,
+   "commits": 12,
    "doc": "Typed tool registry and policy-governed native/MCP tool implementations.",
    "doc_full": "Typed tool registry and policy-governed native/MCP tool implementations.",
    "external": [
@@ -2393,15 +2395,15 @@
     "record.artifacts"
    ],
    "in_boundary": true,
-   "last_touched": "2026-09-02",
+   "last_touched": "2026-09-03",
    "layer": "execution",
-   "lines": 1175,
+   "lines": 1182,
    "name": "execution.tools",
    "path": "harness/execution/tools.py",
    "side": "harness",
-   "sloc": 1034,
+   "sloc": 1033,
    "test_cases": 58,
-   "test_sloc": 632,
+   "test_sloc": 646,
    "tests": [
     "test_patch_recovery.py",
     "test_review_findings.py",
@@ -2517,7 +2519,7 @@
    "side": "harness",
    "sloc": 360,
    "test_cases": 137,
-   "test_sloc": 1146,
+   "test_sloc": 1160,
    "tests": [
     "test_denied_approval.py",
     "test_patch_recovery.py",
@@ -2532,150 +2534,96 @@
   {
    "api": [
     {
-     "doc": "",
+     "doc": "One indexed chunk, as it comes back from a query.",
      "kind": "class",
-     "line": 47,
-     "methods": [],
-     "name": "RetrievalConfig"
-    },
-    {
-     "doc": "",
-     "kind": "class",
-     "line": 67,
-     "methods": [],
-     "name": "Chunk"
-    },
-    {
-     "doc": "",
-     "kind": "class",
-     "line": 75,
-     "methods": [],
-     "name": "Hit"
-    },
-    {
-     "doc": "",
-     "kind": "class",
-     "line": 81,
-     "methods": [],
-     "name": "EmbeddingRequest"
-    },
-    {
-     "doc": "Identifier-aware lowercase tokens.",
-     "kind": "function",
-     "line": 87,
-     "methods": [],
-     "name": "tokenize"
-    },
-    {
-     "doc": "Split one file into line-ranged chunks, skipping what cannot be read.",
-     "kind": "function",
-     "line": 104,
-     "methods": [],
-     "name": "chunk_file"
-    },
-    {
-     "doc": "A cheap fingerprint of the indexable tree: file count and newest mtime.",
-     "kind": "function",
-     "line": 130,
-     "methods": [],
-     "name": "workspace_signature"
-    },
-    {
-     "doc": "Every indexable chunk under `root`, bounded by the configured caps.",
-     "kind": "function",
-     "line": 155,
-     "methods": [],
-     "name": "iter_chunks"
-    },
-    {
-     "doc": "Ranking by term statistics. No key, no network, same answer every time.",
-     "kind": "class",
-     "line": 179,
+     "line": 86,
      "methods": [
-      "search"
+      "as_chunk"
      ],
-     "name": "BM25Index"
+     "name": "Row"
     },
     {
-     "doc": "Ranking by cosine similarity against a provider's vectors.",
+     "doc": "Where a workspace's index lives.",
+     "kind": "function",
+     "line": 100,
+     "methods": [],
+     "name": "index_path"
+    },
+    {
+     "doc": "Every file worth indexing, relative and posix, in a stable order.",
+     "kind": "function",
+     "line": 113,
+     "methods": [],
+     "name": "discover"
+    },
+    {
+     "doc": "An operator's question, as an FTS5 expression that cannot be a syntax error.",
+     "kind": "function",
+     "line": 159,
+     "methods": [],
+     "name": "fts_query"
+    },
+    {
+     "doc": "A workspace's chunks, ranked by FTS5, updated one file at a time.",
      "kind": "class",
-     "line": 224,
+     "line": 171,
      "methods": [
-      "search"
+      "clear",
+      "close",
+      "sync",
+      "search",
+      "all_chunks",
+      "vector_search",
+      "hybrid_search",
+      "vector_count",
+      "count"
      ],
-     "name": "EmbeddingIndex"
+     "name": "SqliteIndex"
     },
     {
-     "doc": "Similarity, defined as zero wherever it would otherwise be undefined.",
+     "doc": "Combine rankings by position rather than by score.",
      "kind": "function",
-     "line": 265,
+     "line": 414,
      "methods": [],
-     "name": "cosine"
-    },
-    {
-     "doc": "An OpenAI-compatible /embeddings call. The key travels in a header.",
-     "kind": "function",
-     "line": 282,
-     "methods": [],
-     "name": "embedding_request"
-    },
-    {
-     "doc": "Read vectors back, restoring the order they were asked for.",
-     "kind": "function",
-     "line": 294,
-     "methods": [],
-     "name": "parse_embeddings"
-    },
-    {
-     "doc": "What the model sees: excerpts with the coordinates to go read more.",
-     "kind": "function",
-     "line": 318,
-     "methods": [],
-     "name": "render_hits"
-    },
-    {
-     "doc": "",
-     "kind": "function",
-     "line": 336,
-     "methods": [],
-     "name": "retrieval_config_from_dict"
+     "name": "fuse"
     }
    ],
-   "api_count": 15,
-   "classes": 6,
-   "commits": 2,
-   "doc": "Retrieval: finding the relevant part of a repository too big to read.",
-   "doc_full": "Retrieval: finding the relevant part of a repository too big to read.\n\n`search_repo` matches a literal string. That is exact, and useless when you do\nnot already know the identifier: \"where is the retry backoff decided\" finds\nnothing, because nobody wrote that sentence in the code. A model that cannot\nfind the right file reads the wrong ones, and a context budget is spent on\nmaterial that was never going to help.\n\nTwo backends, and the default is the one that always works. Lexical (BM25)\nranks by term statistics -- no key, no network, deterministic, and available\non a workshop laptop. Embedding ranks by cosine similarity against a\nprovider's vectors and finds things lexical search cannot, at the cost of a\ndependency on that provider being reachable and paid for.\n\nEverything that decides a ranking is a pure function over text, so the\nscoring is tested without a network and the provider's answers are recorded\npayloads. Retrieval that only works when someone has a key is retrieval that\nis never exercised in CI.",
+   "api_count": 6,
+   "classes": 2,
+   "commits": 1,
+   "doc": "A workspace index that survives the process that built it.",
+   "doc_full": "A workspace index that survives the process that built it.\n\nThe old index was built in memory, from a full walk of the tree, in every\nprocess that asked a question. On this repository that is three seconds before\nthe first answer and it is linear in the size of the repository, so the cost\nlands hardest exactly where retrieval matters most. Worse, it was rebuilt from\nscratch when an agent edited one file, because the freshness check was a single\nfingerprint over the whole tree.\n\nSo the index lives in SQLite, under the user's home rather than in the\nrepository, and it updates per file. An agent that edits two files in a\nfive-thousand-file repository re-reads two files.\n\nFTS5 does the ranking. It is a full-text index with a real `bm25()` built into\nthe SQLite that ships with CPython, which means persistence, incremental\nupdate and BM25 arrive together with no dependency at all. Verified present\nbefore this was written, rather than assumed.\n\nDiscovery asks git. `git ls-files --cached --others --exclude-standard` is the\nlist of files that are tracked or could be, which is precisely the set worth\nsearching: it honours `.gitignore` and every other ignore rule the repository\nalready declares, and it includes a file the agent created a moment ago. The\nprevious walk ignored all of that and indexed build output -- on this\nrepository 35% of the index was generated JSON, and two copies of a generated\nartifact outranked real code. A tree that is not a git repository falls back to\nwalking it.",
    "external": [
     "__future__",
+    "array",
     "collections",
     "dataclasses",
-    "json",
-    "math",
+    "hashlib",
+    "os",
     "pathlib",
     "re",
-    "typing"
+    "sqlite3",
+    "subprocess"
    ],
-   "fan_in": 2,
+   "fan_in": 1,
    "fan_out": 1,
-   "functions": 9,
+   "functions": 4,
    "imported_by": [
-    "config",
-    "execution.tools"
+    "execution.retrieval"
    ],
    "imports": [
-    "core.errors"
+    "execution.chunking"
    ],
    "in_boundary": false,
-   "last_touched": "2026-09-02",
+   "last_touched": "2026-09-03",
    "layer": "execution",
-   "lines": 365,
-   "name": "execution.retrieval",
-   "path": "harness/execution/retrieval.py",
+   "lines": 425,
+   "name": "execution.indexing",
+   "path": "harness/execution/indexing.py",
    "side": "harness",
-   "sloc": 300,
-   "test_cases": 35,
-   "test_sloc": 215,
+   "sloc": 325,
+   "test_cases": 71,
+   "test_sloc": 404,
    "tests": [
     "test_retrieval.py"
    ]
@@ -2812,7 +2760,7 @@
    "side": "harness",
    "sloc": 287,
    "test_cases": 74,
-   "test_sloc": 563,
+   "test_sloc": 578,
    "tests": [
     "test_os_sandbox.py",
     "test_sandbox.py",
@@ -2894,8 +2842,8 @@
    "path": "harness/execution/workspace.py",
    "side": "harness",
    "sloc": 278,
-   "test_cases": 441,
-   "test_sloc": 4351,
+   "test_cases": 454,
+   "test_sloc": 4509,
    "tests": [
     "test_checkpoints.py",
     "test_context_budget.py",
@@ -2914,6 +2862,7 @@
     "test_repl_gemini.py",
     "test_repl_tool_safety.py",
     "test_repl_tools.py",
+    "test_review_findings.py",
     "test_session.py",
     "test_shared_tooling.py",
     "test_tools.py",
@@ -3018,6 +2967,125 @@
     {
      "doc": "",
      "kind": "class",
+     "line": 50,
+     "methods": [],
+     "name": "RetrievalConfig"
+    },
+    {
+     "doc": "",
+     "kind": "class",
+     "line": 72,
+     "methods": [
+      "of"
+     ],
+     "name": "Hit"
+    },
+    {
+     "doc": "",
+     "kind": "class",
+     "line": 82,
+     "methods": [],
+     "name": "EmbeddingRequest"
+    },
+    {
+     "doc": "A static embedding model, or None when the optional dependency is absent.",
+     "kind": "function",
+     "line": 91,
+     "methods": [],
+     "name": "local_embedder"
+    },
+    {
+     "doc": "One workspace, kept searchable.",
+     "kind": "class",
+     "line": 117,
+     "methods": [
+      "sync",
+      "search",
+      "close"
+     ],
+     "name": "Retriever"
+    },
+    {
+     "doc": "Similarity, defined as zero wherever it would otherwise be undefined.",
+     "kind": "function",
+     "line": 162,
+     "methods": [],
+     "name": "cosine"
+    },
+    {
+     "doc": "An OpenAI-compatible /embeddings call. The key travels in a header.",
+     "kind": "function",
+     "line": 179,
+     "methods": [],
+     "name": "embedding_request"
+    },
+    {
+     "doc": "Read vectors back, restoring the order they were asked for.",
+     "kind": "function",
+     "line": 191,
+     "methods": [],
+     "name": "parse_embeddings"
+    },
+    {
+     "doc": "What the model sees: excerpts with the coordinates to go read more.",
+     "kind": "function",
+     "line": 218,
+     "methods": [],
+     "name": "render_hits"
+    },
+    {
+     "doc": "",
+     "kind": "function",
+     "line": 235,
+     "methods": [],
+     "name": "retrieval_config_from_dict"
+    }
+   ],
+   "api_count": 10,
+   "classes": 4,
+   "commits": 3,
+   "doc": "Finding the relevant part of a repository too big to read.",
+   "doc_full": "Finding the relevant part of a repository too big to read.\n\n`grep` matches a literal string. That is exact, and useless when you do not\nalready know the identifier: \"where is the retry backoff decided\" finds\nnothing, because nobody wrote that sentence in the code. A model that cannot\nfind the right file reads the wrong ones, and a context budget is spent on\nmaterial that was never going to help.\n\nThree backends, and the default is the one that always works.\n\n`lexical` is BM25 over a persistent SQLite FTS5 index. No key, no network, no\ndependency, deterministic, and available on a laptop with nothing installed.\n\n`hybrid` adds a local static embedding model and fuses the two rankings by\nreciprocal rank. Static embeddings are lookup tables rather than a forward\npass, so the model is 8 MB, needs no GPU, and encodes this repository in about\na second. Measured on ten questions about this codebase, fusing lifted the\ntop-three hit rate from 40% to 70%.\n\n`embedding` is the original remote-provider backend, kept because an operator\nwith a provider they trust should be able to use it.\n\nThe measurement that decided the default model is worth recording, because it\nwas the opposite of what everyone assumes. A *code*-specialised static model\nscored worse than the general one -- 30% at top-three against 70%. Our queries\nare English questions about code, not code searching for code, and the chunks\nlead with a path and a symbol name. The smallest, most general model won.",
+   "external": [
+    "__future__",
+    "collections",
+    "dataclasses",
+    "json",
+    "model2vec",
+    "pathlib",
+    "typing"
+   ],
+   "fan_in": 2,
+   "fan_out": 3,
+   "functions": 6,
+   "imported_by": [
+    "config",
+    "execution.tools"
+   ],
+   "imports": [
+    "core.errors",
+    "execution.chunking",
+    "execution.indexing"
+   ],
+   "in_boundary": false,
+   "last_touched": "2026-09-03",
+   "layer": "execution",
+   "lines": 262,
+   "name": "execution.retrieval",
+   "path": "harness/execution/retrieval.py",
+   "side": "harness",
+   "sloc": 198,
+   "test_cases": 71,
+   "test_sloc": 404,
+   "tests": [
+    "test_retrieval.py"
+   ]
+  },
+  {
+   "api": [
+    {
+     "doc": "",
+     "kind": "class",
      "line": 22,
      "methods": [
       "connect",
@@ -3067,6 +3135,72 @@
    "test_cases": 0,
    "test_sloc": 0,
    "tests": []
+  },
+  {
+   "api": [
+    {
+     "doc": "One rankable piece of one file.",
+     "kind": "class",
+     "line": 42,
+     "methods": [
+      "search_text",
+      "label"
+     ],
+     "name": "Chunk"
+    },
+    {
+     "doc": "Cut one file's contents, at its own boundaries where we can read them.",
+     "kind": "function",
+     "line": 73,
+     "methods": [],
+     "name": "chunk_text"
+    },
+    {
+     "doc": "Fixed windows: the fallback, and the only option for most languages.",
+     "kind": "function",
+     "line": 84,
+     "methods": [],
+     "name": "window_chunks"
+    },
+    {
+     "doc": "Every definition in a Python file, plus whatever sits between them.",
+     "kind": "function",
+     "line": 106,
+     "methods": [],
+     "name": "python_chunks"
+    }
+   ],
+   "api_count": 4,
+   "classes": 1,
+   "commits": 1,
+   "doc": "Cutting a repository into pieces worth ranking.",
+   "doc_full": "Cutting a repository into pieces worth ranking.\n\nA chunk is the unit retrieval returns, so what a chunk *is* decides what\nretrieval can find. Fixed line windows were the cheap answer and they are\nwrong in a specific way: a forty-line window starting at line 60 is a\nfragment of two functions and the whole of neither, and nothing in it says\nwhich functions those were. Rank it first and the model still has to open the\nfile to find out what it is looking at.\n\nSo a Python file is cut at its own boundaries instead, using `ast` from the\nstandard library. Each function and method becomes one chunk that knows its\nown name. Everything else -- other languages, unparseable files, module-level\ncode between definitions -- falls back to line windows, because a worse chunk\nis much better than no chunk.\n\nThe other half of the idea is `search_text`. A chunk is indexed as its path\nand symbol *followed by* its source, so `harness/models/providers.py` and\n`_retry_after` are terms a query can match. Asking \"where is the retry backoff\ndecided\" previously ranked the documentation that contains the phrase above\nthe code that does it, because the code says `backoff_seconds` and never says\n\"retry backoff\" in prose. Naming the symbol in the indexed text is what closes\nthat gap without an embedding model.",
+   "external": [
+    "__future__",
+    "ast",
+    "dataclasses"
+   ],
+   "fan_in": 2,
+   "fan_out": 0,
+   "functions": 3,
+   "imported_by": [
+    "execution.indexing",
+    "execution.retrieval"
+   ],
+   "imports": [],
+   "in_boundary": false,
+   "last_touched": "2026-09-03",
+   "layer": "execution",
+   "lines": 207,
+   "name": "execution.chunking",
+   "path": "harness/execution/chunking.py",
+   "side": "harness",
+   "sloc": 165,
+   "test_cases": 71,
+   "test_sloc": 404,
+   "tests": [
+    "test_retrieval.py"
+   ]
   },
   {
    "api": [
@@ -3645,56 +3779,56 @@
     {
      "doc": "A run could not be delivered, or delivery was declined.",
      "kind": "class",
-     "line": 33,
+     "line": 34,
      "methods": [],
      "name": "DeliveryError"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 41,
+     "line": 42,
      "methods": [],
      "name": "DeliveryRequest"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 54,
+     "line": 55,
      "methods": [],
      "name": "DeliveryResult"
     },
     {
      "doc": "Commit, push and open a pull request for a completed run.",
      "kind": "function",
-     "line": 64,
+     "line": 65,
      "methods": [],
      "name": "deliver"
     },
     {
      "doc": "A commit that says what was asked for and which run produced it.",
      "kind": "function",
-     "line": 173,
+     "line": 184,
      "methods": [],
      "name": "commit_message"
     },
     {
      "doc": "One line, from what the operator asked for rather than what the model said.",
      "kind": "function",
-     "line": 182,
+     "line": 193,
      "methods": [],
      "name": "subject"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 207,
+     "line": 218,
      "methods": [],
      "name": "pull_request_body"
     }
    ],
    "api_count": 7,
    "classes": 3,
-   "commits": 3,
+   "commits": 4,
    "doc": "Turning a verified run into a commit, a pushed branch, and a pull request.",
    "doc_full": "Turning a verified run into a commit, a pushed branch, and a pull request.\n\nThis is the only part of the harness that reaches outside the machine, so it\nis deliberately the most reluctant. Delivery refuses a run the verifier did\nnot pass, refuses a run with nothing in it, and asks before every step whose\neffect another person can see. Each step is also independently retryable: a\ndeclined push leaves the commit alone so the next attempt has something to\nsend, and a declined pull request leaves the branch pushed.\n\nThe pull request body is assembled from the run's own evidence rather than\nfrom the model's description of its work. A model's account of what it did is\nexactly the thing the verifier exists not to trust.",
    "external": [
@@ -3703,6 +3837,7 @@
     "json",
     "os",
     "pathlib",
+    "shutil",
     "subprocess",
     "typing"
    ],
@@ -3719,15 +3854,15 @@
     "execution.workspace"
    ],
    "in_boundary": false,
-   "last_touched": "2026-09-02",
+   "last_touched": "2026-09-03",
    "layer": "autonomy",
-   "lines": 338,
+   "lines": 349,
    "name": "autonomy.delivery",
    "path": "harness/autonomy/delivery.py",
    "side": "harness",
-   "sloc": 280,
+   "sloc": 287,
    "test_cases": 30,
-   "test_sloc": 276,
+   "test_sloc": 267,
    "tests": [
     "test_delivery.py"
    ]
@@ -3969,7 +4104,7 @@
    "side": "harness",
    "sloc": 146,
    "test_cases": 29,
-   "test_sloc": 326,
+   "test_sloc": 340,
    "tests": [
     "test_loop.py",
     "test_review_findings.py"
@@ -4122,7 +4257,7 @@
    "side": "harness",
    "sloc": 123,
    "test_cases": 59,
-   "test_sloc": 556,
+   "test_sloc": 570,
    "tests": [
     "test_backlog.py",
     "test_demo_repo.py",
@@ -4274,7 +4409,7 @@
    "side": "harness",
    "sloc": 907,
    "test_cases": 23,
-   "test_sloc": 227,
+   "test_sloc": 241,
    "tests": [
     "test_denied_approval.py",
     "test_review_findings.py"
@@ -4360,7 +4495,7 @@
    "side": "harness",
    "sloc": 781,
    "test_cases": 52,
-   "test_sloc": 580,
+   "test_sloc": 594,
    "tests": [
     "test_compaction.py",
     "test_review_findings.py",
@@ -4437,7 +4572,7 @@
    ],
    "api_count": 9,
    "classes": 5,
-   "commits": 15,
+   "commits": 16,
    "doc": "Versioned, strict configuration/task/skill loading.",
    "doc_full": "Versioned, strict configuration/task/skill loading.",
    "external": [
@@ -4492,8 +4627,8 @@
    "path": "harness/config.py",
    "side": "harness",
    "sloc": 618,
-   "test_cases": 689,
-   "test_sloc": 6514,
+   "test_cases": 760,
+   "test_sloc": 6932,
    "tests": [
     "test_atlas_trace.py",
     "test_auth_gateways.py",
@@ -4520,6 +4655,7 @@
     "test_repl_gemini.py",
     "test_repl_tool_safety.py",
     "test_repl_tools.py",
+    "test_retrieval.py",
     "test_review_findings.py",
     "test_runtime.py",
     "test_shared_tooling.py",
@@ -4612,7 +4748,7 @@
    ],
    "api_count": 3,
    "classes": 3,
-   "commits": 8,
+   "commits": 9,
    "doc": "The interactive shell around the agent loop.",
    "doc_full": "The interactive shell around the agent loop.\n\nOwns everything the loop deliberately does not: reading a line, expanding\n`@path` and `!command`, slash commands, the banner, and turning Ctrl-C into\nan interrupted turn rather than a dead process.",
    "external": [
@@ -4834,7 +4970,7 @@
    ],
    "api_count": 5,
    "classes": 5,
-   "commits": 1,
+   "commits": 2,
    "doc": "What the operator sees.",
    "doc_full": "What the operator sees.\n\nFour rules shape everything here.\n\n**The screen shows what happened, not what was sent to the model.** A 400-line\nfile read is one line on screen and 400 in the context.\n\n**Nothing is printed that the terminal cannot encode.** A Windows console in\ncp1252 raising mid-stream would end a session over decoration, so every glyph\nhas an ASCII fallback chosen once at startup.\n\n**One grid.** Every line in the session shares a two-column gutter: marks hang\nin it, content starts after it. Tool names, model prose and status lines all\nbegin at the same column, and nested detail sits exactly one gutter deeper.\nAlignment is the only part of the hierarchy that survives a pipe, `NO_COLOR`,\nor a monochrome terminal, so it carries the structure and colour only\nreinforces it. The palette itself is in `theme.py`, with the measurements.\n\n**Prose looks the same however it arrived.** Streamed text used to be written\nstraight to the terminal, unwrapped and unstyled, while a blocking response\nwent through the markdown renderer. The same model saying the same words\nproduced two different screens depending on a transport setting. `Prose` below\nis the single renderer both paths feed, so the only difference streaming makes\nis when the characters appear.",
    "external": [
@@ -4859,7 +4995,7 @@
     "repl.theme"
    ],
    "in_boundary": false,
-   "last_touched": "2026-09-02",
+   "last_touched": "2026-09-03",
    "layer": "repl",
    "lines": 489,
    "name": "repl.render",
@@ -4903,7 +5039,7 @@
    ],
    "api_count": 2,
    "classes": 2,
-   "commits": 2,
+   "commits": 3,
    "doc": "Talking to a model in conversation shape.",
    "doc_full": "Talking to a model in conversation shape.\n\n`providers.complete` normalizes a response down to one `ActionProposal`,\nbecause that is what the batch loop consumes. A conversation needs the\nopposite: the prose and every tool call, with nothing discarded and no JSON\nenvelope demanded of a model that simply wants to answer.\n\nTransport is not reimplemented here. `_HTTPProvider.send` owns timeouts,\nstatus classification and the error vocabulary; this module owns the request\nbody and the reading of the reply.",
    "external": [
@@ -4929,7 +5065,7 @@
     "repl.conversation"
    ],
    "in_boundary": false,
-   "last_touched": "2026-09-02",
+   "last_touched": "2026-09-03",
    "layer": "repl",
    "lines": 382,
    "name": "repl.model",
@@ -5006,7 +5142,7 @@
    ],
    "api_count": 7,
    "classes": 6,
-   "commits": 4,
+   "commits": 5,
    "doc": "The turn loop.",
    "doc_full": "The turn loop.\n\nOne user message starts a turn. A turn is: send the whole thread, read what\ncomes back, run whatever tools it asked for, append the results, and send\nagain. It ends when the model replies without asking for a tool -- or when a\nbound is hit, which is the difference between an agent and a runaway loop.",
    "external": [
@@ -5167,7 +5303,7 @@
    ],
    "api_count": 5,
    "classes": 3,
-   "commits": 1,
+   "commits": 2,
    "doc": "The message history a session accumulates, and what to do when it fills.",
    "doc_full": "The message history a session accumulates, and what to do when it fills.\n\nMessages are held in the OpenAI chat shape because it is the one every route\nin this repository speaks natively except Anthropic, which `model.py`\nconverts on the way out. Holding one canonical shape means compaction,\npersistence and token accounting are written once.",
    "external": [
@@ -5189,7 +5325,7 @@
    ],
    "imports": [],
    "in_boundary": false,
-   "last_touched": "2026-09-02",
+   "last_touched": "2026-09-03",
    "layer": "repl",
    "lines": 247,
    "name": "repl.conversation",
@@ -5315,7 +5451,7 @@
    ],
    "api_count": 1,
    "classes": 0,
-   "commits": 3,
+   "commits": 4,
    "doc": "The system prompt, assembled once per session.",
    "doc_full": "The system prompt, assembled once per session.\n\nKept stable and at the front of every request. Providers cache on prompt\nprefixes, so the difference between building this once and rebuilding it per\nturn is a cache hit on the entire conversation history.",
    "external": [
@@ -5338,13 +5474,13 @@
     "run.instructions"
    ],
    "in_boundary": false,
-   "last_touched": "2026-09-02",
+   "last_touched": "2026-09-03",
    "layer": "repl",
-   "lines": 133,
+   "lines": 140,
    "name": "repl.prompt",
    "path": "harness/repl/prompt.py",
    "side": "harness",
-   "sloc": 114,
+   "sloc": 116,
    "test_cases": 0,
    "test_sloc": 0,
    "tests": []
@@ -5375,7 +5511,7 @@
    ],
    "api_count": 3,
    "classes": 0,
-   "commits": 1,
+   "commits": 2,
    "doc": "The wordmark drawn at the top of a session.",
    "doc_full": "The wordmark drawn at the top of a session.\n\nA block font rather than an image, because the one thing a terminal banner has\nto survive is being a terminal: no truecolor, no Unicode, eighty columns, a\npipe instead of a tty. Each of those degrades here rather than breaking.\n\nThe block character is U+2588, which is not in cp1252, so a legacy Windows\nconsole cannot encode it and `console.write` would swallow the whole line. The\nfont is therefore rendered with whatever fill the stream can actually take, and\nthe layout is identical either way.",
    "external": [
@@ -5390,7 +5526,7 @@
     "repl.theme"
    ],
    "in_boundary": false,
-   "last_touched": "2026-09-02",
+   "last_touched": "2026-09-03",
    "layer": "repl",
    "lines": 107,
    "name": "repl.banner",
@@ -5452,7 +5588,7 @@
    ],
    "api_count": 1,
    "classes": 1,
-   "commits": 0,
+   "commits": 1,
    "doc": "One palette and one layout grid, so the session looks like one program.",
    "doc_full": "One palette and one layout grid, so the session looks like one program.\n\nColour here is information, not decoration, so there are five roles and no\nmore. Anything that does not carry meaning is left at the terminal's own\nforeground, which is the only colour guaranteed to be readable.\n\n**The colours are measured, not chosen by eye.** A terminal's background is\nunknown and unknowable: it may be white, black, or Solarized Dark, and the\nprogram cannot ask. So each role's colour was picked by maximising its *worst*\nWCAG contrast ratio across all three. The arithmetic ceiling for a single\ncolour that must work on both white and black is sqrt(21), about 4.58, reached\nonly at relative luminance 0.179; every colour below is within 0.9 of that\nceiling. The numbers are in the comments and reproducible from the constants.\n\nThree findings from terminal practice shaped the rest.\n\n**SGR 2 (`dim`/faint) is not used anywhere.** Support is inconsistent: some\nterminals ignore it, leaving no hierarchy at all, and others render it so faint\nit is unreadable on a dark background. The old renderer used it for the\nmajority of its output, which meant most of the interface was at the mercy of a\ncode that had no defined appearance. A measured grey replaces it.\n\n**The 16 ANSI colours are not used either.** They have no standard: each\nterminal theme picks its own, so `blue` may be anything and is famously\nillegible on black in several popular themes. The 256-colour cube is fixed, so\na chosen colour is the colour that appears.\n\n**Nothing depends on colour alone.** Piped output, `NO_COLOR`, and a dumb\nterminal all lose every code here, so the layout below has to carry the\nstructure by itself. That is what the grid is for.",
    "external": [
@@ -5469,7 +5605,7 @@
    ],
    "imports": [],
    "in_boundary": false,
-   "last_touched": "",
+   "last_touched": "2026-09-03",
    "layer": "repl",
    "lines": 97,
    "name": "repl.theme",
@@ -5530,10 +5666,10 @@
      "repl.conversation",
      "repl.prompt"
     ],
-    "sloc": 302,
+    "sloc": 304,
     "tests": 160
    },
-   "sloc": 691
+   "sloc": 693
   },
   {
    "asks": "typed capabilities, validated arguments, legible failures",
@@ -5544,7 +5680,7 @@
      "execution.tools",
      "core.schema"
     ],
-    "sloc": 1093,
+    "sloc": 1092,
     "tests": 58
    },
    "key": "execution.tools",
@@ -5558,7 +5694,7 @@
     "sloc": 622,
     "tests": 304
    },
-   "sloc": 1715
+   "sloc": 1714
   },
   {
    "asks": "capability sets declared outside the code that runs them",
@@ -5570,7 +5706,7 @@
      "config"
     ],
     "sloc": 798,
-    "tests": 689
+    "tests": 760
    },
    "key": "skills",
    "name": "Skills and MCP",
@@ -5668,7 +5804,7 @@
      "execution.workspace"
     ],
     "sloc": 664,
-    "tests": 540
+    "tests": 553
    },
    "key": "execution.sandbox",
    "name": "Sandbox and execution",
@@ -5721,7 +5857,7 @@
      "record.artifacts",
      "autonomy.delivery"
     ],
-    "sloc": 454,
+    "sloc": 461,
     "tests": 36
    },
    "key": "verification",
@@ -5733,7 +5869,7 @@
     "sloc": 0,
     "tests": 0
    },
-   "sloc": 454
+   "sloc": 461
   },
   {
    "asks": "what was recorded, and can it be replayed",
@@ -5819,7 +5955,7 @@
      "core.errors"
     ],
     "sloc": 290,
-    "tests": 602
+    "tests": 638
    },
    "key": "reliability",
    "name": "Reliability",
@@ -5837,14 +5973,14 @@
   {
    "asks": "finding the relevant part of a repository too big to read",
    "batch": {
-    "api": 22,
+    "api": 17,
     "missing": [],
     "modules": [
      "execution.retrieval",
      "execution.search"
     ],
-    "sloc": 500,
-    "tests": 73
+    "sloc": 398,
+    "tests": 109
    },
    "key": "execution.retrieval",
    "name": "Retrieval and search",
@@ -5857,7 +5993,7 @@
     "sloc": 622,
     "tests": 304
    },
-   "sloc": 1122
+   "sloc": 1020
   }
  ],
  "repo": "yatra-harness",
@@ -6168,8 +6304,8 @@
    "covers": [
     "execution.workspace"
    ],
-   "lines": 186,
-   "sloc": 156
+   "lines": 178,
+   "sloc": 148
   },
   "test_delivery.py": {
    "cases": 30,
@@ -6178,8 +6314,8 @@
     "core.contracts",
     "execution.workspace"
    ],
-   "lines": 338,
-   "sloc": 276
+   "lines": 333,
+   "sloc": 267
   },
   "test_demo_repo.py": {
    "cases": 13,
@@ -6504,13 +6640,16 @@
    "sloc": 214
   },
   "test_retrieval.py": {
-   "cases": 35,
+   "cases": 71,
    "covers": [
+    "config",
     "core.errors",
+    "execution.chunking",
+    "execution.indexing",
     "execution.retrieval"
    ],
-   "lines": 294,
-   "sloc": 215
+   "lines": 549,
+   "sloc": 404
   },
   "test_review_findings.py": {
    "cases": 13,
@@ -6523,10 +6662,11 @@
     "core.errors",
     "execution.policy",
     "execution.tools",
+    "execution.workspace",
     "runtime"
    ],
-   "lines": 213,
-   "sloc": 161
+   "lines": 228,
+   "sloc": 175
   },
   "test_rubric.py": {
    "cases": 18,
@@ -6554,8 +6694,8 @@
     "core.errors",
     "execution.sandbox"
    ],
-   "lines": 283,
-   "sloc": 217
+   "lines": 302,
+   "sloc": 232
   },
   "test_search.py": {
    "cases": 20,
@@ -6649,7 +6789,7 @@
     "objective"
    ],
    "description": "",
-   "line": 181,
+   "line": 179,
    "name": "delegate",
    "required": [
     "agent",
@@ -6662,8 +6802,8 @@
     "query",
     "limit"
    ],
-   "description": "Find the parts of the workspace most relevant to a question, ranked, as excerpts with their file and line range.",
-   "line": 247,
+   "description": "Search the workspace by meaning. Ask a plain question and get back the most relevant excerpts, ranked, each with its file, line range and enclosing function. Use this first to find where something lives when you do not already know the file or the identifier; it replaces listing directories and opening files to look around. Use grep instead when you know the exact string.",
+   "line": 245,
    "name": "retrieve",
    "required": [
     "query"
@@ -6676,7 +6816,7 @@
     "limit"
    ],
    "description": "Search the web and return ranked results with their URLs.",
-   "line": 264,
+   "line": 270,
    "name": "web_search",
    "required": [
     "query"
@@ -6688,7 +6828,7 @@
     "url"
    ],
    "description": "Fetch one URL and return its readable text.",
-   "line": 278,
+   "line": 284,
    "name": "browser_fetch",
    "required": [
     "url"
@@ -6700,7 +6840,7 @@
     "max_entries"
    ],
    "description": "List a bounded tree of files in the run workspace.",
-   "line": 306,
+   "line": 312,
    "name": "repo_tree",
    "required": [],
    "risk": "read"
@@ -6711,7 +6851,7 @@
     "max_matches"
    ],
    "description": "Search UTF-8 text files in the workspace for a literal string.",
-   "line": 315,
+   "line": 321,
    "name": "search_repo",
    "required": [
     "query"
@@ -6725,7 +6865,7 @@
     "end_line"
    ],
    "description": "Read a UTF-8 file inside the run workspace.",
-   "line": 327,
+   "line": 333,
    "name": "read_file",
    "required": [
     "path"
@@ -6737,7 +6877,7 @@
     "patch"
    ],
    "description": "Apply a unified git patch inside the run workspace.",
-   "line": 343,
+   "line": 349,
    "name": "apply_patch",
    "required": [
     "patch"
@@ -6749,7 +6889,7 @@
     "command"
    ],
    "description": "Run an allowlisted command without a shell in the workspace.",
-   "line": 352,
+   "line": 358,
    "name": "run_command",
    "required": [
     "command"
@@ -6762,7 +6902,7 @@
     "arguments"
    ],
    "description": "Run a workspace-relative Python script in isolated interpreter mode.",
-   "line": 363,
+   "line": 369,
    "name": "python_run",
    "required": [
     "path"
@@ -6772,7 +6912,7 @@
   {
    "arguments": [],
    "description": "Return the current workspace diff and changed paths.",
-   "line": 378,
+   "line": 384,
    "name": "git_diff",
    "required": [],
    "risk": "read"
@@ -6782,7 +6922,7 @@
     "url"
    ],
    "description": "Fetch one allowlisted public HTTP(S) URL without following redirects.",
-   "line": 387,
+   "line": 393,
    "name": "browser_fetch",
    "required": [
     "url"
@@ -6795,7 +6935,7 @@
     "limit"
    ],
    "description": "Find the parts of the workspace most relevant to a question, ranked, as excerpts with their file and line range.",
-   "line": 396,
+   "line": 402,
    "name": "retrieve",
    "required": [
     "query"
@@ -6807,7 +6947,7 @@
     "query"
    ],
    "description": "Search the public web and return titles, URLs and snippets.",
-   "line": 408,
+   "line": 414,
    "name": "web_search",
    "required": [
     "query"
@@ -6819,7 +6959,7 @@
     "summary"
    ],
    "description": "Submit a completion claim. The harness will independently verify it.",
-   "line": 417,
+   "line": 423,
    "name": "finish",
    "required": [
     "summary"
@@ -6828,16 +6968,16 @@
   }
  ],
  "totals": {
-  "api": 288,
+  "api": 293,
   "commands": 20,
   "commits": 16,
-  "edges": 202,
-  "lines": 16452,
-  "modules": 55,
-  "sloc": 13526,
-  "test_cases": 1169,
+  "edges": 205,
+  "lines": 17006,
+  "modules": 57,
+  "sloc": 13922,
+  "test_cases": 1205,
   "test_files": 52,
-  "test_sloc": 10123,
+  "test_sloc": 10324,
   "tools": 15
  },
  "transitions": [
