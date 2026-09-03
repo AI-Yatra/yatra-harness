@@ -102,6 +102,20 @@ class LabelTests(unittest.TestCase):
         for label in document().all("label"):
             self.assertTrue(label.text.strip(), f"<label for={label.get('for')!r}> is empty")
 
+    def test_a_field_is_not_left_completely_anonymous(self) -> None:
+        """Two blank boxes and nothing to tell them apart.
+
+        With neither a label nor a placeholder, a sighted visitor has to guess
+        which box is which and a screen reader announces only "edit text".
+        """
+        parsed = document()
+        targets = {label.get("for") for label in parsed.all("label")}
+        for element in self.inputs():
+            named = element.get("id") in targets or element.get("aria-label")
+            self.assertTrue(
+                named, f"the {element.get('name')!r} field has no name of any kind"
+            )
+
     def test_a_placeholder_is_not_used_as_the_only_name(self) -> None:
         """It disappears on typing and is not announced consistently."""
         parsed = document()

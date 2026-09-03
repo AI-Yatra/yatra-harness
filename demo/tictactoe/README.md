@@ -5,6 +5,33 @@ Noughts and crosses as a library, used as a worked example for the
 functions over a nine-cell board, so a harness run can be judged by running
 the tests rather than by someone looking at a screen.
 
+## Run it
+
+```
+cd demo/tictactoe
+ay
+```
+
+No flags. `ay` works in the directory you started it in and reads the
+`AGENTS.md` here on its own.
+
+Then type this at the `>` prompt:
+
+```
+The test suite is failing. Run the tests, read the failures, fix game.py so
+every test passes, then run them again to confirm. Do not edit anything under
+tests/.
+```
+
+Thirteen tests fail before, thirty pass after. It takes about a minute.
+
+To watch instead of letting it work unattended, type `/mode plan` first and
+ask it what is wrong: in that mode it can read but cannot change anything.
+
+Put it back with `git checkout -- demo/tictactoe`.
+
+## Checking by hand
+
 ```
 python -m unittest discover -s tests
 ```

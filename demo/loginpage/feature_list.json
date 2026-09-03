@@ -1,5 +1,17 @@
 [
   {
+    "id": "fields-fit-the-card",
+    "description": "Make the input fields fit inside the card and the button label readable. .control is width: 100% with padding and a border and nothing sets box-sizing: border-box, so every field overflows the card by thirteen pixels either side. The submit label is #4d94d6 on a #0069c2 button, 1.72:1 where body text needs 4.5:1.",
+    "acceptance": [
+      "python -m unittest tests.test_style"
+    ],
+    "passes": false,
+    "category": "ui",
+    "protect": [
+      "tests/**"
+    ]
+  },
+  {
     "id": "identical-failure-message",
     "description": "Every failed sign-in returns the same message, whatever was wrong with it. auth.authenticate currently says 'We do not have an account with that username' for an unknown username and 'That password is not correct' for a bad password, which tells an anonymous visitor which usernames exist. Use auth.FAILURE for every failure. A failure must still carry a message; identical is not the same as absent.",
     "acceptance": [
@@ -13,7 +25,7 @@
   },
   {
     "id": "labelled-controls",
-    "description": "Give both inputs a real <label for=...> with words in it, keeping their ids, and mark the error paragraph so a screen reader announces it (role='alert' or aria-live). The controls are currently named by placeholder alone, which vanishes on typing and is not announced reliably. The error region must exist in the document before there is an error to put in it.",
+    "description": "Give both inputs a real <label for=...> with words in it, keeping their ids, and mark the error paragraph so a screen reader announces it (role=alert or aria-live). The fields currently carry neither a label nor a placeholder, so nothing on screen or in the accessibility tree says which is which.",
     "acceptance": [
       "python -m unittest tests.test_page"
     ],
@@ -25,7 +37,7 @@
   },
   {
     "id": "readable-error-colour",
-    "description": "Make the failure message readable. The --danger custom property in static/style.css is #f4f6f8 against a #ffffff card, a contrast ratio of 1.08:1 where WCAG asks 4.5:1 for body text, so the message is present in the HTML and invisible on screen. Choose a colour that reaches 4.5:1 against the card and is distinct from ordinary body text.",
+    "description": "Make the failure message readable. --danger is #f4f6f8 on a #fdecec panel, a contrast ratio of 1.05:1 where WCAG asks 4.5:1, so a bordered red alert box appears completely empty. Choose a colour that reaches 4.5:1 against that panel and against the card, and is distinct from ordinary body text.",
     "acceptance": [
       "python -m unittest tests.test_style"
     ],

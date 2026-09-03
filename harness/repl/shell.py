@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from harness import settings
 from harness.config import HarnessConfig, RouteConfig, load_config
 from harness.core.contracts import ToolSpec
 from harness.core.errors import HarnessError
@@ -37,6 +38,7 @@ from .approvals import Gate, Mode, Request, Verdict
 from .checkpoints import Checkpoints
 from .conversation import Conversation, ToolCall
 from .model import ChatModel, RouteChain
+from .reading import PASTE_OFF, PASTE_ON, LineReader, read_message
 from .render import Console, Renderer, Spinner
 from .theme import GUTTER
 
@@ -57,6 +59,7 @@ Ask anything, or give an instruction. The agent works in this directory.
   /compact           summarise the conversation to free context
   /undo              put the files back to before the last change
   /checkpoints       the states this session can go back to
+  /memory [forget X] what earlier sessions learned, and how to correct it
   /clear             forget the conversation and start fresh
   /init              write an AGENTS.md describing this repository
   /config            the active config file and route
@@ -65,6 +68,7 @@ Ask anything, or give an instruction. The agent works in this directory.
   @path/to/file      include a file's contents with your message
   !command           run a shell command yourself, without the model
   \\ at end of line   continue on the next line
+  paste a block      arrives as one message, not one line per turn
 """
 
 
@@ -98,7 +102,13 @@ class Shell:
         self.options = options
         self.console = Console()
         self.render = Renderer(self.console)
-        self.config: HarnessConfig = load_config(options.config_path)
+        # Discovery starts where the operator started, so a repository's own
+        # `.yatra/settings.yaml` applies without anyone naming it on the
+        # command line. That is the whole point: a rule can now belong to one
+        # project instead of to every session on the machine.
+        self.config: HarnessConfig = load_config(
+            options.config_path, project_root=options.root
+        )
         self.root = options.root.resolve()
         # Set only by /profile; None means the route still decides.
         self._profile_override: prompting.PromptProfile | None = None
@@ -109,7 +119,7 @@ class Shell:
         self.session_id = options.session_id or self._latest_session() or f"ay-{uuid.uuid4().hex[:8]}"
         self.workspace = Workspace(self.root, ())
         # Whatever the config makes available, this loop offers too. MCP
-        # servers, retrieval and the network tools were previously reachable
+        # servers and the network tools were previously reachable
         # only from `harness run`, not because a conversation had no use for
         # them but because they were registered inside the batch builder.
         # A server that fails to start is reported and the session continues,
@@ -119,6 +129,15 @@ class Shell:
         except HarnessError as exc:
             extra = []
             self._startup_notices.append(f"optional tools unavailable: {exc}")
+        # A repository quietly trying to register a hook or open the network
+        # is worth seeing, and an operator whose setting does nothing needs to
+        # know it was refused rather than wonder why it had no effect.
+        for layer in settings.discover(options.root):
+            for key in settings.refused(layer):
+                self._startup_notices.append(
+                    f"{layer.path.name} may not set {key}; a committed project file "
+                    "can add refusals but cannot grant permissions or run commands"
+                )
         self.toolset = ReplToolset(self.workspace, self.config, extra_tools=extra)
         # A sandbox that quietly is not one is worse than none, because the
         # operator relaxes on the strength of it. If the kernel mechanism is
@@ -150,6 +169,12 @@ class Shell:
         self.total_out = 0
         self._spinner: Spinner | None = None
         self._streamed = False
+        # One object reads stdin for the whole session. Two readers -- the
+        # worker here and an `input()` inside the approval prompt -- would race
+        # for the operator's answer, and whichever won would decide whether an
+        # action was approved.
+        self.reader = LineReader()
+        self.render.reader = self.reader
 
     # ------------------------------------------------------------------ setup
 
@@ -354,6 +379,18 @@ class Shell:
         readline.set_history_length(HISTORY_LIMIT)
         self._history_file = history
 
+    def _paste_mode(self, *, on: bool) -> None:
+        """Ask the terminal to mark pasted text so a reader can tell.
+
+        Without it a paste is indistinguishable from someone typing quickly,
+        and a multi-line prompt arrives as one message per line. Terminals
+        that do not understand the sequence ignore it, and a pipe never sees
+        it, so both keep the old line-at-a-time behaviour.
+        """
+        if not self.console.stream.isatty():
+            return
+        self.console.write(PASTE_ON if on else PASTE_OFF)
+
     def _save_history(self) -> None:
         path = getattr(self, "_history_file", None)
         if path is None:
@@ -366,26 +403,22 @@ class Shell:
             pass
 
     def _read(self) -> str | None:
-        """One logical input, which may span lines. None means end of input."""
-        parts: list[str] = []
-        while True:
-            marker = "  " if parts else self.console.accent("> ")
-            try:
-                self.console.write("\n" + marker if not parts else marker)
-                line = input()
-            except EOFError:
-                return None
-            except KeyboardInterrupt:
-                self.console.line()
-                if not parts:
-                    self.console.line(self.console.muted("  (ctrl-c again or /exit to leave)"))
-                    return ""
-                return ""
-            if line.endswith("\\"):
-                parts.append(line[:-1])
-                continue
-            parts.append(line)
-            return "\n".join(parts).strip()
+        """One logical input, which may span lines. None means end of input.
+
+        A paste arrives as a run of lines with nothing marking it, so the
+        reader groups whatever lands together. See `reading.py` for why the
+        terminal cannot be relied on to tell us.
+        """
+        self.console.write("\n" + self.console.accent("> "))
+        try:
+            # Grouping is a terminal behaviour. A pipe delivers everything
+            # at once, so timing says nothing there and grouping would turn a
+            # script of commands into one enormous message.
+            return read_message(self.reader, group=self.console.stream.isatty())
+        except KeyboardInterrupt:
+            self.console.line()
+            self.console.line(self.console.muted("  (ctrl-c again or /exit to leave)"))
+            return ""
 
     def _expand(self, text: str) -> str:
         """Inline the contents of any `@path` the operator referenced."""
@@ -441,6 +474,9 @@ class Shell:
         if name == "checkpoints":
             self._list_checkpoints()
             return True
+        if name == "memory":
+            self._memory(argument)
+            return True
         if name == "approvals":
             standing = self.gate.standing_approvals
             if not standing:
@@ -484,6 +520,11 @@ class Shell:
             return True
         if name == "config":
             self.render.notice(f"config: {self.options.config_path}")
+            # Named individually rather than summarised, and scope-tagged. An
+            # operator debugging a rule needs to know which file set it, and
+            # guessing is how they edit the wrong one.
+            for line in settings.describe(settings.discover(self.root)):
+                self.render.notice(f"        + {line}")
             self.render.notice(f"route:  {self.route.name} ({self.route.kind})")
             self.render.notice(f"model:  {self.route.model}")
             self.render.notice(f"cwd:    {self.root}")
@@ -492,6 +533,34 @@ class Shell:
 
         self.render.error(f"unknown command: /{name}   (try /help)")
         return True
+
+    def _memory(self, argument: str) -> None:
+        """Show what earlier sessions learned here, or drop some of it.
+
+        The operator needs a way to correct this without opening a file. A
+        wrong memory is worse than none: it is stated confidently, it is in
+        every prompt, and the model has no way to know it is out of date.
+        """
+        from harness.record import memory  # noqa: PLC0415 - keeps the layer honest
+
+        if argument.startswith("forget"):
+            needle = argument[len("forget"):].strip()
+            if not needle:
+                self.render.error("say what to forget, for example /memory forget spec/")
+                return
+            gone = memory.forget(self.root, needle)
+            self.render.notice(f"forgot {gone} entr{'y' if gone == 1 else 'ies'} matching {needle!r}")
+            return
+        entries = memory.load(self.root)
+        if not entries:
+            self.render.notice("nothing remembered about this directory yet")
+            return
+        for entry in reversed(entries):
+            age = f"{entry.age_days}d" if entry.age_days else "today"
+            mark = self.console.failure(age) if entry.stale else self.console.muted(age)
+            self.console.line(f"  {mark:>18}  {entry.text[: self.console.measure - 12]}")
+        self.render.notice(f"{memory.path_for(self.root)}")
+        self.render.notice("/memory forget <text> to drop an entry")
 
     def _switch_model(self, argument: str) -> None:
         if not argument:
@@ -966,6 +1035,8 @@ class Shell:
         if not self._credential_ready():
             return 2
         self._setup_readline()
+        self.reader.start()
+        self._paste_mode(on=True)
         self._banner()
 
         if self.options.initial_message:
@@ -995,6 +1066,9 @@ class Shell:
             self._run_turn(self._expand(line))
 
         self._save_history()
+        # Left on, the terminal keeps wrapping pastes in markers the operator's
+        # next program will print as literal escape codes.
+        self._paste_mode(on=False)
         self.console.line(self.console.muted("\n  bye"))
         return 0
 

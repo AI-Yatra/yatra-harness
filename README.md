@@ -405,24 +405,30 @@ uninterrupted run, so nothing is executed twice.
 prints a SHA-256 of the ledger. Edit one event and the hash changes. Delete one
 and the sequence check names the gap.
 
+## Three demos to try it on
+
+Each is a small repository broken on purpose, with the exact prompt to paste in
+its README. No flags: `ay` works in the directory you start it in.
+
+| | what it teaches | run |
+|---|---|---|
+| [demo/tictactoe](demo/tictactoe) | a logic flaw and a missing feature, judged by tests | `cd demo/tictactoe && ay` |
+| [demo/loginpage](demo/loginpage) | a visibly broken UI: overflow, no labels, an empty alert, a leak | `cd demo/loginpage && ay` |
+| [demo/inventory](demo/inventory) | the harness itself: plan mode, approvals, `/undo`, cost | `cd demo/inventory && ay` |
+
+Put any of them back with `git checkout -- demo/`.
+
 ## Finding things in a large repository
 
-`search_repo` matches a literal string. `retrieve` ranks excerpts against a
-question:
+`grep` and `glob`, and deliberately nothing more.
 
-```
-retrieve  "how are credentials redacted from the ledger"
-
---- README.md:161-200 (score 12.89)
---- docs/SECURITY.md:41-80 (score 11.40)
---- harness/record/redaction.py:1-40 (score 10.37)
-```
-
-BM25 by default — no key, no network, deterministic, and therefore actually
-covered by CI. Point `retrieval.kind: embedding` at any OpenAI-compatible
-`/embeddings` endpoint for vector search; it falls back to lexical when the
-provider is unreachable, because retrieval going quiet is worse than
-retrieval being approximate.
+A ranked semantic `retrieve` tool lived here and was removed. It was measured
+against six live sessions and chosen zero times: the model reached for `grep`
+every time, and on the questions asked grep was right. The literature agrees --
+lexical search measures uniformly stronger than dense retrieval under inline
+delivery across four harnesses and five models -- and the tool cost a 148-package
+dependency in a harness whose promise is that a laptop with nothing installed
+still runs it. The reasoning and the numbers are in the commit that removed it.
 
 ## Running tools in a container
 
@@ -482,7 +488,7 @@ uv run ruff check harness tests ay.py
 ```
 
 540 tests cover the runtime, the tool registry, provider adapters, routing,
-repository workspaces, delivery, sessions, sub-agents, retrieval, streaming,
+repository workspaces, delivery, sessions, sub-agents, streaming,
 the sandbox and the REPL. Tests that need docker skip themselves where it is
 absent. CI runs them on three Python versions along with `harness doctor` and
 a full deterministic run.
@@ -590,7 +596,7 @@ yatra-harness/
 ├── harness/            runtime: contracts, context, routing, tools, policy,
 │                       workspace, verifier, events, checkpoints, replay,
 │                       sandbox, sessions, sub-agents, delivery, goal, loop,
-│                       retrieval, search, tracing, evals, rubric
+│                       search, tracing, evals, rubric
 ├── ay.py               the ay REPL entry point
 ├── harness/repl/       the conversational agent behind it
 ├── configs/            teaching, local, remote, llm_light
@@ -613,8 +619,9 @@ schemas. [Security](docs/SECURITY.md) states what the harness defends against
 and what it does not, including where redaction stops.
 [Interface](docs/INTERFACE.md) is the grid and the palette `ay` draws itself
 with, and how each was measured.
-[Retrieval](docs/RETRIEVAL.md) is how `retrieve` finds the relevant part of a
-repository nobody has read, and the measurements behind its defaults.
+[Project state](docs/PROJECT-STATE.md) covers the three things that follow the
+repository rather than the install: layered settings, what one session
+remembers for the next, and the checker that runs after every edit.
 [Operations](docs/OPERATIONS.md) is the runbook,
 [Testing](docs/TESTING.md) maps tests to acceptance criteria, and
 [Workshop](docs/WORKSHOP.md) walks through the material module by module.

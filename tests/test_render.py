@@ -25,6 +25,7 @@ import io
 import random
 import re
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from harness.repl.render import (
@@ -38,6 +39,8 @@ from harness.repl.render import (
     _clip,
 )
 from harness.repl.theme import THEME, Theme
+
+ROOT = Path(__file__).resolve().parents[1]
 
 #: Backgrounds a session can land on and cannot detect.
 WHITE = (255, 255, 255)

@@ -22,13 +22,6 @@ from harness.core.util import truncate
 from harness.execution.mcp import MCPStdioClient
 from harness.execution.policy import PolicyEngine
 from harness.execution.process import run_process
-from harness.execution.retrieval import (
-    Retriever,
-    embedding_request,
-    local_embedder,
-    parse_embeddings,
-    render_hits,
-)
 from harness.execution.sandbox import build_sandbox
 from harness.execution.search import build_request, parse_results, render
 from harness.execution.workspace import Workspace
@@ -241,27 +234,25 @@ def optional_tools(
     # beyond the workspace, which is exactly what makes it worth having in a
     # conversation that has not been told where to look.
     found.append(
-            (
-                ToolSpec(
-                    "retrieve",
-                    # Written to be chosen. The old description said what the
-                    # tool did and not when to reach for it, so a model with
-                    # grep and read_file in front of it never picked this one.
-                    "Search the workspace by meaning. Ask a plain question and "
-                    "get back the most relevant excerpts, ranked, each with its "
-                    "file, line range and enclosing function. Use this first to "
-                    "find where something lives when you do not already know "
-                    "the file or the identifier; it replaces listing "
-                    "directories and opening files to look around. Use grep "
-                    "instead when you know the exact string.",
-                    object_schema(
-                        {"query": {"type": "string"}, "limit": {"type": "integer"}},
-                        ("query",),
-                    ),
-                    RiskLevel.READ,
-                ),
-                lambda args: _retrieve(workspace, args, config),
-            )
+        (
+            ToolSpec(
+                "remember",
+                # The description is the whole defence against a memory full
+                # of noise. It says what is worth keeping and, more usefully,
+                # what is not: the expensive failure is not forgetting, it is
+                # remembering something that was only true once.
+                "Write one durable fact about this repository for future "
+                "sessions to read. Worth remembering: a convention that is not "
+                "written down, where something surprising lives, a command that "
+                "works here, a dead end and why. Not worth remembering: "
+                "anything already in AGENTS.md or the README, anything true "
+                "only of the change you are making now, or a summary of this "
+                "conversation. One sentence.",
+                object_schema({"fact": {"type": "string"}}, ("fact",)),
+                RiskLevel.WRITE,
+            ),
+            lambda args: _remember(workspace, args),
+        )
     )
 
     if config.policy.network_enabled:
@@ -397,18 +388,6 @@ def _register_native(registry: ToolRegistry, config: HarnessConfig, workspace: W
             RiskLevel.NETWORK,
         ),
         lambda args: _browser_fetch(args, config),
-    )
-    registry.register(
-        ToolSpec(
-            "retrieve",
-            "Find the parts of the workspace most relevant to a question, "
-            "ranked, as excerpts with their file and line range.",
-            object_schema(
-                {"query": {"type": "string"}, "limit": {"type": "integer"}}, ("query",)
-            ),
-            RiskLevel.READ,
-        ),
-        lambda args: _retrieve(workspace, args, config),
     )
     registry.register(
         ToolSpec(
@@ -988,82 +967,16 @@ def _browser_fetch(arguments: dict[str, Any], config: HarnessConfig) -> tuple[st
         raise ToolError(f"HTTP request failed: {exc.reason}") from exc
 
 
-# One open retriever per workspace. The index itself is on disk now, so this
-# only avoids reopening SQLite and reloading the embedding model; correctness
-# no longer depends on it, because `Retriever.search` syncs per file before
-# every query rather than trusting a whole-tree fingerprint.
-_RETRIEVERS: dict[tuple[str, str], Retriever] = {}
-# Bounded because the process outlives the run. `harness loop` and
-# `harness goal` create a workspace per feature or per attempt, and an
-# unbounded cache would hold an open database handle for every one of them.
-_INDEX_CACHE_LIMIT = 4
+def _remember(workspace: Workspace, arguments: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    from harness.record import memory  # noqa: PLC0415 - avoids a cycle at import time
 
-
-def _retriever(workspace: Workspace, config: HarnessConfig) -> Retriever:
-    settings = config.retrieval
-    key = (str(workspace.root), settings.kind)
-    found = _RETRIEVERS.get(key)
-    if found is None:
-        embed = local_embedder(settings.local_model) if settings.kind == "hybrid" else None
-        found = Retriever(workspace.root, settings, embed=embed)
-        _RETRIEVERS[key] = found
-        while len(_RETRIEVERS) > _INDEX_CACHE_LIMIT:
-            # Insertion-ordered, so the oldest workspace leaves first. Closed
-            # rather than dropped: an abandoned SQLite handle keeps a WAL file
-            # open, and on Windows that also keeps the directory undeletable.
-            oldest = next(iter(_RETRIEVERS))
-            _RETRIEVERS.pop(oldest).close()
-    return found
-
-
-def _retrieve(
-    workspace: Workspace, arguments: dict[str, Any], config: HarnessConfig
-) -> tuple[str, dict[str, Any]]:
-    """Rank workspace chunks against a question.
-
-    The index is built once per workspace and reused. Rebuilding it on every
-    call would re-read the repository -- and, with the embedding backend,
-    re-embed all of it -- for each question the agent asks.
-    """
-    settings = config.retrieval
-    retriever = _retriever(workspace, config)
-    limit = int(arguments.get("limit") or settings.limit)
-    hits = retriever.search(str(arguments["query"]), limit=max(1, min(limit, 20)))
-    return render_hits(hits), {
-        "backend": "lexical" if retriever.degraded else settings.kind,
-        "query": str(arguments["query"]),
-        "hits": len(hits),
-        "paths": [f"{hit.chunk.path}:{hit.chunk.start_line}" for hit in hits],
-    }
-
-
-def _embed(texts: list[str], config: HarnessConfig) -> list[list[float]]:
-    """One /embeddings call, batched, with the key in a header."""
-    settings = config.retrieval
-    secret = auth.resolve_env(settings.api_key_env).key if settings.api_key_env else ""
-    request = embedding_request(settings, texts, key=secret)
-    host = urllib.parse.urlparse(request.url).hostname or ""
-    _validate_public_url(request.url, (*config.policy.allowed_domains, host))
-    http_request = urllib.request.Request(
-        request.url,
-        data=request.body.encode("utf-8"),
-        headers={"User-Agent": "yatra-harness/1.0", **request.headers},
-        method="POST",
-    )
     try:
-        with urllib.request.build_opener(_NoRedirect()).open(
-            http_request, timeout=max(config.policy.browser_timeout_seconds, 30)
-        ) as response:
-            payload = response.read().decode(
-                response.headers.get_content_charset() or "utf-8", errors="replace"
-            )
-    except urllib.error.HTTPError as exc:
-        # The status, never the body: a failed embeddings call can echo the
-        # key back and must not reach an observation.
-        raise ToolError(f"embeddings request failed with status {exc.code}") from exc
-    except urllib.error.URLError as exc:
-        raise ToolError(f"embeddings request failed: {exc.reason}") from exc
-    return parse_embeddings(payload, len(texts))
+        entry = memory.remember(workspace.root, str(arguments.get("fact", "")))
+    except (ValueError, OSError) as exc:
+        raise ToolError(f"could not write that down: {exc}") from exc
+    return f"Remembered: {entry.text}", {"fact": entry.text, "written": entry.written.isoformat()}
+
+
 
 
 def _web_search(arguments: dict[str, Any], config: HarnessConfig) -> tuple[str, dict[str, Any]]:

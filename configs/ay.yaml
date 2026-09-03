@@ -357,27 +357,34 @@ context:
   instruction_files: [AGENTS.md, CLAUDE.md]
   max_instruction_chars: 6000
 
-# How `retrieve` finds the relevant part of a repository nobody has read.
+# The project's own checker, run over a file straight after the agent writes
+# it. On by default, at the lowest useful setting: `python -m py_compile`,
+# which is standard library, needs no configuration and catches the mistake an
+# agent actually makes -- an edit that leaves the file unparseable -- at the
+# moment it is made rather than at the next test run.
 #
-#   lexical    BM25 over a persistent SQLite FTS5 index. No key, no network,
-#              no dependency. Always works, and is the default for that reason.
-#   hybrid     lexical plus a local static embedding model, fused by rank.
-#              Needs `pip install "yatra-harness[search]"`; without it this
-#              degrades to lexical and says so rather than failing.
-#   embedding  vectors from a remote provider. Needs an endpoint and a key.
+# Every sensor shipping switched off is what harness engineering calls a
+# feed-forward-only harness: it encodes rules and never finds out whether they
+# worked. Raise this to your project's real checker; `command: []` turns it off.
 #
-# The index is per workspace, lives under ~/.yatra-harness/index/ rather than
-# in your repository, and updates one file at a time, so an agent that edits
-# two files re-reads two files.
+# This is not a hook. A hook observes and its output never reaches the model,
+# because a formatter that is not installed is your problem and a model told
+# about it tries to fix it. This report is about the model's own edit, so it
+# goes to the model -- separated from the edit's result and labelled, because
+# an agent that reads a diagnostic as a failed edit writes the change twice.
 #
-# local_model is measured, not assumed. A code-specialised static model
-# scored worse here than the general one, because these queries are English
-# questions about code rather than code searching for code.
-retrieval:
-  kind: hybrid
-  local_model: minishlab/potion-base-8M
-  lines_per_chunk: 40
-  limit: 5
+#   command    the checker; `{file}` is the changed path, appended if absent
+#   suffixes   only these extensions are checked; empty means every file
+#   timeout    seconds, default 20
+#   max_lines  how much of a noisy report to pass on, default 20
+#
+# A CLI checker rather than a language server, deliberately: no client, no
+# protocol, no per-language install, and your project already has one.
+#
+#   diagnostics:
+#     command: [ruff, check, --output-format, concise, "{file}"]
+#     suffixes: [.py]
+diagnostics: {}
 
 # Commands that run when the agent acts. These observe; they cannot veto. The
 # approval gate already answers whether something may happen, and two

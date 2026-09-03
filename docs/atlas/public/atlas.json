@@ -465,8 +465,8 @@
  "generated_by": "docs/atlas/scripts/scan_harness.py",
  "head": {
   "date": "2026-09-03",
-  "sha": "583d8ee",
-  "subject": "Find `gh` the way a shell does, and fix the tests that hid it"
+  "sha": "f9baed5",
+  "subject": "Install bubblewrap in CI, and name every skip"
  },
  "lanes": [
   {
@@ -553,6 +553,7 @@
    "modules": [
     "record.artifacts",
     "record.events",
+    "record.memory",
     "record.redaction",
     "record.replay",
     "record.state",
@@ -565,13 +566,11 @@
    "blurb": "Workspace, policy gate, sandbox, the tools themselves.",
    "key": "execution",
    "modules": [
-    "execution.chunking",
+    "execution.diagnostics",
     "execution.hooks",
-    "execution.indexing",
     "execution.mcp",
     "execution.policy",
     "execution.process",
-    "execution.retrieval",
     "execution.sandbox",
     "execution.search",
     "execution.tools",
@@ -625,7 +624,8 @@
     "cli",
     "config",
     "doctor",
-    "runtime"
+    "runtime",
+    "settings"
    ],
    "side": "harness",
    "title": "Entry points"
@@ -850,8 +850,8 @@
    "path": "harness/core/contracts.py",
    "side": "harness",
    "sloc": 235,
-   "test_cases": 409,
-   "test_sloc": 3702,
+   "test_cases": 407,
+   "test_sloc": 3666,
    "tests": [
     "test_atlas_scan.py",
     "test_checkpoints.py",
@@ -1215,7 +1215,7 @@
    "doc": "Typed harness failures used to make terminal behavior explicit.",
    "doc_full": "Typed harness failures used to make terminal behavior explicit.",
    "external": [],
-   "fan_in": 32,
+   "fan_in": 33,
    "fan_out": 0,
    "functions": 0,
    "imported_by": [
@@ -1228,9 +1228,9 @@
     "config",
     "core.schema",
     "doctor",
+    "execution.diagnostics",
     "execution.hooks",
     "execution.mcp",
-    "execution.retrieval",
     "execution.sandbox",
     "execution.search",
     "execution.tools",
@@ -1250,7 +1250,8 @@
     "run.faults",
     "run.session",
     "run.subagents",
-    "runtime"
+    "runtime",
+    "settings"
    ],
    "imports": [],
    "in_boundary": false,
@@ -1261,12 +1262,13 @@
    "path": "harness/core/errors.py",
    "side": "harness",
    "sloc": 47,
-   "test_cases": 638,
-   "test_sloc": 5544,
+   "test_cases": 652,
+   "test_sloc": 5669,
    "tests": [
     "test_backlog.py",
     "test_compaction.py",
     "test_context_budget.py",
+    "test_diagnostics.py",
     "test_evals.py",
     "test_failure_recovery.py",
     "test_gmi.py",
@@ -1280,11 +1282,11 @@
     "test_repl_agent.py",
     "test_repl_gemini.py",
     "test_repl_tools.py",
-    "test_retrieval.py",
     "test_review_findings.py",
     "test_sandbox.py",
     "test_search.py",
     "test_session.py",
+    "test_settings_and_memory.py",
     "test_subagents.py",
     "test_tools.py",
     "test_workspace.py"
@@ -1956,6 +1958,91 @@
    "api": [
     {
      "doc": "",
+     "kind": "class",
+     "line": 71,
+     "methods": [
+      "age_days",
+      "stale",
+      "render"
+     ],
+     "name": "Entry"
+    },
+    {
+     "doc": "",
+     "kind": "function",
+     "line": 87,
+     "methods": [],
+     "name": "path_for"
+    },
+    {
+     "doc": "Everything remembered about this project, oldest first.",
+     "kind": "function",
+     "line": 91,
+     "methods": [],
+     "name": "load"
+    },
+    {
+     "doc": "Add one fact, and drop the oldest if the file is full.",
+     "kind": "function",
+     "line": 113,
+     "methods": [],
+     "name": "remember"
+    },
+    {
+     "doc": "Drop every entry containing *needle*. Returns how many went.",
+     "kind": "function",
+     "line": 124,
+     "methods": [],
+     "name": "forget"
+    },
+    {
+     "doc": "",
+     "kind": "function",
+     "line": 139,
+     "methods": [],
+     "name": "save"
+    },
+    {
+     "doc": "The block that goes into the system prompt, newest first.",
+     "kind": "function",
+     "line": 146,
+     "methods": [],
+     "name": "as_prompt"
+    }
+   ],
+   "api_count": 7,
+   "classes": 1,
+   "commits": 1,
+   "doc": "What one session leaves for the next.",
+   "doc_full": "What one session leaves for the next.\n\nA session persisted its transcript and nothing else, so every conversation\nstarted from zero: the same questions answered, the same conventions\nrediscovered, the same dead end walked into twice. `Session` holds an id, a\ndirectory and a list of turns, and none of that is memory.\n\nMemory here is a markdown file in the project, not a vector store. That is a\ndeliberate choice and not a shortcut. A file can be read, edited and deleted\nby the person it describes; it diffs; a team can commit it or ignore it; and\nwhen it is wrong the fix is obvious. An embedding index of remembered facts is\nnone of those things, and for the amount a repository actually needs\nremembering -- tens of lines, not thousands -- it would be machinery standing\nin for a paragraph.\n\nThree failures decide the design, and each is a rule below.\n\n**Staleness.** A remembered fact outlives the thing it describes. \"The tests\nlive in `spec/`\" survives the day someone renames the directory, and the agent\nthen acts on it confidently. Every entry carries the date it was written and\nis shown with its age, so the model reads a claim about the repository next to\nhow old the claim is.\n\n**Growth.** A memory that only grows becomes the context problem it was meant\nto solve. The file is capped, and the oldest entries fall off the end.\n\n**Junk.** The expensive failure is not forgetting, it is remembering the\nwrong thing: a fact true only of one branch, or a preference the operator\nstated once and changed their mind about. The `remember` tool says what is\nworth keeping, and the file is small enough to read at a glance.\n\nMemory is scoped to the project, not the session, because the project is the\nstable identity. Keying it to a session id would mean it never outlives the\nthing it exists to outlive.",
+   "external": [
+    "__future__",
+    "dataclasses",
+    "datetime",
+    "pathlib",
+    "re"
+   ],
+   "fan_in": 0,
+   "fan_out": 0,
+   "functions": 6,
+   "imported_by": [],
+   "imports": [],
+   "in_boundary": false,
+   "last_touched": "2026-09-03",
+   "layer": "record",
+   "lines": 166,
+   "name": "record.memory",
+   "path": "harness/record/memory.py",
+   "side": "harness",
+   "sloc": 124,
+   "test_cases": 0,
+   "test_sloc": 0,
+   "tests": []
+  },
+  {
+   "api": [
+    {
+     "doc": "",
      "kind": "function",
      "line": 34,
      "methods": [],
@@ -2307,14 +2394,14 @@
     {
      "doc": "",
      "kind": "class",
-     "line": 50,
+     "line": 43,
      "methods": [],
      "name": "RegisteredTool"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 55,
+     "line": 48,
      "methods": [
       "register",
       "specs",
@@ -2325,35 +2412,35 @@
     {
      "doc": "",
      "kind": "function",
-     "line": 134,
+     "line": 127,
      "methods": [],
      "name": "validate_json_schema"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 195,
+     "line": 188,
      "methods": [],
      "name": "build_registry"
     },
     {
      "doc": "The capabilities a loop opts into rather than always having.",
      "kind": "function",
-     "line": 222,
+     "line": 215,
      "methods": [],
      "name": "optional_tools"
     },
     {
      "doc": "Discover one MCP server's tools as registerable pairs.",
      "kind": "function",
-     "line": 1121,
+     "line": 1034,
      "methods": [],
      "name": "mcp_tools"
     }
    ],
    "api_count": 6,
    "classes": 2,
-   "commits": 12,
+   "commits": 14,
    "doc": "Typed tool registry and policy-governed native/MCP tool implementations.",
    "doc_full": "Typed tool registry and policy-governed native/MCP tool implementations.",
    "external": [
@@ -2372,7 +2459,7 @@
     "urllib"
    ],
    "fan_in": 4,
-   "fan_out": 12,
+   "fan_out": 11,
    "functions": 4,
    "imported_by": [
     "cli",
@@ -2388,7 +2475,6 @@
     "execution.mcp",
     "execution.policy",
     "execution.process",
-    "execution.retrieval",
     "execution.sandbox",
     "execution.search",
     "execution.workspace",
@@ -2397,16 +2483,15 @@
    "in_boundary": true,
    "last_touched": "2026-09-03",
    "layer": "execution",
-   "lines": 1182,
+   "lines": 1095,
    "name": "execution.tools",
    "path": "harness/execution/tools.py",
    "side": "harness",
-   "sloc": 1033,
-   "test_cases": 58,
-   "test_sloc": 646,
+   "sloc": 961,
+   "test_cases": 45,
+   "test_sloc": 468,
    "tests": [
     "test_patch_recovery.py",
-    "test_review_findings.py",
     "test_shared_tooling.py",
     "test_tools.py"
    ]
@@ -2467,14 +2552,14 @@
     {
      "doc": "The rule governing this call, or None when the operator wrote none.",
      "kind": "function",
-     "line": 375,
+     "line": 387,
      "methods": [],
      "name": "rule_for"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 404,
+     "line": 431,
      "methods": [
       "evaluate"
      ],
@@ -2483,7 +2568,7 @@
    ],
    "api_count": 9,
    "classes": 3,
-   "commits": 7,
+   "commits": 8,
    "doc": "Capability authorization separate from technical tool availability.",
    "doc_full": "Capability authorization separate from technical tool availability.",
    "external": [
@@ -2513,13 +2598,13 @@
    "in_boundary": true,
    "last_touched": "2026-09-03",
    "layer": "execution",
-   "lines": 476,
+   "lines": 503,
    "name": "execution.policy",
    "path": "harness/execution/policy.py",
    "side": "harness",
-   "sloc": 360,
-   "test_cases": 137,
-   "test_sloc": 1160,
+   "sloc": 377,
+   "test_cases": 135,
+   "test_sloc": 1124,
    "tests": [
     "test_denied_approval.py",
     "test_patch_recovery.py",
@@ -2534,113 +2619,16 @@
   {
    "api": [
     {
-     "doc": "One indexed chunk, as it comes back from a query.",
-     "kind": "class",
-     "line": 86,
-     "methods": [
-      "as_chunk"
-     ],
-     "name": "Row"
-    },
-    {
-     "doc": "Where a workspace's index lives.",
-     "kind": "function",
-     "line": 100,
-     "methods": [],
-     "name": "index_path"
-    },
-    {
-     "doc": "Every file worth indexing, relative and posix, in a stable order.",
-     "kind": "function",
-     "line": 113,
-     "methods": [],
-     "name": "discover"
-    },
-    {
-     "doc": "An operator's question, as an FTS5 expression that cannot be a syntax error.",
-     "kind": "function",
-     "line": 159,
-     "methods": [],
-     "name": "fts_query"
-    },
-    {
-     "doc": "A workspace's chunks, ranked by FTS5, updated one file at a time.",
-     "kind": "class",
-     "line": 171,
-     "methods": [
-      "clear",
-      "close",
-      "sync",
-      "search",
-      "all_chunks",
-      "vector_search",
-      "hybrid_search",
-      "vector_count",
-      "count"
-     ],
-     "name": "SqliteIndex"
-    },
-    {
-     "doc": "Combine rankings by position rather than by score.",
-     "kind": "function",
-     "line": 414,
-     "methods": [],
-     "name": "fuse"
-    }
-   ],
-   "api_count": 6,
-   "classes": 2,
-   "commits": 1,
-   "doc": "A workspace index that survives the process that built it.",
-   "doc_full": "A workspace index that survives the process that built it.\n\nThe old index was built in memory, from a full walk of the tree, in every\nprocess that asked a question. On this repository that is three seconds before\nthe first answer and it is linear in the size of the repository, so the cost\nlands hardest exactly where retrieval matters most. Worse, it was rebuilt from\nscratch when an agent edited one file, because the freshness check was a single\nfingerprint over the whole tree.\n\nSo the index lives in SQLite, under the user's home rather than in the\nrepository, and it updates per file. An agent that edits two files in a\nfive-thousand-file repository re-reads two files.\n\nFTS5 does the ranking. It is a full-text index with a real `bm25()` built into\nthe SQLite that ships with CPython, which means persistence, incremental\nupdate and BM25 arrive together with no dependency at all. Verified present\nbefore this was written, rather than assumed.\n\nDiscovery asks git. `git ls-files --cached --others --exclude-standard` is the\nlist of files that are tracked or could be, which is precisely the set worth\nsearching: it honours `.gitignore` and every other ignore rule the repository\nalready declares, and it includes a file the agent created a moment ago. The\nprevious walk ignored all of that and indexed build output -- on this\nrepository 35% of the index was generated JSON, and two copies of a generated\nartifact outranked real code. A tree that is not a git repository falls back to\nwalking it.",
-   "external": [
-    "__future__",
-    "array",
-    "collections",
-    "dataclasses",
-    "hashlib",
-    "os",
-    "pathlib",
-    "re",
-    "sqlite3",
-    "subprocess"
-   ],
-   "fan_in": 1,
-   "fan_out": 1,
-   "functions": 4,
-   "imported_by": [
-    "execution.retrieval"
-   ],
-   "imports": [
-    "execution.chunking"
-   ],
-   "in_boundary": false,
-   "last_touched": "2026-09-03",
-   "layer": "execution",
-   "lines": 425,
-   "name": "execution.indexing",
-   "path": "harness/execution/indexing.py",
-   "side": "harness",
-   "sloc": 325,
-   "test_cases": 71,
-   "test_sloc": 404,
-   "tests": [
-    "test_retrieval.py"
-   ]
-  },
-  {
-   "api": [
-    {
      "doc": "",
      "kind": "class",
-     "line": 43,
+     "line": 45,
      "methods": [],
      "name": "SandboxConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 65,
+     "line": 67,
      "methods": [
       "run"
      ],
@@ -2649,7 +2637,7 @@
     {
      "doc": "The original behaviour: a process on this machine, in the workspace.",
      "kind": "class",
-     "line": 88,
+     "line": 90,
      "methods": [
       "run"
      ],
@@ -2658,7 +2646,7 @@
     {
      "doc": "A throwaway container with the workspace mounted and nothing else.",
      "kind": "class",
-     "line": 109,
+     "line": 111,
      "methods": [
       "run"
      ],
@@ -2667,7 +2655,7 @@
     {
      "doc": "Confinement from the kernel, without a container.",
      "kind": "class",
-     "line": 137,
+     "line": 139,
      "methods": [
       "run"
      ],
@@ -2676,70 +2664,86 @@
     {
      "doc": "Which kernel sandbox is available here, and why not when there is none.",
      "kind": "function",
-     "line": 182,
+     "line": 197,
      "methods": [],
      "name": "detect_mechanism"
     },
     {
+     "doc": "What bubblewrap can actually do on this host, as opposed to whether it exists.",
+     "kind": "class",
+     "line": 217,
+     "methods": [],
+     "name": "Probe"
+    },
+    {
+     "doc": "Run bubblewrap once and find out what it can do here.",
+     "kind": "function",
+     "line": 241,
+     "methods": [],
+     "name": "probe_bubblewrap"
+    },
+    {
      "doc": "An Apple Seatbelt profile allowing reads, writes only in the workspace.",
      "kind": "function",
-     "line": 199,
+     "line": 266,
      "methods": [],
      "name": "seatbelt_profile"
     },
     {
      "doc": "The `sandbox-exec` invocation for one command. Pure, so it is testable.",
      "kind": "function",
-     "line": 221,
+     "line": 288,
      "methods": [],
      "name": "seatbelt_command"
     },
     {
      "doc": "The `bwrap` invocation for one command.",
      "kind": "function",
-     "line": 233,
+     "line": 300,
      "methods": [],
      "name": "bubblewrap_command"
     },
     {
      "doc": "The `docker run` invocation for one command.",
      "kind": "function",
-     "line": 275,
+     "line": 342,
      "methods": [],
      "name": "docker_command"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 336,
+     "line": 403,
      "methods": [],
      "name": "build_sandbox"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 344,
+     "line": 411,
      "methods": [],
      "name": "sandbox_config_from_dict"
     }
    ],
-   "api_count": 12,
-   "classes": 5,
+   "api_count": 14,
+   "classes": 6,
    "commits": 4,
    "doc": "Where a tool command actually runs.",
    "doc_full": "Where a tool command actually runs.\n\nPath containment and a command allowlist confine the model's *interface*.\nThey do not confine the operating system: an allowlisted test runner is still\nan ordinary process on the host, with the host's filesystem and the host's\nnetwork. docs/SECURITY.md has said so honestly for as long as it has existed,\nand recommended a container. This is that container.\n\nThe rules a sandbox has to enforce are the ones an application-level gate\ncannot: no network unless asked for, no new privileges, not root, bounded\nmemory and CPU, and nothing mounted except the run workspace. All of that\nlives in `docker_command`, which is a pure function -- so those rules are\nchecked on every machine, and only the test that genuinely starts a container\nneeds docker installed.\n\nLocal execution stays the default. A workshop laptop without docker must\nstill be able to run the harness, and a teaching tool that refuses to start\nteaches nothing.",
    "external": [
     "__future__",
     "dataclasses",
+    "functools",
     "os",
     "pathlib",
     "shutil",
+    "subprocess",
     "sys",
     "typing"
    ],
    "fan_in": 5,
    "fan_out": 2,
-   "functions": 7,
+   "functions": 8,
    "imported_by": [
     "config",
     "execution.tools",
@@ -2754,13 +2758,13 @@
    "in_boundary": true,
    "last_touched": "2026-09-03",
    "layer": "execution",
-   "lines": 366,
+   "lines": 433,
    "name": "execution.sandbox",
    "path": "harness/execution/sandbox.py",
    "side": "harness",
-   "sloc": 287,
-   "test_cases": 74,
-   "test_sloc": 578,
+   "sloc": 340,
+   "test_cases": 77,
+   "test_sloc": 604,
    "tests": [
     "test_os_sandbox.py",
     "test_sandbox.py",
@@ -2842,13 +2846,14 @@
    "path": "harness/execution/workspace.py",
    "side": "harness",
    "sloc": 278,
-   "test_cases": 454,
-   "test_sloc": 4509,
+   "test_cases": 473,
+   "test_sloc": 4540,
    "tests": [
     "test_checkpoints.py",
     "test_context_budget.py",
     "test_deliver_cli.py",
     "test_delivery.py",
+    "test_diagnostics.py",
     "test_failure_recovery.py",
     "test_hooks.py",
     "test_instructions.py",
@@ -2862,7 +2867,6 @@
     "test_repl_gemini.py",
     "test_repl_tool_safety.py",
     "test_repl_tools.py",
-    "test_review_findings.py",
     "test_session.py",
     "test_shared_tooling.py",
     "test_tools.py",
@@ -2967,125 +2971,6 @@
     {
      "doc": "",
      "kind": "class",
-     "line": 50,
-     "methods": [],
-     "name": "RetrievalConfig"
-    },
-    {
-     "doc": "",
-     "kind": "class",
-     "line": 72,
-     "methods": [
-      "of"
-     ],
-     "name": "Hit"
-    },
-    {
-     "doc": "",
-     "kind": "class",
-     "line": 82,
-     "methods": [],
-     "name": "EmbeddingRequest"
-    },
-    {
-     "doc": "A static embedding model, or None when the optional dependency is absent.",
-     "kind": "function",
-     "line": 91,
-     "methods": [],
-     "name": "local_embedder"
-    },
-    {
-     "doc": "One workspace, kept searchable.",
-     "kind": "class",
-     "line": 117,
-     "methods": [
-      "sync",
-      "search",
-      "close"
-     ],
-     "name": "Retriever"
-    },
-    {
-     "doc": "Similarity, defined as zero wherever it would otherwise be undefined.",
-     "kind": "function",
-     "line": 162,
-     "methods": [],
-     "name": "cosine"
-    },
-    {
-     "doc": "An OpenAI-compatible /embeddings call. The key travels in a header.",
-     "kind": "function",
-     "line": 179,
-     "methods": [],
-     "name": "embedding_request"
-    },
-    {
-     "doc": "Read vectors back, restoring the order they were asked for.",
-     "kind": "function",
-     "line": 191,
-     "methods": [],
-     "name": "parse_embeddings"
-    },
-    {
-     "doc": "What the model sees: excerpts with the coordinates to go read more.",
-     "kind": "function",
-     "line": 218,
-     "methods": [],
-     "name": "render_hits"
-    },
-    {
-     "doc": "",
-     "kind": "function",
-     "line": 235,
-     "methods": [],
-     "name": "retrieval_config_from_dict"
-    }
-   ],
-   "api_count": 10,
-   "classes": 4,
-   "commits": 3,
-   "doc": "Finding the relevant part of a repository too big to read.",
-   "doc_full": "Finding the relevant part of a repository too big to read.\n\n`grep` matches a literal string. That is exact, and useless when you do not\nalready know the identifier: \"where is the retry backoff decided\" finds\nnothing, because nobody wrote that sentence in the code. A model that cannot\nfind the right file reads the wrong ones, and a context budget is spent on\nmaterial that was never going to help.\n\nThree backends, and the default is the one that always works.\n\n`lexical` is BM25 over a persistent SQLite FTS5 index. No key, no network, no\ndependency, deterministic, and available on a laptop with nothing installed.\n\n`hybrid` adds a local static embedding model and fuses the two rankings by\nreciprocal rank. Static embeddings are lookup tables rather than a forward\npass, so the model is 8 MB, needs no GPU, and encodes this repository in about\na second. Measured on ten questions about this codebase, fusing lifted the\ntop-three hit rate from 40% to 70%.\n\n`embedding` is the original remote-provider backend, kept because an operator\nwith a provider they trust should be able to use it.\n\nThe measurement that decided the default model is worth recording, because it\nwas the opposite of what everyone assumes. A *code*-specialised static model\nscored worse than the general one -- 30% at top-three against 70%. Our queries\nare English questions about code, not code searching for code, and the chunks\nlead with a path and a symbol name. The smallest, most general model won.",
-   "external": [
-    "__future__",
-    "collections",
-    "dataclasses",
-    "json",
-    "model2vec",
-    "pathlib",
-    "typing"
-   ],
-   "fan_in": 2,
-   "fan_out": 3,
-   "functions": 6,
-   "imported_by": [
-    "config",
-    "execution.tools"
-   ],
-   "imports": [
-    "core.errors",
-    "execution.chunking",
-    "execution.indexing"
-   ],
-   "in_boundary": false,
-   "last_touched": "2026-09-03",
-   "layer": "execution",
-   "lines": 262,
-   "name": "execution.retrieval",
-   "path": "harness/execution/retrieval.py",
-   "side": "harness",
-   "sloc": 198,
-   "test_cases": 71,
-   "test_sloc": 404,
-   "tests": [
-    "test_retrieval.py"
-   ]
-  },
-  {
-   "api": [
-    {
-     "doc": "",
-     "kind": "class",
      "line": 22,
      "methods": [
       "connect",
@@ -3139,67 +3024,89 @@
   {
    "api": [
     {
-     "doc": "One rankable piece of one file.",
+     "doc": "The project's checker, and when to run it.",
      "kind": "class",
-     "line": 42,
+     "line": 72,
      "methods": [
-      "search_text",
-      "label"
+      "enabled",
+      "applies_to"
      ],
-     "name": "Chunk"
+     "name": "DiagnosticsConfig"
     },
     {
-     "doc": "Cut one file's contents, at its own boundaries where we can read them.",
-     "kind": "function",
-     "line": 73,
-     "methods": [],
-     "name": "chunk_text"
+     "doc": "What the checker said. Empty output means it was happy.",
+     "kind": "class",
+     "line": 93,
+     "methods": [
+      "clean"
+     ],
+     "name": "Report"
     },
     {
-     "doc": "Fixed windows: the fallback, and the only option for most languages.",
+     "doc": "The command for one file, with `{file}` filled in.",
      "kind": "function",
-     "line": 84,
+     "line": 108,
      "methods": [],
-     "name": "window_chunks"
+     "name": "build_command"
     },
     {
-     "doc": "Every definition in a Python file, plus whatever sits between them.",
+     "doc": "Run the checker over one changed file. Never raises.",
      "kind": "function",
-     "line": 106,
+     "line": 115,
      "methods": [],
-     "name": "python_chunks"
+     "name": "check"
+    },
+    {
+     "doc": "Put the report after the edit's own result, clearly separated.",
+     "kind": "function",
+     "line": 144,
+     "methods": [],
+     "name": "attach"
+    },
+    {
+     "doc": "",
+     "kind": "function",
+     "line": 163,
+     "methods": [],
+     "name": "diagnostics_config_from_dict"
     }
    ],
-   "api_count": 4,
-   "classes": 1,
-   "commits": 1,
-   "doc": "Cutting a repository into pieces worth ranking.",
-   "doc_full": "Cutting a repository into pieces worth ranking.\n\nA chunk is the unit retrieval returns, so what a chunk *is* decides what\nretrieval can find. Fixed line windows were the cheap answer and they are\nwrong in a specific way: a forty-line window starting at line 60 is a\nfragment of two functions and the whole of neither, and nothing in it says\nwhich functions those were. Rank it first and the model still has to open the\nfile to find out what it is looking at.\n\nSo a Python file is cut at its own boundaries instead, using `ast` from the\nstandard library. Each function and method becomes one chunk that knows its\nown name. Everything else -- other languages, unparseable files, module-level\ncode between definitions -- falls back to line windows, because a worse chunk\nis much better than no chunk.\n\nThe other half of the idea is `search_text`. A chunk is indexed as its path\nand symbol *followed by* its source, so `harness/models/providers.py` and\n`_retry_after` are terms a query can match. Asking \"where is the retry backoff\ndecided\" previously ranked the documentation that contains the phrase above\nthe code that does it, because the code says `backoff_seconds` and never says\n\"retry backoff\" in prose. Naming the symbol in the indexed text is what closes\nthat gap without an embedding model.",
+   "api_count": 6,
+   "classes": 2,
+   "commits": 2,
+   "doc": "What the project's own checker says about a file the agent just changed.",
+   "doc_full": "What the project's own checker says about a file the agent just changed.\n\nWithout this the agent is editing blind. It writes a change, the change is\napplied, and nothing tells it that the file no longer imports, no longer type\nchecks, or breaks a lint rule the repository enforces. It finds out later, if\nit happens to run the right command, or it never finds out and hands back\nsomething that does not compile.\n\n**This is not a hook, and the difference is the whole point.** A hook observes\nand its output deliberately never reaches the model, because a formatter that\nis not installed is the operator's problem and a model told about it tries to\nfix it. Diagnostics are the opposite: the report is *about the model's own\nedit*, it is exactly what the model needs, and it is useless to anyone else.\nOne mechanism could not have both rules.\n\nA CLI checker rather than a language server, deliberately. A language server\nmeans a client, a lifecycle, a protocol and a per-language install, and the\nprojects that most want this already have `ruff`, `tsc` or `mypy` configured\nand know how to run them. The tradeoff is real -- no go-to-definition, no call\ngraph -- and it is documented rather than hidden.\n\nThe one rule everything here is shaped by: **a diagnostic is not a failed\nedit.** Another agent shipped this exact bug -- its model read the diagnostics\nattached to a successful edit and concluded the edit had not been applied, so\nit wrote the same change again. So the edit's own result comes first and\nstands on its own, the report is separated from it and labelled, and the\ntool's success flag never changes because a checker had something to say.",
    "external": [
     "__future__",
-    "ast",
-    "dataclasses"
+    "dataclasses",
+    "pathlib",
+    "shlex",
+    "sys",
+    "typing"
    ],
-   "fan_in": 2,
-   "fan_out": 0,
-   "functions": 3,
+   "fan_in": 1,
+   "fan_out": 2,
+   "functions": 4,
    "imported_by": [
-    "execution.indexing",
-    "execution.retrieval"
+    "config"
    ],
-   "imports": [],
+   "imports": [
+    "core.errors",
+    "execution.process"
+   ],
    "in_boundary": false,
    "last_touched": "2026-09-03",
    "layer": "execution",
-   "lines": 207,
-   "name": "execution.chunking",
-   "path": "harness/execution/chunking.py",
+   "lines": 193,
+   "name": "execution.diagnostics",
+   "path": "harness/execution/diagnostics.py",
    "side": "harness",
-   "sloc": 165,
-   "test_cases": 71,
-   "test_sloc": 404,
+   "sloc": 130,
+   "test_cases": 84,
+   "test_sloc": 533,
    "tests": [
-    "test_retrieval.py"
+    "test_diagnostics.py",
+    "test_settings_and_memory.py"
    ]
   },
   {
@@ -3308,10 +3215,11 @@
     "signal",
     "subprocess"
    ],
-   "fan_in": 7,
+   "fan_in": 8,
    "fan_out": 1,
    "functions": 1,
    "imported_by": [
+    "execution.diagnostics",
     "execution.hooks",
     "execution.sandbox",
     "execution.tools",
@@ -4103,8 +4011,8 @@
    "path": "harness/autonomy/loop.py",
    "side": "harness",
    "sloc": 146,
-   "test_cases": 29,
-   "test_sloc": 340,
+   "test_cases": 27,
+   "test_sloc": 307,
    "tests": [
     "test_loop.py",
     "test_review_findings.py"
@@ -4256,8 +4164,8 @@
    "path": "harness/autonomy/backlog.py",
    "side": "harness",
    "sloc": 123,
-   "test_cases": 59,
-   "test_sloc": 570,
+   "test_cases": 57,
+   "test_sloc": 537,
    "tests": [
     "test_backlog.py",
     "test_demo_repo.py",
@@ -4408,8 +4316,8 @@
    "path": "harness/cli.py",
    "side": "harness",
    "sloc": 907,
-   "test_cases": 23,
-   "test_sloc": 241,
+   "test_cases": 21,
+   "test_sloc": 208,
    "tests": [
     "test_denied_approval.py",
     "test_review_findings.py"
@@ -4494,8 +4402,8 @@
    "path": "harness/runtime.py",
    "side": "harness",
    "sloc": 781,
-   "test_cases": 52,
-   "test_sloc": 594,
+   "test_cases": 50,
+   "test_sloc": 561,
    "tests": [
     "test_compaction.py",
     "test_review_findings.py",
@@ -4507,72 +4415,72 @@
     {
      "doc": "",
      "kind": "class",
-     "line": 46,
+     "line": 47,
      "methods": [],
      "name": "RouteConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 73,
+     "line": 74,
      "methods": [],
      "name": "ModelRouterConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 83,
+     "line": 84,
      "methods": [],
      "name": "PolicyConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 101,
+     "line": 102,
      "methods": [],
      "name": "MCPServerConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 110,
+     "line": 111,
      "methods": [
       "with_overrides"
      ],
      "name": "HarnessConfig"
     },
     {
-     "doc": "",
+     "doc": "Load the shipped config, then fold any project settings onto it.",
      "kind": "function",
-     "line": 201,
+     "line": 210,
      "methods": [],
      "name": "load_config"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 432,
+     "line": 452,
      "methods": [],
      "name": "reject_unknown_route_keys"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 605,
+     "line": 625,
      "methods": [],
      "name": "load_task"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 687,
+     "line": 707,
      "methods": [],
      "name": "load_skill"
     }
    ],
    "api_count": 9,
    "classes": 5,
-   "commits": 16,
+   "commits": 18,
    "doc": "Versioned, strict configuration/task/skill loading.",
    "doc_full": "Versioned, strict configuration/task/skill loading.",
    "external": [
@@ -4609,9 +4517,9 @@
    "imports": [
     "core.contracts",
     "core.errors",
+    "execution.diagnostics",
     "execution.hooks",
     "execution.policy",
-    "execution.retrieval",
     "execution.sandbox",
     "execution.search",
     "models.llm_light",
@@ -4622,13 +4530,13 @@
    "in_boundary": true,
    "last_touched": "2026-09-03",
    "layer": "",
-   "lines": 702,
+   "lines": 722,
    "name": "config",
    "path": "harness/config.py",
    "side": "harness",
-   "sloc": 618,
-   "test_cases": 760,
-   "test_sloc": 6932,
+   "sloc": 630,
+   "test_cases": 771,
+   "test_sloc": 7025,
    "tests": [
     "test_atlas_trace.py",
     "test_auth_gateways.py",
@@ -4637,6 +4545,7 @@
     "test_context_budget.py",
     "test_demo_repo.py",
     "test_denied_approval.py",
+    "test_diagnostics.py",
     "test_failure_recovery.py",
     "test_gmi.py",
     "test_goal.py",
@@ -4655,14 +4564,112 @@
     "test_repl_gemini.py",
     "test_repl_tool_safety.py",
     "test_repl_tools.py",
-    "test_retrieval.py",
     "test_review_findings.py",
     "test_runtime.py",
+    "test_settings_and_memory.py",
     "test_shared_tooling.py",
     "test_subagents.py",
     "test_tools.py",
     "test_workspace.py"
    ]
+  },
+  {
+   "api": [
+    {
+     "doc": "One settings file that was found, and what it said.",
+     "kind": "class",
+     "line": 94,
+     "methods": [],
+     "name": "Layer"
+    },
+    {
+     "doc": "The nearest directory above *start* holding a `.yatra` or a `.git`.",
+     "kind": "function",
+     "line": 103,
+     "methods": [],
+     "name": "find_project_root"
+    },
+    {
+     "doc": "Every settings layer that applies, lowest precedence first.",
+     "kind": "function",
+     "line": 119,
+     "methods": [],
+     "name": "discover"
+    },
+    {
+     "doc": "Fold every layer onto *base*, lowest precedence first.",
+     "kind": "function",
+     "line": 151,
+     "methods": [],
+     "name": "apply"
+    },
+    {
+     "doc": "A layer's values with anything it is not allowed to set removed.",
+     "kind": "function",
+     "line": 160,
+     "methods": [],
+     "name": "trusted"
+    },
+    {
+     "doc": "The keys a committed file tried to set and was not allowed to.",
+     "kind": "function",
+     "line": 175,
+     "methods": [],
+     "name": "refused"
+    },
+    {
+     "doc": "Deep-merge *overlay* onto *base*, without mutating either.",
+     "kind": "function",
+     "line": 202,
+     "methods": [],
+     "name": "merge"
+    },
+    {
+     "doc": "One line per layer, for `/config` to print.",
+     "kind": "function",
+     "line": 258,
+     "methods": [],
+     "name": "describe"
+    },
+    {
+     "doc": "Keep the machine-local file out of the repository.",
+     "kind": "function",
+     "line": 271,
+     "methods": [],
+     "name": "ignore_local_settings"
+    }
+   ],
+   "api_count": 9,
+   "classes": 1,
+   "commits": 2,
+   "doc": "Settings that follow the project rather than the install.",
+   "doc_full": "Settings that follow the project rather than the install.\n\n`ay` read one config, from its own install directory, and nothing from the\ndirectory you started it in. So a rule could not be scoped to one repository:\neither every session got it or none did. Writing a demo that needed one deny\nrule in one folder is what made the gap concrete -- the constraint had to\nbecome a sentence in AGENTS.md that the model chooses to obey, instead of a\ngate that stops it.\n\nThe precedence chain is the one every comparable tool settled on, and the\norder is the point rather than the file names:\n\n    explicit --config          what the operator typed wins outright\n    .yatra/settings.local.yaml machine-local, gitignored, not shared\n    .yatra/settings.yaml       the project's, committed, shared with the team\n    ~/.yatra-harness/settings.yaml   personal defaults for every project\n    configs/ay.yaml            what ships\n\n**Permission rules do not follow that order.** They merge across every layer,\nand a `deny` written at any layer survives all of them. Overriding is right\nfor a model choice and wrong for a refusal: if a project bans `git push` a\npersonal file must not quietly re-enable it, and the operator who wrote the\nnarrower rule is usually the one who knows why. Everything else is last\nwriter wins.\n\nDiscovery walks up from the working directory, so a session started three\nfolders inside a repository still finds the repository's settings. It stops at\na `.git` directory or the filesystem root, because past that point the files\nbelong to somebody else's project.",
+   "external": [
+    "__future__",
+    "collections",
+    "dataclasses",
+    "pathlib",
+    "typing",
+    "yaml"
+   ],
+   "fan_in": 0,
+   "fan_out": 1,
+   "functions": 8,
+   "imported_by": [],
+   "imports": [
+    "core.errors"
+   ],
+   "in_boundary": false,
+   "last_touched": "2026-09-03",
+   "layer": "",
+   "lines": 283,
+   "name": "settings",
+   "path": "harness/settings.py",
+   "side": "harness",
+   "sloc": 200,
+   "test_cases": 0,
+   "test_sloc": 0,
+   "tests": []
   },
   {
    "api": [
@@ -4725,21 +4732,21 @@
     {
      "doc": "`--model route:model` named a route the config does not define.",
      "kind": "class",
-     "line": 71,
+     "line": 73,
      "methods": [],
      "name": "UnknownRoute"
     },
     {
      "doc": "Everything the shell was started with.",
      "kind": "class",
-     "line": 79,
+     "line": 81,
      "methods": [],
      "name": "Options"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 96,
+     "line": 98,
      "methods": [
       "run"
      ],
@@ -4748,7 +4755,7 @@
    ],
    "api_count": 3,
    "classes": 3,
-   "commits": 9,
+   "commits": 12,
    "doc": "The interactive shell around the agent loop.",
    "doc_full": "The interactive shell around the agent loop.\n\nOwns everything the loop deliberately does not: reading a line, expanding\n`@path` and `!command`, slash commands, the banner, and turning Ctrl-C into\nan interrupted turn rather than a dead process.",
    "external": [
@@ -4791,11 +4798,11 @@
    "in_boundary": false,
    "last_touched": "2026-09-03",
    "layer": "repl",
-   "lines": 1092,
+   "lines": 1145,
    "name": "repl.shell",
    "path": "harness/repl/shell.py",
    "side": "harness",
-   "sloc": 937,
+   "sloc": 977,
    "test_cases": 93,
    "test_sloc": 848,
    "tests": [
@@ -4809,14 +4816,14 @@
     {
      "doc": "What running a tool produced.",
      "kind": "class",
-     "line": 57,
+     "line": 58,
      "methods": [],
      "name": "ToolOutcome"
     },
     {
      "doc": "The conversational tool set, executed by the shared registry.",
      "kind": "class",
-     "line": 152,
+     "line": 153,
      "methods": [
       "specs",
       "dispatch",
@@ -4833,14 +4840,14 @@
     {
      "doc": "A diff for the approval prompt, so consent is informed by the change.",
      "kind": "function",
-     "line": 725,
+     "line": 765,
      "methods": [],
      "name": "unified_diff"
     }
    ],
    "api_count": 3,
    "classes": 2,
-   "commits": 5,
+   "commits": 7,
    "doc": "The tools a conversational session gives the model.",
    "doc_full": "The tools a conversational session gives the model.\n\nShaped for editing rather than for batch patching. The batch path's\n`apply_patch` takes a whole unified diff, which asks a model to get line\nnumbers and context right in one shot; the failure mode is a rejected hunk\nand a wasted turn. `edit_file` instead takes the exact text to replace and\nrefuses when that text is absent or ambiguous, so a mistake comes back as a\nspecific, fixable message rather than a corrupted file.\n\nEvery path goes through `Workspace.resolve`, so containment is the same code\nthe batch path uses. The difference is only where the workspace root points:\nhere it is the directory the operator launched in.",
    "external": [
@@ -4874,17 +4881,18 @@
     "record.artifacts"
    ],
    "in_boundary": false,
-   "last_touched": "2026-09-02",
+   "last_touched": "2026-09-03",
    "layer": "repl",
-   "lines": 757,
+   "lines": 797,
    "name": "repl.tools",
    "path": "harness/repl/tools.py",
    "side": "harness",
-   "sloc": 622,
-   "test_cases": 304,
-   "test_sloc": 2914,
+   "sloc": 654,
+   "test_cases": 336,
+   "test_sloc": 3120,
    "tests": [
     "test_checkpoints.py",
+    "test_diagnostics.py",
     "test_failure_recovery.py",
     "test_hooks.py",
     "test_interrupt.py",
@@ -5193,6 +5201,101 @@
   {
    "api": [
     {
+     "doc": "One tool the model asked for, with its arguments already parsed.",
+     "kind": "class",
+     "line": 23,
+     "methods": [],
+     "name": "ToolCall"
+    },
+    {
+     "doc": "What one inference produced: some prose, and zero or more tool calls.",
+     "kind": "class",
+     "line": 37,
+     "methods": [
+      "wants_tools"
+     ],
+     "name": "AssistantTurn"
+    },
+    {
+     "doc": "A deliberately rough token count.",
+     "kind": "function",
+     "line": 61,
+     "methods": [],
+     "name": "estimate_tokens"
+    },
+    {
+     "doc": "",
+     "kind": "function",
+     "line": 72,
+     "methods": [],
+     "name": "message_tokens"
+    },
+    {
+     "doc": "One thread: a fixed system prompt and a growing list of turns.",
+     "kind": "class",
+     "line": 83,
+     "methods": [
+      "add_user",
+      "add_assistant",
+      "add_tool_result",
+      "add_system_note",
+      "token_estimate",
+      "wire_messages",
+      "needs_compaction",
+      "compact",
+      "transcript",
+      "save",
+      "load"
+     ],
+     "name": "Conversation"
+    }
+   ],
+   "api_count": 5,
+   "classes": 3,
+   "commits": 3,
+   "doc": "The message history a session accumulates, and what to do when it fills.",
+   "doc_full": "The message history a session accumulates, and what to do when it fills.\n\nMessages are held in the OpenAI chat shape because it is the one every route\nin this repository speaks natively except Anthropic, which `model.py`\nconverts on the way out. Holding one canonical shape means compaction,\npersistence and token accounting are written once.",
+   "external": [
+    "__future__",
+    "collections",
+    "dataclasses",
+    "json",
+    "pathlib",
+    "re",
+    "time",
+    "typing"
+   ],
+   "fan_in": 3,
+   "fan_out": 0,
+   "functions": 2,
+   "imported_by": [
+    "repl.agent",
+    "repl.model",
+    "repl.shell"
+   ],
+   "imports": [],
+   "in_boundary": false,
+   "last_touched": "2026-09-03",
+   "layer": "repl",
+   "lines": 291,
+   "name": "repl.conversation",
+   "path": "harness/repl/conversation.py",
+   "side": "harness",
+   "sloc": 221,
+   "test_cases": 160,
+   "test_sloc": 1743,
+   "tests": [
+    "test_hooks.py",
+    "test_interrupt.py",
+    "test_repl_agent.py",
+    "test_repl_end_to_end.py",
+    "test_repl_gemini.py",
+    "test_repl_shell.py"
+   ]
+  },
+  {
+   "api": [
+    {
      "doc": "One recorded state of the working tree.",
      "kind": "class",
      "line": 59,
@@ -5247,100 +5350,6 @@
    "test_sloc": 188,
    "tests": [
     "test_checkpoints.py"
-   ]
-  },
-  {
-   "api": [
-    {
-     "doc": "One tool the model asked for, with its arguments already parsed.",
-     "kind": "class",
-     "line": 22,
-     "methods": [],
-     "name": "ToolCall"
-    },
-    {
-     "doc": "What one inference produced: some prose, and zero or more tool calls.",
-     "kind": "class",
-     "line": 36,
-     "methods": [
-      "wants_tools"
-     ],
-     "name": "AssistantTurn"
-    },
-    {
-     "doc": "A deliberately rough token count.",
-     "kind": "function",
-     "line": 60,
-     "methods": [],
-     "name": "estimate_tokens"
-    },
-    {
-     "doc": "",
-     "kind": "function",
-     "line": 71,
-     "methods": [],
-     "name": "message_tokens"
-    },
-    {
-     "doc": "One thread: a fixed system prompt and a growing list of turns.",
-     "kind": "class",
-     "line": 82,
-     "methods": [
-      "add_user",
-      "add_assistant",
-      "add_tool_result",
-      "add_system_note",
-      "token_estimate",
-      "wire_messages",
-      "needs_compaction",
-      "compact",
-      "transcript",
-      "save",
-      "load"
-     ],
-     "name": "Conversation"
-    }
-   ],
-   "api_count": 5,
-   "classes": 3,
-   "commits": 2,
-   "doc": "The message history a session accumulates, and what to do when it fills.",
-   "doc_full": "The message history a session accumulates, and what to do when it fills.\n\nMessages are held in the OpenAI chat shape because it is the one every route\nin this repository speaks natively except Anthropic, which `model.py`\nconverts on the way out. Holding one canonical shape means compaction,\npersistence and token accounting are written once.",
-   "external": [
-    "__future__",
-    "collections",
-    "dataclasses",
-    "json",
-    "pathlib",
-    "time",
-    "typing"
-   ],
-   "fan_in": 3,
-   "fan_out": 0,
-   "functions": 2,
-   "imported_by": [
-    "repl.agent",
-    "repl.model",
-    "repl.shell"
-   ],
-   "imports": [],
-   "in_boundary": false,
-   "last_touched": "2026-09-03",
-   "layer": "repl",
-   "lines": 247,
-   "name": "repl.conversation",
-   "path": "harness/repl/conversation.py",
-   "side": "harness",
-   "sloc": 188,
-   "test_cases": 160,
-   "test_sloc": 1743,
-   "tests": [
-    "test_hooks.py",
-    "test_interrupt.py",
-    "test_repl_agent.py",
-    "test_repl_end_to_end.py",
-    "test_repl_gemini.py",
-    "test_repl_shell.py"
    ]
   },
   {
@@ -5424,8 +5433,8 @@
    "path": "harness/repl/approvals.py",
    "side": "harness",
    "sloc": 184,
-   "test_cases": 266,
-   "test_sloc": 2416,
+   "test_cases": 318,
+   "test_sloc": 2740,
    "tests": [
     "test_hooks.py",
     "test_interrupt.py",
@@ -5436,7 +5445,8 @@
     "test_repl_agent.py",
     "test_repl_end_to_end.py",
     "test_repl_gemini.py",
-    "test_repl_shell.py"
+    "test_repl_shell.py",
+    "test_settings_and_memory.py"
    ]
   },
   {
@@ -5451,7 +5461,7 @@
    ],
    "api_count": 1,
    "classes": 0,
-   "commits": 4,
+   "commits": 6,
    "doc": "The system prompt, assembled once per session.",
    "doc_full": "The system prompt, assembled once per session.\n\nKept stable and at the front of every request. Providers cache on prompt\nprefixes, so the difference between building this once and rebuilding it per\nturn is a cache hit on the entire conversation history.",
    "external": [
@@ -5476,14 +5486,16 @@
    "in_boundary": false,
    "last_touched": "2026-09-03",
    "layer": "repl",
-   "lines": 140,
+   "lines": 155,
    "name": "repl.prompt",
    "path": "harness/repl/prompt.py",
    "side": "harness",
-   "sloc": 116,
-   "test_cases": 0,
-   "test_sloc": 0,
-   "tests": []
+   "sloc": 129,
+   "test_cases": 52,
+   "test_sloc": 324,
+   "tests": [
+    "test_settings_and_memory.py"
+   ]
   },
   {
    "api": [
@@ -5629,7 +5641,7 @@
      "runtime"
     ],
     "sloc": 781,
-    "tests": 52
+    "tests": 50
    },
    "key": "autonomy.loop",
    "name": "Agent loop",
@@ -5666,10 +5678,10 @@
      "repl.conversation",
      "repl.prompt"
     ],
-    "sloc": 304,
-    "tests": 160
+    "sloc": 350,
+    "tests": 212
    },
-   "sloc": 693
+   "sloc": 739
   },
   {
    "asks": "typed capabilities, validated arguments, legible failures",
@@ -5680,8 +5692,8 @@
      "execution.tools",
      "core.schema"
     ],
-    "sloc": 1092,
-    "tests": 58
+    "sloc": 1020,
+    "tests": 45
    },
    "key": "execution.tools",
    "name": "Tool design",
@@ -5691,10 +5703,10 @@
     "modules": [
      "repl.tools"
     ],
-    "sloc": 622,
-    "tests": 304
+    "sloc": 654,
+    "tests": 336
    },
-   "sloc": 1714
+   "sloc": 1674
   },
   {
    "asks": "capability sets declared outside the code that runs them",
@@ -5705,8 +5717,8 @@
      "execution.mcp",
      "config"
     ],
-    "sloc": 798,
-    "tests": 760
+    "sloc": 810,
+    "tests": 771
    },
    "key": "skills",
    "name": "Skills and MCP",
@@ -5717,7 +5729,7 @@
     "sloc": 0,
     "tests": 0
    },
-   "sloc": 798
+   "sloc": 810
   },
   {
    "asks": "who may do what, and what may never be authorized at all",
@@ -5727,8 +5739,8 @@
     "modules": [
      "execution.policy"
     ],
-    "sloc": 360,
-    "tests": 137
+    "sloc": 377,
+    "tests": 135
    },
    "key": "permissions",
    "name": "Permissions",
@@ -5739,9 +5751,9 @@
      "repl.approvals"
     ],
     "sloc": 184,
-    "tests": 266
+    "tests": 318
    },
-   "sloc": 544
+   "sloc": 561
   },
   {
    "asks": "what survives a turn, a crash, and a session",
@@ -5754,7 +5766,7 @@
      "autonomy.backlog"
     ],
     "sloc": 244,
-    "tests": 75
+    "tests": 73
    },
    "key": "memory",
    "name": "Memory and state",
@@ -5764,10 +5776,10 @@
     "modules": [
      "repl.conversation"
     ],
-    "sloc": 188,
+    "sloc": 221,
     "tests": 160
    },
-   "sloc": 432
+   "sloc": 465
   },
   {
    "asks": "breaking work up, and pursuing it across attempts",
@@ -5780,7 +5792,7 @@
      "run.subagents"
     ],
     "sloc": 466,
-    "tests": 78
+    "tests": 76
    },
    "key": "planning",
    "name": "Planning and decomposition",
@@ -5796,15 +5808,15 @@
   {
    "asks": "where a command runs and what it can reach",
    "batch": {
-    "api": 17,
+    "api": 19,
     "missing": [],
     "modules": [
      "execution.sandbox",
      "execution.process",
      "execution.workspace"
     ],
-    "sloc": 664,
-    "tests": 553
+    "sloc": 717,
+    "tests": 575
    },
    "key": "execution.sandbox",
    "name": "Sandbox and execution",
@@ -5814,10 +5826,10 @@
     "modules": [
      "repl.tools"
     ],
-    "sloc": 622,
-    "tests": 304
+    "sloc": 654,
+    "tests": 336
    },
-   "sloc": 1286
+   "sloc": 1371
   },
   {
    "asks": "which model, which credential, what if it fails",
@@ -5905,7 +5917,7 @@
      "cli"
     ],
     "sloc": 907,
-    "tests": 23
+    "tests": 21
    },
    "key": "hitl",
    "name": "Human in the loop",
@@ -5916,10 +5928,10 @@
      "repl.shell",
      "repl.render"
     ],
-    "sloc": 1305,
+    "sloc": 1345,
     "tests": 231
    },
-   "sloc": 2212
+   "sloc": 2252
   },
   {
    "asks": "does the harness still do the job after a change",
@@ -5955,7 +5967,7 @@
      "core.errors"
     ],
     "sloc": 290,
-    "tests": 638
+    "tests": 652
    },
    "key": "reliability",
    "name": "Reliability",
@@ -5973,27 +5985,26 @@
   {
    "asks": "finding the relevant part of a repository too big to read",
    "batch": {
-    "api": 17,
+    "api": 7,
     "missing": [],
     "modules": [
-     "execution.retrieval",
      "execution.search"
     ],
-    "sloc": 398,
-    "tests": 109
+    "sloc": 200,
+    "tests": 38
    },
-   "key": "execution.retrieval",
-   "name": "Retrieval and search",
+   "key": "execution.search",
+   "name": "Search",
    "repl": {
     "api": 3,
     "missing": [],
     "modules": [
      "repl.tools"
     ],
-    "sloc": 622,
-    "tests": 304
+    "sloc": 654,
+    "tests": 336
    },
-   "sloc": 1020
+   "sloc": 854
   }
  ],
  "repo": "yatra-harness",
@@ -6337,6 +6348,18 @@
    "lines": 95,
    "sloc": 66
   },
+  "test_diagnostics.py": {
+   "cases": 32,
+   "covers": [
+    "config",
+    "core.errors",
+    "execution.diagnostics",
+    "execution.workspace",
+    "repl.tools"
+   ],
+   "lines": 271,
+   "sloc": 209
+  },
   "test_evals.py": {
    "cases": 16,
    "covers": [
@@ -6447,13 +6470,13 @@
    "sloc": 165
   },
   "test_os_sandbox.py": {
-   "cases": 27,
+   "cases": 30,
    "covers": [
     "core.errors",
     "execution.sandbox"
    ],
-   "lines": 224,
-   "sloc": 174
+   "lines": 260,
+   "sloc": 203
   },
   "test_patch_recovery.py": {
    "cases": 6,
@@ -6639,20 +6662,8 @@
    "lines": 265,
    "sloc": 214
   },
-  "test_retrieval.py": {
-   "cases": 71,
-   "covers": [
-    "config",
-    "core.errors",
-    "execution.chunking",
-    "execution.indexing",
-    "execution.retrieval"
-   ],
-   "lines": 549,
-   "sloc": 404
-  },
   "test_review_findings.py": {
-   "cases": 13,
+   "cases": 11,
    "covers": [
     "autonomy.backlog",
     "autonomy.loop",
@@ -6661,12 +6672,10 @@
     "core.contracts",
     "core.errors",
     "execution.policy",
-    "execution.tools",
-    "execution.workspace",
     "runtime"
    ],
-   "lines": 228,
-   "sloc": 175
+   "lines": 187,
+   "sloc": 142
   },
   "test_rubric.py": {
    "cases": 18,
@@ -6717,6 +6726,19 @@
    "lines": 160,
    "sloc": 126
   },
+  "test_settings_and_memory.py": {
+   "cases": 52,
+   "covers": [
+    "config",
+    "core.errors",
+    "execution.diagnostics",
+    "record",
+    "repl.approvals",
+    "repl.prompt"
+   ],
+   "lines": 424,
+   "sloc": 324
+  },
   "test_shared_tooling.py": {
    "cases": 20,
    "covers": [
@@ -6729,8 +6751,8 @@
     "execution.workspace",
     "repl.tools"
    ],
-   "lines": 215,
-   "sloc": 172
+   "lines": 212,
+   "sloc": 169
   },
   "test_streaming.py": {
    "cases": 17,
@@ -6789,7 +6811,7 @@
     "objective"
    ],
    "description": "",
-   "line": 179,
+   "line": 172,
    "name": "delegate",
    "required": [
     "agent",
@@ -6799,16 +6821,15 @@
   },
   {
    "arguments": [
-    "query",
-    "limit"
+    "fact"
    ],
-   "description": "Search the workspace by meaning. Ask a plain question and get back the most relevant excerpts, ranked, each with its file, line range and enclosing function. Use this first to find where something lives when you do not already know the file or the identifier; it replaces listing directories and opening files to look around. Use grep instead when you know the exact string.",
-   "line": 245,
-   "name": "retrieve",
+   "description": "Write one durable fact about this repository for future sessions to read. Worth remembering: a convention that is not written down, where something surprising lives, a command that works here, a dead end and why. Not worth remembering: anything already in AGENTS.md or the README, anything true only of the change you are making now, or a summary of this conversation. One sentence.",
+   "line": 238,
+   "name": "remember",
    "required": [
-    "query"
+    "fact"
    ],
-   "risk": "read"
+   "risk": "write"
   },
   {
    "arguments": [
@@ -6816,7 +6837,7 @@
     "limit"
    ],
    "description": "Search the web and return ranked results with their URLs.",
-   "line": 270,
+   "line": 261,
    "name": "web_search",
    "required": [
     "query"
@@ -6828,7 +6849,7 @@
     "url"
    ],
    "description": "Fetch one URL and return its readable text.",
-   "line": 284,
+   "line": 275,
    "name": "browser_fetch",
    "required": [
     "url"
@@ -6840,7 +6861,7 @@
     "max_entries"
    ],
    "description": "List a bounded tree of files in the run workspace.",
-   "line": 312,
+   "line": 303,
    "name": "repo_tree",
    "required": [],
    "risk": "read"
@@ -6851,7 +6872,7 @@
     "max_matches"
    ],
    "description": "Search UTF-8 text files in the workspace for a literal string.",
-   "line": 321,
+   "line": 312,
    "name": "search_repo",
    "required": [
     "query"
@@ -6865,7 +6886,7 @@
     "end_line"
    ],
    "description": "Read a UTF-8 file inside the run workspace.",
-   "line": 333,
+   "line": 324,
    "name": "read_file",
    "required": [
     "path"
@@ -6877,7 +6898,7 @@
     "patch"
    ],
    "description": "Apply a unified git patch inside the run workspace.",
-   "line": 349,
+   "line": 340,
    "name": "apply_patch",
    "required": [
     "patch"
@@ -6889,7 +6910,7 @@
     "command"
    ],
    "description": "Run an allowlisted command without a shell in the workspace.",
-   "line": 358,
+   "line": 349,
    "name": "run_command",
    "required": [
     "command"
@@ -6902,7 +6923,7 @@
     "arguments"
    ],
    "description": "Run a workspace-relative Python script in isolated interpreter mode.",
-   "line": 369,
+   "line": 360,
    "name": "python_run",
    "required": [
     "path"
@@ -6912,7 +6933,7 @@
   {
    "arguments": [],
    "description": "Return the current workspace diff and changed paths.",
-   "line": 384,
+   "line": 375,
    "name": "git_diff",
    "required": [],
    "risk": "read"
@@ -6922,7 +6943,7 @@
     "url"
    ],
    "description": "Fetch one allowlisted public HTTP(S) URL without following redirects.",
-   "line": 393,
+   "line": 384,
    "name": "browser_fetch",
    "required": [
     "url"
@@ -6931,23 +6952,10 @@
   },
   {
    "arguments": [
-    "query",
-    "limit"
-   ],
-   "description": "Find the parts of the workspace most relevant to a question, ranked, as excerpts with their file and line range.",
-   "line": 402,
-   "name": "retrieve",
-   "required": [
-    "query"
-   ],
-   "risk": "read"
-  },
-  {
-   "arguments": [
     "query"
    ],
    "description": "Search the public web and return titles, URLs and snippets.",
-   "line": 414,
+   "line": 393,
    "name": "web_search",
    "required": [
     "query"
@@ -6959,7 +6967,7 @@
     "summary"
    ],
    "description": "Submit a completion claim. The harness will independently verify it.",
-   "line": 423,
+   "line": 402,
    "name": "finish",
    "required": [
     "summary"
@@ -6968,17 +6976,17 @@
   }
  ],
  "totals": {
-  "api": 293,
+  "api": 297,
   "commands": 20,
-  "commits": 16,
-  "edges": 205,
-  "lines": 17006,
+  "commits": 18,
+  "edges": 203,
+  "lines": 16933,
   "modules": 57,
-  "sloc": 13922,
-  "test_cases": 1205,
-  "test_files": 52,
-  "test_sloc": 10324,
-  "tools": 15
+  "sloc": 13816,
+  "test_cases": 1219,
+  "test_files": 53,
+  "test_sloc": 10446,
+  "tools": 14
  },
  "transitions": [
   {

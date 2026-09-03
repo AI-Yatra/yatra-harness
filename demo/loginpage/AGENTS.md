@@ -32,6 +32,8 @@ hang the run. The tests are what decides whether the work is done.
   an anonymous visitor which usernames exist.
 - **Do not weaken the tests' thresholds.** 4.5:1 is the WCAG contrast ratio for
   body text, not a preference.
+- **Contrast is measured against what the text actually sits on.** The error
+  message is on its own tinted panel, not on the card.
 - Keep it dependency-free and keep the markup escaped: `page.render` is given
   a username the visitor typed.
 - Passwords are compared as SHA-256 hashes. That is not a recommendation for

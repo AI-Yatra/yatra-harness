@@ -33,6 +33,7 @@ import sys
 import threading
 import time
 from dataclasses import dataclass
+from typing import Any
 
 from .approvals import Request, Verdict
 from .theme import GUTTER, INDENT, RESET, RIGHT_MARGIN, THEME, Theme
@@ -345,6 +346,11 @@ class Renderer:
     def __init__(self, console: Console) -> None:
         self.console = console
         self.prose = Prose(console)
+        #: Set by the shell to the session's single stdin reader. Everything
+        #: that reads a line has to go through one object, or the reader's
+        #: worker thread and this prompt race for the operator's answer and
+        #: whichever wins decides whether an action was approved.
+        self.reader: Any = None
 
     # -------------------------------------------------------------- assistant
 
@@ -452,8 +458,24 @@ class Renderer:
             console.line(" " * INDENT + f"{console.accent(key)}  {text}")
         while True:
             try:
+                # Anything already read was typed before this question existed,
+                # so it cannot be an answer to it. Letting it answer turns the
+                # gate into a formality: a pasted line beginning "1" approves
+                # an action nobody saw.
+                discarded = self.reader.drain() if self.reader is not None else 0
+                if discarded:
+                    console.line(
+                        " " * INDENT
+                        + console.muted(
+                            f"({discarded} pasted line{'s' if discarded != 1 else ''} ignored; "
+                            "they were typed before this question)"
+                        )
+                    )
                 console.write(pad + console.muted("choose 1-3 ") + console.accent("> "))
-                answer = input().strip().lower()
+                answer = (
+                    self.reader.next_line() if self.reader is not None else input()
+                )
+                answer = (answer or "").strip().lower()
             except (EOFError, KeyboardInterrupt):
                 console.line()
                 return Verdict.DENY

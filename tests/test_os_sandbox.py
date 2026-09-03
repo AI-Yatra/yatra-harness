@@ -57,6 +57,42 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(SandboxConfig().kind, "local")
 
 
+class ProbeTests(unittest.TestCase):
+    """Presence is not capability, and assuming it was hid a real failure.
+
+    `--unshare-net` asks the kernel to bring a loopback interface up inside
+    the new namespace. In a container, or under a hardened AppArmor profile,
+    that is refused and *every* command through the sandbox fails rather than
+    running confined. The first CI run that installed bwrap found it at once;
+    the suite had been green for as long as bwrap was absent, which was
+    everywhere.
+    """
+
+    def test_the_probe_answers_both_questions(self) -> None:
+        from harness.execution.sandbox import probe_bubblewrap
+
+        if not shutil.which("bwrap"):
+            self.skipTest("bubblewrap is not installed")
+        probe = probe_bubblewrap()
+        self.assertIsInstance(probe.usable, bool)
+        self.assertIsInstance(probe.network, bool)
+
+    def test_a_host_that_cannot_unshare_the_network_still_confines_files(self) -> None:
+        """Half a sandbox is worth having; half a sandbox unannounced is not."""
+        argv = bubblewrap_command(
+            SandboxConfig(kind="os"), ["x"], workspace=WORKSPACE, network=False
+        )
+        self.assertNotIn("--unshare-net", argv)
+        self.assertIn("--bind", argv)
+        self.assertIn("--ro-bind-try", argv)
+
+    def test_the_operator_is_told_when_the_network_is_not_confined(self) -> None:
+        sandbox = OsSandbox(SandboxConfig(kind="os"))
+        if sandbox.mechanism != "bubblewrap" or sandbox.network_confined:
+            self.skipTest("this host confines the network")
+        self.assertIn("network", sandbox.reason)
+
+
 class MechanismTests(unittest.TestCase):
     def test_it_names_a_mechanism_or_says_why_not(self) -> None:
         mechanism, reason = detect_mechanism()
@@ -69,10 +105,26 @@ class MechanismTests(unittest.TestCase):
         self.assertEqual(mechanism, "")
         self.assertIn("docker", reason)
 
-    def test_the_mechanism_matches_what_is_installed(self) -> None:
-        mechanism, _ = detect_mechanism()
+    def test_the_mechanism_matches_what_can_actually_run(self) -> None:
+        """Installed is not the same as usable, which is the whole point.
+
+        This test used to assert that finding `bwrap` on PATH meant the
+        mechanism was bubblewrap. That is the assumption that hid a sandbox
+        which failed every command on any host that cannot unshare a network
+        namespace, so the assertion now follows the probe rather than the
+        which.
+        """
+        from harness.execution.sandbox import probe_bubblewrap
+
+        mechanism, reason = detect_mechanism()
         if sys.platform.startswith("linux"):
-            self.assertEqual(mechanism, "bubblewrap" if shutil.which("bwrap") else "")
+            if not shutil.which("bwrap"):
+                self.assertEqual(mechanism, "")
+            elif probe_bubblewrap().usable:
+                self.assertEqual(mechanism, "bubblewrap")
+            else:
+                self.assertEqual(mechanism, "")
+                self.assertIn("cannot run here", reason)
         elif sys.platform == "darwin":
             self.assertEqual(mechanism, "seatbelt" if shutil.which("sandbox-exec") else "")
 

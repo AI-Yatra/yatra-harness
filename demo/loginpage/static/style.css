@@ -10,9 +10,10 @@
   --line: #c8d2de;
   --accent: #0069c2;
   --danger: #f4f6f8;
+  --danger-wash: #fdecec;
+  --danger-line: #f5b5b5;
+  --on-accent: #4d94d6;
 }
-
-* { box-sizing: border-box; }
 
 body {
   margin: 0;
@@ -69,6 +70,10 @@ h1 {
 .error {
   margin: 0 0 1rem;
   min-height: 1.25rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--danger-line);
+  border-radius: 8px;
+  background: var(--danger-wash);
   font-size: 0.875rem;
   color: var(--danger);
 }
@@ -79,7 +84,7 @@ h1 {
   border: 0;
   border-radius: 8px;
   background: var(--accent);
-  color: var(--paper);
+  color: var(--on-accent);
   font: inherit;
   font-weight: 600;
   cursor: pointer;

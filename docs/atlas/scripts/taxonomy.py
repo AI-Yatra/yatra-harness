@@ -121,10 +121,10 @@ PRIMITIVES: list[dict[str, Any]] = [
         "repl": ["repl.model"],
     },
     {
-        "key": "execution.retrieval",
-        "name": "Retrieval and search",
+        "key": "execution.search",
+        "name": "Search",
         "asks": "finding the relevant part of a repository too big to read",
-        "batch": ["execution.retrieval", "execution.search"],
+        "batch": ["execution.search"],
         "repl": ["repl.tools"],
     },
 ]
