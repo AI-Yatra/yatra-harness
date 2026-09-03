@@ -413,7 +413,7 @@ its README. No flags: `ay` works in the directory you start it in.
 | | what it teaches | run |
 |---|---|---|
 | [demo/tictactoe](demo/tictactoe) | a logic flaw and a missing feature, judged by tests | `cd demo/tictactoe && ay` |
-| [demo/loginpage](demo/loginpage) | a UI you can look at: enumeration, labels, an invisible error | `cd demo/loginpage && ay` |
+| [demo/loginpage](demo/loginpage) | a UI you can look at: one fault you can see, three you cannot | `cd demo/loginpage && ay` |
 | [demo/inventory](demo/inventory) | the harness itself: plan mode, approvals, `/undo`, cost | `cd demo/inventory && ay` |
 
 Put any of them back with `git checkout -- demo/`.

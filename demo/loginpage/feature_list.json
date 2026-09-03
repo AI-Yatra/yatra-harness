@@ -1,5 +1,17 @@
 [
   {
+    "id": "fields-fit-the-card",
+    "description": "Make the input fields fit inside the card. .control is width: 100% with padding and a border, and nothing sets box-sizing: border-box, so the browser adds the padding on top of the full width and every field overflows the card by about 26 pixels either side. This is the one fault on the page that is visible without reading the tests.",
+    "acceptance": [
+      "python -m unittest tests.test_style"
+    ],
+    "passes": false,
+    "category": "ui",
+    "protect": [
+      "tests/**"
+    ]
+  },
+  {
     "id": "identical-failure-message",
     "description": "Every failed sign-in returns the same message, whatever was wrong with it. auth.authenticate currently says 'We do not have an account with that username' for an unknown username and 'That password is not correct' for a bad password, which tells an anonymous visitor which usernames exist. Use auth.FAILURE for every failure. A failure must still carry a message; identical is not the same as absent.",
     "acceptance": [

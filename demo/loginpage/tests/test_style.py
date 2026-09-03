@@ -126,6 +126,25 @@ class StylesheetTests(unittest.TestCase):
         ratio = contrast(self.colour_of(".hint"), self.card_background())
         self.assertGreaterEqual(ratio, MINIMUM_CONTRAST, f"the hint is {ratio:.2f}:1")
 
+    def test_the_fields_fit_inside_the_card(self) -> None:
+        """The one thing wrong with this page that you can see at a glance.
+
+        `.control` is `width: 100%` with padding and a border. Without
+        `box-sizing: border-box` the browser adds those on top of the 100%, so
+        every input is wider than the card holding it and punches out past
+        both edges. It is the most common layout bug there is, and unlike the
+        other three faults here it needs no test to notice.
+        """
+        rule = re.search(r"\*\s*\{([^}]*)\}", self.css)
+        universal = rule.group(1) if rule else ""
+        control = self.css[self.css.index(".control"):] if ".control" in self.css else ""
+        applied = "border-box" in universal or "border-box" in control[:400]
+        self.assertTrue(
+            applied,
+            "nothing sets box-sizing: border-box, so a width:100% field with "
+            "padding is wider than the card that holds it",
+        )
+
     def test_a_focused_control_is_visibly_focused(self) -> None:
         """Keyboard users have nothing else to tell them where they are."""
         body = rule(self.css, ".control:focus")
