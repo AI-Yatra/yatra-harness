@@ -13,6 +13,7 @@ the layout is identical either way.
 from __future__ import annotations
 
 from .render import Console, _encodable
+from .theme import GUTTER
 
 #: Five rows per glyph, drawn on a three-wide stroke. `#` marks ink and a space
 #: marks paper, so the fill character can be swapped without touching the
@@ -93,7 +94,7 @@ def width(word: str = WORDMARK) -> int:
     return max((len(row) for row in rows), default=0)
 
 
-def draw(console: Console, word: str = WORDMARK, *, indent: str = "   ") -> list[str]:
+def draw(console: Console, word: str = WORDMARK, *, indent: str = " " * GUTTER) -> list[str]:
     """The painted rows, or an empty list when there is no room for them.
 
     Returning the lines rather than printing them keeps this testable without
