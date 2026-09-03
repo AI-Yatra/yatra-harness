@@ -72,6 +72,22 @@ Ask anything, or give an instruction. The agent works in this directory.
 """
 
 
+def usable_routes(config: HarnessConfig, *, exclude: str = "") -> list[str]:
+    """Configured routes whose credential is actually present.
+
+    Keyless routes are left out. `local` needs no credential but does need a
+    server running, and naming it as ready would be a promise this cannot
+    check.
+    """
+    return [
+        name
+        for name, route in config.router.routes.items()
+        if name != exclude
+        and route.api_key_env
+        and auth.resolve_route(route.api_key_env, route.base_url).available
+    ]
+
+
 class UnknownRoute(HarnessError):
     """`--model route:model` named a route the config does not define."""
 
@@ -1084,6 +1100,17 @@ class Shell:
         self.render.notice("store one:  ay auth add <key>")
         self.render.notice(f"or export:  {variable}=...   (environment or .env)")
         self.render.notice("check:      ay auth status")
+        # The half that was missing. An operator stored a GMI key on a fresh
+        # machine and was still told about DASHSCOPE_API_KEY, because the
+        # primary route is the only one this ever looked at. Three routes were
+        # ready to run and nothing said so. Keyless routes are left out: `local`
+        # needs no credential but does need a server, and offering it here
+        # would be a promise this cannot check.
+        ready = usable_routes(self.config, exclude=self.route.name)
+        if ready:
+            self.render.notice(f"ready now:  ay --model {ready[0]}")
+            if len(ready) > 1:
+                self.render.notice(f"  or:       {', '.join(ready[1:])}")
         return False
 
     def _banner(self) -> None:
