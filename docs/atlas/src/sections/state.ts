@@ -27,7 +27,7 @@ export function buildState(store: Store, x: number, y: number): Section {
 
   const { root, body } = section(
     'state',
-    'How a run ends',
+    'Run States',
     'Nine statuses, five of them terminal. Only the verifier may produce COMPLETED.',
     x,
     y,

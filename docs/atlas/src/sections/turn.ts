@@ -28,7 +28,7 @@ export function buildTurn(store: Store, x: number, y: number): Section {
 
   const { root, body } = section(
     'turn',
-    'One turn, end to end',
+    'One Turn',
     'Who does what, in order, and what each step writes down.',
     x,
     y,

@@ -50,7 +50,7 @@ export function buildGraph(store: Store, x: number, y: number): Section {
 
   const { root, body } = section(
     'graph',
-    'What imports what',
+    'Import Graph',
     `All ${a.totals.edges} import edges inside the package, drawn where they actually run.`,
     x,
     y,

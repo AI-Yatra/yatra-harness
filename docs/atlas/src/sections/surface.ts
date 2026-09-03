@@ -21,7 +21,7 @@ export function buildSurface(store: Store, x: number, y: number): Section {
   const a = store.atlas;
   const { root, body } = section(
     'tools',
-    'What the model may ask for',
+    'Tool Surface',
     'Grouped by the risk class the policy gate reads. Arguments are the schema, not a description of it.',
     x,
     y,
