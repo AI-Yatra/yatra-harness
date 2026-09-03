@@ -226,48 +226,6 @@ tell a recorded observation from a paraphrase of several.
 
 `CONTEXT_COMPACTED` records which strategy ran.
 
-## Retrieval
-
-Backs the `retrieve` tool: ranked excerpts of the workspace for a question,
-rather than the literal-string match `search_repo` does.
-
-| Key | Default | Meaning |
-|---|---|---|
-| `kind` | `lexical` | `lexical` (BM25) or `embedding` |
-| `endpoint` | — | required for embedding; an OpenAI-compatible `/embeddings` URL |
-| `api_key_env` | `""` | variable holding that provider's key |
-| `model` | `text-embedding-3-small` | embedding model |
-| `lines_per_chunk` | 40 | chunk size |
-| `max_file_bytes` | 200000 | files larger than this are skipped |
-| `max_chunks` | 4000 | index cap |
-| `limit` | 5 | results per query |
-
-```yaml
-retrieval:
-  kind: embedding
-  endpoint: https://api.openai.com/v1/embeddings
-  api_key_env: OPENAI_API_KEY
-```
-
-`search_repo` is exact and useless when you do not already know the
-identifier: "where is the retry backoff decided" finds nothing, because
-nobody wrote that sentence in the code. `retrieve` answers that question.
-
-Lexical is the default because it works with no key and no network, so
-retrieval is exercised in CI rather than only where someone has a provider.
-The embedding backend **falls back to lexical** when the provider is
-unreachable: retrieval going quiet is worse than retrieval being approximate,
-because the model does not learn that its question failed — it just gets
-nothing and reads the wrong files.
-
-Tokens are identifier-aware: `retry_backoff` and `retryBackoff` are both
-reachable from "retry backoff", so the operator does not have to guess the
-file's naming convention.
-
-The index is cached per workspace and invalidated by a cheap signature (file
-count and newest mtime). An agent patches files as it works, so an index
-built on turn two is wrong by turn four.
-
 ## Sandbox
 
 Where `run_command`, `python_run` and the verifier's acceptance commands

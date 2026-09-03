@@ -9,6 +9,7 @@ persistence and token accounting are written once.
 from __future__ import annotations
 
 import json
+import re
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -166,12 +167,13 @@ class Conversation:
         before = self.token_estimate()
         tail = self.messages[-keep_recent:] if keep_recent > 0 else []
         tail = _trim_to_safe_start(tail)
+        dropped = self.messages[: len(self.messages) - len(tail)]
         self.messages = [
             {
                 "role": "user",
                 "content": (
                     "Summary of the earlier part of this conversation, which has been "
-                    f"compacted to save context:\n\n{summary}"
+                    f"compacted to save context:\n\n{summary}{_anchors(dropped, summary)}"
                 ),
             },
             *tail,
@@ -232,6 +234,48 @@ class Conversation:
             conversation.messages = _trim_to_safe_start(conversation.messages)
         conversation.compactions = int(raw.get("compactions") or 0)
         return conversation
+
+
+#: A path, narrowly. A false positive costs a few wasted tokens; a miss costs
+#: the model the only coordinate it had for a file it worked on.
+_PATH = re.compile(r"[\w./\\-]+\.[A-Za-z][A-Za-z0-9]{0,4}\b")
+
+#: Past this the list of names is itself the context problem that compaction
+#: exists to solve.
+MAX_ANCHORS = 12
+
+
+def _anchors(dropped: list[dict[str, Any]], summary: str) -> str:
+    """File paths that were in the compacted region and are missing from the summary.
+
+    A summarizer optimises for narrative and loses coordinates: it writes
+    "fixed the retry logic" and drops `harness/models/model_router.py`. The
+    model can re-read a file if it still knows the name and can do nothing at
+    all if it does not, so the names are appended verbatim rather than trusted
+    to prose.
+
+    This is the affordable half of trajectory-grounded compaction validation.
+    Checking that a summary is *faithful* needs another model call; this only
+    guarantees that the identifiers it may have dropped are still reachable,
+    which is the part that decides whether the next turn can act.
+    """
+    seen: list[str] = []
+    for message in dropped:
+        content = message.get("content")
+        if not isinstance(content, str):
+            continue
+        for match in _PATH.finditer(content):
+            path = match.group(0)
+            if path not in seen and path not in summary:
+                seen.append(path)
+    if not seen:
+        return ""
+    kept = seen[:MAX_ANCHORS]
+    more = f" (+{len(seen) - len(kept)} more)" if len(seen) > len(kept) else ""
+    return (
+        "\n\nFiles named in the compacted part, kept because a summary loses "
+        f"coordinates: {', '.join(kept)}{more}"
+    )
 
 
 def _trim_to_safe_start(messages: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:

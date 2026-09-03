@@ -358,7 +358,14 @@ context:
   max_instruction_chars: 6000
 
 # The project's own checker, run over a file straight after the agent writes
-# it. Off by default: a checker nobody asked for is a surprise.
+# it. On by default, at the lowest useful setting: `python -m py_compile`,
+# which is standard library, needs no configuration and catches the mistake an
+# agent actually makes -- an edit that leaves the file unparseable -- at the
+# moment it is made rather than at the next test run.
+#
+# Every sensor shipping switched off is what harness engineering calls a
+# feed-forward-only harness: it encodes rules and never finds out whether they
+# worked. Raise this to your project's real checker; `command: []` turns it off.
 #
 # This is not a hook. A hook observes and its output never reaches the model,
 # because a formatter that is not installed is your problem and a model told

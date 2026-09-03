@@ -76,13 +76,28 @@ wrote down outranks what the agent worked out for itself.
 ## Diagnostics
 
 The project's own checker, run over a file straight after the agent writes it.
-Off unless configured.
+
+**On by default, at the lowest useful setting.** The default is
+`python -m py_compile` over `.py` files: standard library, no configuration, no
+network, milliseconds. It says nothing about types or style, and it catches the
+mistake an agent actually makes -- an edit that leaves the file unparseable --
+at the moment it is made rather than at the next test run.
+
+That default exists because of the taxonomy. Harness engineering divides
+controls into guides, which steer before the agent acts, and sensors, which
+observe after so it can self-correct, and warns that a feed-forward-only
+harness "encodes rules but never finds out whether they worked". Shipping every
+sensor switched off is exactly that shape.
+
+Raise it to whatever your project already runs:
 
 ```yaml
 diagnostics:
   command: [ruff, check, --output-format, concise, "{file}"]
   suffixes: [.py]
 ```
+
+`command: []` turns it off.
 
 `{file}` is the changed path, appended if the token is absent. `suffixes`
 keeps a Python type checker away from a Markdown edit.

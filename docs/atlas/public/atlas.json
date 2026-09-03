@@ -465,8 +465,8 @@
  "generated_by": "docs/atlas/scripts/scan_harness.py",
  "head": {
   "date": "2026-09-03",
-  "sha": "673c2be",
-  "subject": "Refresh the atlas after the settings review"
+  "sha": "56e3581",
+  "subject": "Remove retrieval: 750 lines and 148 packages for a tool nothing called"
  },
  "lanes": [
   {
@@ -1262,8 +1262,8 @@
    "path": "harness/core/errors.py",
    "side": "harness",
    "sloc": 47,
-   "test_cases": 646,
-   "test_sloc": 5604,
+   "test_cases": 649,
+   "test_sloc": 5640,
    "tests": [
     "test_backlog.py",
     "test_compaction.py",
@@ -2440,7 +2440,7 @@
    ],
    "api_count": 6,
    "classes": 2,
-   "commits": 13,
+   "commits": 14,
    "doc": "Typed tool registry and policy-governed native/MCP tool implementations.",
    "doc_full": "Typed tool registry and policy-governed native/MCP tool implementations.",
    "external": [
@@ -2830,8 +2830,8 @@
    "path": "harness/execution/workspace.py",
    "side": "harness",
    "sloc": 278,
-   "test_cases": 470,
-   "test_sloc": 4512,
+   "test_cases": 473,
+   "test_sloc": 4540,
    "tests": [
     "test_checkpoints.py",
     "test_context_budget.py",
@@ -3008,6 +3008,94 @@
   {
    "api": [
     {
+     "doc": "The project's checker, and when to run it.",
+     "kind": "class",
+     "line": 72,
+     "methods": [
+      "enabled",
+      "applies_to"
+     ],
+     "name": "DiagnosticsConfig"
+    },
+    {
+     "doc": "What the checker said. Empty output means it was happy.",
+     "kind": "class",
+     "line": 93,
+     "methods": [
+      "clean"
+     ],
+     "name": "Report"
+    },
+    {
+     "doc": "The command for one file, with `{file}` filled in.",
+     "kind": "function",
+     "line": 108,
+     "methods": [],
+     "name": "build_command"
+    },
+    {
+     "doc": "Run the checker over one changed file. Never raises.",
+     "kind": "function",
+     "line": 115,
+     "methods": [],
+     "name": "check"
+    },
+    {
+     "doc": "Put the report after the edit's own result, clearly separated.",
+     "kind": "function",
+     "line": 144,
+     "methods": [],
+     "name": "attach"
+    },
+    {
+     "doc": "",
+     "kind": "function",
+     "line": 163,
+     "methods": [],
+     "name": "diagnostics_config_from_dict"
+    }
+   ],
+   "api_count": 6,
+   "classes": 2,
+   "commits": 1,
+   "doc": "What the project's own checker says about a file the agent just changed.",
+   "doc_full": "What the project's own checker says about a file the agent just changed.\n\nWithout this the agent is editing blind. It writes a change, the change is\napplied, and nothing tells it that the file no longer imports, no longer type\nchecks, or breaks a lint rule the repository enforces. It finds out later, if\nit happens to run the right command, or it never finds out and hands back\nsomething that does not compile.\n\n**This is not a hook, and the difference is the whole point.** A hook observes\nand its output deliberately never reaches the model, because a formatter that\nis not installed is the operator's problem and a model told about it tries to\nfix it. Diagnostics are the opposite: the report is *about the model's own\nedit*, it is exactly what the model needs, and it is useless to anyone else.\nOne mechanism could not have both rules.\n\nA CLI checker rather than a language server, deliberately. A language server\nmeans a client, a lifecycle, a protocol and a per-language install, and the\nprojects that most want this already have `ruff`, `tsc` or `mypy` configured\nand know how to run them. The tradeoff is real -- no go-to-definition, no call\ngraph -- and it is documented rather than hidden.\n\nThe one rule everything here is shaped by: **a diagnostic is not a failed\nedit.** Another agent shipped this exact bug -- its model read the diagnostics\nattached to a successful edit and concluded the edit had not been applied, so\nit wrote the same change again. So the edit's own result comes first and\nstands on its own, the report is separated from it and labelled, and the\ntool's success flag never changes because a checker had something to say.",
+   "external": [
+    "__future__",
+    "dataclasses",
+    "pathlib",
+    "shlex",
+    "sys",
+    "typing"
+   ],
+   "fan_in": 1,
+   "fan_out": 2,
+   "functions": 4,
+   "imported_by": [
+    "config"
+   ],
+   "imports": [
+    "core.errors",
+    "execution.process"
+   ],
+   "in_boundary": false,
+   "last_touched": "2026-09-03",
+   "layer": "execution",
+   "lines": 193,
+   "name": "execution.diagnostics",
+   "path": "harness/execution/diagnostics.py",
+   "side": "harness",
+   "sloc": 130,
+   "test_cases": 84,
+   "test_sloc": 533,
+   "tests": [
+    "test_diagnostics.py",
+    "test_settings_and_memory.py"
+   ]
+  },
+  {
+   "api": [
+    {
      "doc": "One command, and when to run it.",
      "kind": "class",
      "line": 44,
@@ -3078,92 +3166,6 @@
    "test_sloc": 184,
    "tests": [
     "test_hooks.py"
-   ]
-  },
-  {
-   "api": [
-    {
-     "doc": "The project's checker, and when to run it.",
-     "kind": "class",
-     "line": 54,
-     "methods": [
-      "enabled",
-      "applies_to"
-     ],
-     "name": "DiagnosticsConfig"
-    },
-    {
-     "doc": "What the checker said. Empty output means it was happy.",
-     "kind": "class",
-     "line": 75,
-     "methods": [
-      "clean"
-     ],
-     "name": "Report"
-    },
-    {
-     "doc": "The command for one file, with `{file}` filled in.",
-     "kind": "function",
-     "line": 90,
-     "methods": [],
-     "name": "build_command"
-    },
-    {
-     "doc": "Run the checker over one changed file. Never raises.",
-     "kind": "function",
-     "line": 97,
-     "methods": [],
-     "name": "check"
-    },
-    {
-     "doc": "Put the report after the edit's own result, clearly separated.",
-     "kind": "function",
-     "line": 126,
-     "methods": [],
-     "name": "attach"
-    },
-    {
-     "doc": "",
-     "kind": "function",
-     "line": 145,
-     "methods": [],
-     "name": "diagnostics_config_from_dict"
-    }
-   ],
-   "api_count": 6,
-   "classes": 2,
-   "commits": 1,
-   "doc": "What the project's own checker says about a file the agent just changed.",
-   "doc_full": "What the project's own checker says about a file the agent just changed.\n\nWithout this the agent is editing blind. It writes a change, the change is\napplied, and nothing tells it that the file no longer imports, no longer type\nchecks, or breaks a lint rule the repository enforces. It finds out later, if\nit happens to run the right command, or it never finds out and hands back\nsomething that does not compile.\n\n**This is not a hook, and the difference is the whole point.** A hook observes\nand its output deliberately never reaches the model, because a formatter that\nis not installed is the operator's problem and a model told about it tries to\nfix it. Diagnostics are the opposite: the report is *about the model's own\nedit*, it is exactly what the model needs, and it is useless to anyone else.\nOne mechanism could not have both rules.\n\nA CLI checker rather than a language server, deliberately. A language server\nmeans a client, a lifecycle, a protocol and a per-language install, and the\nprojects that most want this already have `ruff`, `tsc` or `mypy` configured\nand know how to run them. The tradeoff is real -- no go-to-definition, no call\ngraph -- and it is documented rather than hidden.\n\nThe one rule everything here is shaped by: **a diagnostic is not a failed\nedit.** Another agent shipped this exact bug -- its model read the diagnostics\nattached to a successful edit and concluded the edit had not been applied, so\nit wrote the same change again. So the edit's own result comes first and\nstands on its own, the report is separated from it and labelled, and the\ntool's success flag never changes because a checker had something to say.",
-   "external": [
-    "__future__",
-    "dataclasses",
-    "pathlib",
-    "shlex",
-    "typing"
-   ],
-   "fan_in": 1,
-   "fan_out": 2,
-   "functions": 4,
-   "imported_by": [
-    "config"
-   ],
-   "imports": [
-    "core.errors",
-    "execution.process"
-   ],
-   "in_boundary": false,
-   "last_touched": "2026-09-03",
-   "layer": "execution",
-   "lines": 170,
-   "name": "execution.diagnostics",
-   "path": "harness/execution/diagnostics.py",
-   "side": "harness",
-   "sloc": 123,
-   "test_cases": 29,
-   "test_sloc": 181,
-   "tests": [
-    "test_diagnostics.py"
    ]
   },
   {
@@ -4462,7 +4464,7 @@
    ],
    "api_count": 9,
    "classes": 5,
-   "commits": 17,
+   "commits": 18,
    "doc": "Versioned, strict configuration/task/skill loading.",
    "doc_full": "Versioned, strict configuration/task/skill loading.",
    "external": [
@@ -4517,8 +4519,8 @@
    "path": "harness/config.py",
    "side": "harness",
    "sloc": 630,
-   "test_cases": 768,
-   "test_sloc": 6989,
+   "test_cases": 771,
+   "test_sloc": 7025,
    "tests": [
     "test_atlas_trace.py",
     "test_auth_gateways.py",
@@ -4737,7 +4739,7 @@
    ],
    "api_count": 3,
    "classes": 3,
-   "commits": 11,
+   "commits": 12,
    "doc": "The interactive shell around the agent loop.",
    "doc_full": "The interactive shell around the agent loop.\n\nOwns everything the loop deliberately does not: reading a line, expanding\n`@path` and `!command`, slash commands, the banner, and turning Ctrl-C into\nan interrupted turn rather than a dead process.",
    "external": [
@@ -4829,7 +4831,7 @@
    ],
    "api_count": 3,
    "classes": 2,
-   "commits": 6,
+   "commits": 7,
    "doc": "The tools a conversational session gives the model.",
    "doc_full": "The tools a conversational session gives the model.\n\nShaped for editing rather than for batch patching. The batch path's\n`apply_patch` takes a whole unified diff, which asks a model to get line\nnumbers and context right in one shot; the failure mode is a rejected hunk\nand a wasted turn. `edit_file` instead takes the exact text to replace and\nrefuses when that text is absent or ambiguous, so a mistake comes back as a\nspecific, fixable message rather than a corrupted file.\n\nEvery path goes through `Workspace.resolve`, so containment is the same code\nthe batch path uses. The difference is only where the workspace root points:\nhere it is the directory the operator launched in.",
    "external": [
@@ -4870,8 +4872,8 @@
    "path": "harness/repl/tools.py",
    "side": "harness",
    "sloc": 654,
-   "test_cases": 333,
-   "test_sloc": 3092,
+   "test_cases": 336,
+   "test_sloc": 3120,
    "tests": [
     "test_checkpoints.py",
     "test_diagnostics.py",
@@ -5183,6 +5185,101 @@
   {
    "api": [
     {
+     "doc": "One tool the model asked for, with its arguments already parsed.",
+     "kind": "class",
+     "line": 23,
+     "methods": [],
+     "name": "ToolCall"
+    },
+    {
+     "doc": "What one inference produced: some prose, and zero or more tool calls.",
+     "kind": "class",
+     "line": 37,
+     "methods": [
+      "wants_tools"
+     ],
+     "name": "AssistantTurn"
+    },
+    {
+     "doc": "A deliberately rough token count.",
+     "kind": "function",
+     "line": 61,
+     "methods": [],
+     "name": "estimate_tokens"
+    },
+    {
+     "doc": "",
+     "kind": "function",
+     "line": 72,
+     "methods": [],
+     "name": "message_tokens"
+    },
+    {
+     "doc": "One thread: a fixed system prompt and a growing list of turns.",
+     "kind": "class",
+     "line": 83,
+     "methods": [
+      "add_user",
+      "add_assistant",
+      "add_tool_result",
+      "add_system_note",
+      "token_estimate",
+      "wire_messages",
+      "needs_compaction",
+      "compact",
+      "transcript",
+      "save",
+      "load"
+     ],
+     "name": "Conversation"
+    }
+   ],
+   "api_count": 5,
+   "classes": 3,
+   "commits": 2,
+   "doc": "The message history a session accumulates, and what to do when it fills.",
+   "doc_full": "The message history a session accumulates, and what to do when it fills.\n\nMessages are held in the OpenAI chat shape because it is the one every route\nin this repository speaks natively except Anthropic, which `model.py`\nconverts on the way out. Holding one canonical shape means compaction,\npersistence and token accounting are written once.",
+   "external": [
+    "__future__",
+    "collections",
+    "dataclasses",
+    "json",
+    "pathlib",
+    "re",
+    "time",
+    "typing"
+   ],
+   "fan_in": 3,
+   "fan_out": 0,
+   "functions": 2,
+   "imported_by": [
+    "repl.agent",
+    "repl.model",
+    "repl.shell"
+   ],
+   "imports": [],
+   "in_boundary": false,
+   "last_touched": "2026-09-03",
+   "layer": "repl",
+   "lines": 291,
+   "name": "repl.conversation",
+   "path": "harness/repl/conversation.py",
+   "side": "harness",
+   "sloc": 221,
+   "test_cases": 160,
+   "test_sloc": 1743,
+   "tests": [
+    "test_hooks.py",
+    "test_interrupt.py",
+    "test_repl_agent.py",
+    "test_repl_end_to_end.py",
+    "test_repl_gemini.py",
+    "test_repl_shell.py"
+   ]
+  },
+  {
+   "api": [
+    {
      "doc": "One recorded state of the working tree.",
      "kind": "class",
      "line": 59,
@@ -5237,100 +5334,6 @@
    "test_sloc": 188,
    "tests": [
     "test_checkpoints.py"
-   ]
-  },
-  {
-   "api": [
-    {
-     "doc": "One tool the model asked for, with its arguments already parsed.",
-     "kind": "class",
-     "line": 22,
-     "methods": [],
-     "name": "ToolCall"
-    },
-    {
-     "doc": "What one inference produced: some prose, and zero or more tool calls.",
-     "kind": "class",
-     "line": 36,
-     "methods": [
-      "wants_tools"
-     ],
-     "name": "AssistantTurn"
-    },
-    {
-     "doc": "A deliberately rough token count.",
-     "kind": "function",
-     "line": 60,
-     "methods": [],
-     "name": "estimate_tokens"
-    },
-    {
-     "doc": "",
-     "kind": "function",
-     "line": 71,
-     "methods": [],
-     "name": "message_tokens"
-    },
-    {
-     "doc": "One thread: a fixed system prompt and a growing list of turns.",
-     "kind": "class",
-     "line": 82,
-     "methods": [
-      "add_user",
-      "add_assistant",
-      "add_tool_result",
-      "add_system_note",
-      "token_estimate",
-      "wire_messages",
-      "needs_compaction",
-      "compact",
-      "transcript",
-      "save",
-      "load"
-     ],
-     "name": "Conversation"
-    }
-   ],
-   "api_count": 5,
-   "classes": 3,
-   "commits": 2,
-   "doc": "The message history a session accumulates, and what to do when it fills.",
-   "doc_full": "The message history a session accumulates, and what to do when it fills.\n\nMessages are held in the OpenAI chat shape because it is the one every route\nin this repository speaks natively except Anthropic, which `model.py`\nconverts on the way out. Holding one canonical shape means compaction,\npersistence and token accounting are written once.",
-   "external": [
-    "__future__",
-    "collections",
-    "dataclasses",
-    "json",
-    "pathlib",
-    "time",
-    "typing"
-   ],
-   "fan_in": 3,
-   "fan_out": 0,
-   "functions": 2,
-   "imported_by": [
-    "repl.agent",
-    "repl.model",
-    "repl.shell"
-   ],
-   "imports": [],
-   "in_boundary": false,
-   "last_touched": "2026-09-03",
-   "layer": "repl",
-   "lines": 247,
-   "name": "repl.conversation",
-   "path": "harness/repl/conversation.py",
-   "side": "harness",
-   "sloc": 188,
-   "test_cases": 160,
-   "test_sloc": 1743,
-   "tests": [
-    "test_hooks.py",
-    "test_interrupt.py",
-    "test_repl_agent.py",
-    "test_repl_end_to_end.py",
-    "test_repl_gemini.py",
-    "test_repl_shell.py"
    ]
   },
   {
@@ -5415,7 +5418,7 @@
    "side": "harness",
    "sloc": 184,
    "test_cases": 318,
-   "test_sloc": 2732,
+   "test_sloc": 2740,
    "tests": [
     "test_hooks.py",
     "test_interrupt.py",
@@ -5442,7 +5445,7 @@
    ],
    "api_count": 1,
    "classes": 0,
-   "commits": 5,
+   "commits": 6,
    "doc": "The system prompt, assembled once per session.",
    "doc_full": "The system prompt, assembled once per session.\n\nKept stable and at the front of every request. Providers cache on prompt\nprefixes, so the difference between building this once and rebuilding it per\nturn is a cache hit on the entire conversation history.",
    "external": [
@@ -5473,7 +5476,7 @@
    "side": "harness",
    "sloc": 129,
    "test_cases": 52,
-   "test_sloc": 316,
+   "test_sloc": 324,
    "tests": [
     "test_settings_and_memory.py"
    ]
@@ -5659,10 +5662,10 @@
      "repl.conversation",
      "repl.prompt"
     ],
-    "sloc": 317,
+    "sloc": 350,
     "tests": 212
    },
-   "sloc": 706
+   "sloc": 739
   },
   {
    "asks": "typed capabilities, validated arguments, legible failures",
@@ -5685,7 +5688,7 @@
      "repl.tools"
     ],
     "sloc": 654,
-    "tests": 333
+    "tests": 336
    },
    "sloc": 1674
   },
@@ -5699,7 +5702,7 @@
      "config"
     ],
     "sloc": 810,
-    "tests": 768
+    "tests": 771
    },
    "key": "skills",
    "name": "Skills and MCP",
@@ -5757,10 +5760,10 @@
     "modules": [
      "repl.conversation"
     ],
-    "sloc": 188,
+    "sloc": 221,
     "tests": 160
    },
-   "sloc": 432
+   "sloc": 465
   },
   {
    "asks": "breaking work up, and pursuing it across attempts",
@@ -5797,7 +5800,7 @@
      "execution.workspace"
     ],
     "sloc": 664,
-    "tests": 569
+    "tests": 572
    },
    "key": "execution.sandbox",
    "name": "Sandbox and execution",
@@ -5808,7 +5811,7 @@
      "repl.tools"
     ],
     "sloc": 654,
-    "tests": 333
+    "tests": 336
    },
    "sloc": 1318
   },
@@ -5948,7 +5951,7 @@
      "core.errors"
     ],
     "sloc": 290,
-    "tests": 646
+    "tests": 649
    },
    "key": "reliability",
    "name": "Reliability",
@@ -5983,7 +5986,7 @@
      "repl.tools"
     ],
     "sloc": 654,
-    "tests": 333
+    "tests": 336
    },
    "sloc": 854
   }
@@ -6330,7 +6333,7 @@
    "sloc": 66
   },
   "test_diagnostics.py": {
-   "cases": 29,
+   "cases": 32,
    "covers": [
     "config",
     "core.errors",
@@ -6338,8 +6341,8 @@
     "execution.workspace",
     "repl.tools"
    ],
-   "lines": 238,
-   "sloc": 181
+   "lines": 271,
+   "sloc": 209
   },
   "test_evals.py": {
    "cases": 16,
@@ -6712,12 +6715,13 @@
    "covers": [
     "config",
     "core.errors",
+    "execution.diagnostics",
     "record",
     "repl.approvals",
     "repl.prompt"
    ],
-   "lines": 414,
-   "sloc": 316
+   "lines": 424,
+   "sloc": 324
   },
   "test_shared_tooling.py": {
    "cases": 20,
@@ -6958,14 +6962,14 @@
  "totals": {
   "api": 295,
   "commands": 20,
-  "commits": 17,
+  "commits": 18,
   "edges": 203,
-  "lines": 16799,
+  "lines": 16866,
   "modules": 57,
-  "sloc": 13723,
-  "test_cases": 1213,
+  "sloc": 13763,
+  "test_cases": 1216,
   "test_files": 53,
-  "test_sloc": 10381,
+  "test_sloc": 10417,
   "tools": 14
  },
  "transitions": [

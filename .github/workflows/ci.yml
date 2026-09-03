@@ -20,13 +20,21 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: uv sync
       - name: Lint
-        run: uv run ruff check harness tests ay.py docs/atlas/scripts
+        run: uv run ruff check harness tests scripts ay.py docs/atlas/scripts
       # The layering is a claim; this is what makes it a fact. Without it the
       # package structure survives only until the first hurried import.
       - name: Architecture
         run: uv run lint-imports
       - name: Unit and end-to-end tests
         run: uv run python -m unittest discover -s tests -v
+      # The unit suite proves the parts in isolation. This proves they are
+      # wired together, by doing the thing rather than asserting it: a real
+      # deny rule refusing a real call, a checkpoint restoring a real file, an
+      # injected instruction failing to move the gate. It also runs the checks
+      # that skip on Windows, so the kernel sandbox is exercised somewhere.
+      - name: Component evidence
+        run: uv run python scripts/evidence.py
+
       - name: Doctor
         run: uv run harness doctor --config configs/teaching.yaml --task tasks/repair_counter.yaml --skill skills/bugfix.yaml
       - name: Deterministic teaching run

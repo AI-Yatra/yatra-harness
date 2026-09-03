@@ -407,22 +407,15 @@ and the sequence check names the gap.
 
 ## Finding things in a large repository
 
-`search_repo` matches a literal string. `retrieve` ranks excerpts against a
-question:
+`grep` and `glob`, and deliberately nothing more.
 
-```
-retrieve  "how are credentials redacted from the ledger"
-
---- README.md:161-200 (score 12.89)
---- docs/SECURITY.md:41-80 (score 11.40)
---- harness/record/redaction.py:1-40 (score 10.37)
-```
-
-BM25 by default — no key, no network, deterministic, and therefore actually
-covered by CI. Point `retrieval.kind: embedding` at any OpenAI-compatible
-`/embeddings` endpoint for vector search; it falls back to lexical when the
-provider is unreachable, because retrieval going quiet is worse than
-retrieval being approximate.
+A ranked semantic `retrieve` tool lived here and was removed. It was measured
+against six live sessions and chosen zero times: the model reached for `grep`
+every time, and on the questions asked grep was right. The literature agrees --
+lexical search measures uniformly stronger than dense retrieval under inline
+delivery across four harnesses and five models -- and the tool cost a 148-package
+dependency in a harness whose promise is that a laptop with nothing installed
+still runs it. The reasoning and the numbers are in the commit that removed it.
 
 ## Running tools in a container
 
@@ -482,7 +475,7 @@ uv run ruff check harness tests ay.py
 ```
 
 540 tests cover the runtime, the tool registry, provider adapters, routing,
-repository workspaces, delivery, sessions, sub-agents, retrieval, streaming,
+repository workspaces, delivery, sessions, sub-agents, streaming,
 the sandbox and the REPL. Tests that need docker skip themselves where it is
 absent. CI runs them on three Python versions along with `harness doctor` and
 a full deterministic run.
@@ -590,7 +583,7 @@ yatra-harness/
 ├── harness/            runtime: contracts, context, routing, tools, policy,
 │                       workspace, verifier, events, checkpoints, replay,
 │                       sandbox, sessions, sub-agents, delivery, goal, loop,
-│                       retrieval, search, tracing, evals, rubric
+│                       search, tracing, evals, rubric
 ├── ay.py               the ay REPL entry point
 ├── harness/repl/       the conversational agent behind it
 ├── configs/            teaching, local, remote, llm_light

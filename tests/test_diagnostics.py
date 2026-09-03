@@ -36,9 +36,26 @@ HAPPY = (sys.executable, "-c", "print('All checks passed!')")
 
 
 class ConfigTests(unittest.TestCase):
-    def test_diagnostics_are_off_unless_configured(self) -> None:
-        """A checker nobody asked for is a surprise, not a feature."""
-        self.assertFalse(DiagnosticsConfig().enabled)
+    def test_a_sensor_is_on_by_default(self) -> None:
+        """A harness with every sensor switched off is feed-forward only.
+
+        It encodes rules and never finds out whether they worked. The default
+        is the floor rather than a preference: `py_compile` is standard
+        library, needs no configuration, and catches an edit that left the
+        file unparseable at the moment it was made.
+        """
+        config = DiagnosticsConfig()
+        self.assertTrue(config.enabled)
+        self.assertIn("py_compile", " ".join(config.command))
+        self.assertEqual(config.suffixes, (".py",))
+
+    def test_the_default_needs_nothing_installed(self) -> None:
+        """Anything that could be absent is not a default."""
+        self.assertIn(sys.executable, DiagnosticsConfig().command)
+
+    def test_an_empty_command_turns_it_off(self) -> None:
+        """The operator has to be able to say no."""
+        self.assertFalse(diagnostics_config_from_dict({"command": []}).enabled)
 
     def test_a_command_written_as_a_string_is_accepted(self) -> None:
         """It is what an operator writes first."""
@@ -66,7 +83,7 @@ class ConfigTests(unittest.TestCase):
         self.assertFalse(config.applies_to("README.md"))
 
     def test_no_suffixes_means_every_file(self) -> None:
-        config = diagnostics_config_from_dict({"command": "x"})
+        config = diagnostics_config_from_dict({"command": "x", "suffixes": []})
         self.assertTrue(config.applies_to("README.md"))
 
 
@@ -221,17 +238,33 @@ class ToolsetTests(unittest.TestCase):
         self.assertNotIn("no-such-xyz", outcome.content)
         self.assertTrue(toolset.notices)
 
-    def test_diagnostics_off_by_default_changes_nothing(self) -> None:
+    def test_the_default_checker_says_nothing_about_a_valid_file(self) -> None:
         from harness.config import load_config
         from harness.execution.workspace import Workspace
         from harness.repl.tools import ReplToolset
 
         base = load_config(Path(__file__).resolve().parents[1] / "configs" / "ay.yaml")
+        (self.root / "valid.py").write_text("value = 1\n", encoding="utf-8")
         toolset = ReplToolset(Workspace(self.root, ()), base)
         outcome = toolset.edit_file(
-            {"path": "a.py", "old_string": "first line", "new_string": "changed"}
+            {"path": "valid.py", "old_string": "value = 1", "new_string": "value = 2"}
         )
         self.assertNotIn("---", outcome.content)
+
+    def test_the_default_checker_catches_an_unparseable_edit(self) -> None:
+        """The mistake an agent actually makes, caught where it is made."""
+        from harness.config import load_config
+        from harness.execution.workspace import Workspace
+        from harness.repl.tools import ReplToolset
+
+        base = load_config(Path(__file__).resolve().parents[1] / "configs" / "ay.yaml")
+        (self.root / "broken.py").write_text("value = 1\n", encoding="utf-8")
+        toolset = ReplToolset(Workspace(self.root, ()), base)
+        outcome = toolset.edit_file(
+            {"path": "broken.py", "old_string": "value = 1", "new_string": "value = = 1"}
+        )
+        self.assertTrue(outcome.ok, "a diagnostic turned a real edit into a failure")
+        self.assertIn("was applied", outcome.content)
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -196,8 +196,18 @@ model_router:
         self.assertEqual(self.committed().hooks, ())
 
     def test_a_cloned_repository_cannot_set_a_diagnostics_command(self) -> None:
-        """It runs after every edit, which is the same thing as a hook."""
-        self.assertEqual(self.committed().diagnostics.command, ())
+        """It runs after every edit, which is the same thing as a hook.
+
+        Asserted against the shipped default rather than against emptiness.
+        Diagnostics are on by default now, so "the command is empty" would
+        pass for the wrong reason the moment the default changed again; what
+        has to hold is that the clone's command is not the one running.
+        """
+        from harness.execution.diagnostics import DEFAULT_COMMAND
+
+        command = self.committed().diagnostics.command
+        self.assertNotIn("evil.example", " ".join(command))
+        self.assertEqual(command, DEFAULT_COMMAND)
 
     def test_a_cloned_repository_cannot_open_the_network(self) -> None:
         self.assertFalse(self.committed().policy.network_enabled)

@@ -30,6 +30,7 @@ tool's success flag never changes because a checker had something to say.
 from __future__ import annotations
 
 import shlex
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -49,17 +50,34 @@ DEFAULT_MAX_LINES = 20
 #: run as written, which is what a whole-project checker wants.
 FILE_TOKEN = "{file}"  # noqa: S105 - a substitution marker, not a secret
 
+#: The default sensor, and the reason there is one at all.
+#:
+#: Harness engineering divides controls into guides, which steer before the
+#: agent acts, and sensors, which observe after so it can self-correct. An
+#: agent with only guides "encodes rules but never finds out whether they
+#: worked". Shipping every sensor switched off leaves exactly that shape, so
+#: the floor is on by default and the operator raises it.
+#:
+#: `py_compile` is the floor because it is the only checker guaranteed to
+#: exist: standard library, no configuration, no network, milliseconds. It
+#: catches the mistake an agent actually makes -- a paste that leaves the file
+#: unparseable -- at the moment it is made rather than at the next test run.
+#: It says nothing about types or style; `configs/ay.yaml` shows how to point
+#: this at ruff, mypy or tsc when a project has them.
+DEFAULT_COMMAND = (sys.executable, "-m", "py_compile", FILE_TOKEN)
+DEFAULT_SUFFIXES = (".py",)
+
 
 @dataclass(frozen=True, slots=True)
 class DiagnosticsConfig:
     """The project's checker, and when to run it."""
 
-    command: tuple[str, ...] = ()
+    command: tuple[str, ...] = DEFAULT_COMMAND
     timeout: float = DEFAULT_TIMEOUT
     max_lines: int = DEFAULT_MAX_LINES
     #: Only files matching one of these are checked, so a Python type checker
     #: is not run over a Markdown edit.
-    suffixes: tuple[str, ...] = ()
+    suffixes: tuple[str, ...] = DEFAULT_SUFFIXES
 
     @property
     def enabled(self) -> bool:
@@ -149,7 +167,10 @@ def diagnostics_config_from_dict(
 
     value = schema.mapping(raw or {}, path)
     schema.reject_unknown(value, {"command", "timeout", "max_lines", "suffixes"}, path)
-    raw_command = value.get("command", [])
+    if "command" in value and not value["command"]:
+        # An explicitly empty command is how an operator turns the sensor off.
+        return DiagnosticsConfig(command=(), suffixes=())
+    raw_command = value.get("command", list(DEFAULT_COMMAND))
     if isinstance(raw_command, str):
         # A string is what an operator writes first. Accepting it costs a line
         # and saves a confusing failure on the most likely spelling.
@@ -165,6 +186,8 @@ def diagnostics_config_from_dict(
         ),
         suffixes=tuple(
             str(item).lower()
-            for item in schema.string_list(value.get("suffixes", []), f"{path}.suffixes")
+            for item in schema.string_list(
+                value.get("suffixes", list(DEFAULT_SUFFIXES)), f"{path}.suffixes"
+            )
         ),
     )
