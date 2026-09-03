@@ -38,7 +38,7 @@ from .approvals import Gate, Mode, Request, Verdict
 from .checkpoints import Checkpoints
 from .conversation import Conversation, ToolCall
 from .model import ChatModel, RouteChain
-from .render import Console, Renderer, Spinner
+from .render import PASTE_END, PASTE_OFF, PASTE_ON, PASTE_START, Console, Renderer, Spinner
 from .theme import GUTTER
 
 HISTORY_LIMIT = 500
@@ -371,6 +371,18 @@ class Shell:
         readline.set_history_length(HISTORY_LIMIT)
         self._history_file = history
 
+    def _paste_mode(self, *, on: bool) -> None:
+        """Ask the terminal to mark pasted text so a reader can tell.
+
+        Without it a paste is indistinguishable from someone typing quickly,
+        and a multi-line prompt arrives as one message per line. Terminals
+        that do not understand the sequence ignore it, and a pipe never sees
+        it, so both keep the old line-at-a-time behaviour.
+        """
+        if not self.console.stream.isatty():
+            return
+        self.console.write(PASTE_ON if on else PASTE_OFF)
+
     def _save_history(self) -> None:
         path = getattr(self, "_history_file", None)
         if path is None:
@@ -398,6 +410,19 @@ class Shell:
                     self.console.line(self.console.muted("  (ctrl-c again or /exit to leave)"))
                     return ""
                 return ""
+            if PASTE_START in line:
+                # A paste is one message however many lines it has. Read line
+                # by line, every line after the first became a separate turn,
+                # and the leftovers were answered into whatever prompt opened
+                # next -- including a permission question.
+                parts.append(line.split(PASTE_START, 1)[1])
+                while PASTE_END not in parts[-1]:
+                    try:
+                        parts.append(input())
+                    except (EOFError, KeyboardInterrupt):
+                        break
+                parts[-1] = parts[-1].split(PASTE_END, 1)[0]
+                return "\n".join(parts).strip()
             if line.endswith("\\"):
                 parts.append(line[:-1])
                 continue
@@ -1019,6 +1044,7 @@ class Shell:
         if not self._credential_ready():
             return 2
         self._setup_readline()
+        self._paste_mode(on=True)
         self._banner()
 
         if self.options.initial_message:
@@ -1048,6 +1074,9 @@ class Shell:
             self._run_turn(self._expand(line))
 
         self._save_history()
+        # Left on, the terminal keeps wrapping pastes in markers the operator's
+        # next program will print as literal escape codes.
+        self._paste_mode(on=False)
         self.console.line(self.console.muted("\n  bye"))
         return 0
 

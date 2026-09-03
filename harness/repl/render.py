@@ -37,6 +37,50 @@ from dataclasses import dataclass
 from .approvals import Request, Verdict
 from .theme import GUTTER, INDENT, RESET, RIGHT_MARGIN, THEME, Theme
 
+#: Terminals wrap pasted text in these when bracketed paste is on, which is
+#: how a reader tells one paste from someone typing fast. Without it a pasted
+#: prompt arrives as one message per line, and every line after the first is
+#: answered into whatever prompt happens to be open next.
+PASTE_START = "[200~"
+PASTE_END = "[201~"
+PASTE_ON = "[?2004h"
+PASTE_OFF = "[?2004l"
+
+
+def drain_input(stream=None) -> int:
+    """Throw away anything already typed or pasted but not yet read.
+
+    Called before a permission question. The alternative is what happened in
+    practice: a pasted multi-line prompt left seven lines sitting in the
+    buffer, an approval prompt opened, and `input()` answered it with the next
+    line of the paste. A line beginning "1" would have approved an action the
+    operator never saw. Buffered text is not consent.
+
+    Returns how many characters were discarded, so the caller can say so.
+    """
+    stream = stream or sys.stdin
+    if not getattr(stream, "isatty", lambda: False)():
+        return 0
+    dropped = 0
+    try:
+        if os.name == "nt":
+            import msvcrt  # noqa: PLC0415 - Windows only
+
+            while msvcrt.kbhit():
+                msvcrt.getwch()
+                dropped += 1
+        else:
+            import select  # noqa: PLC0415 - POSIX only
+
+            while select.select([stream], [], [], 0)[0]:
+                if not stream.read(1):
+                    break
+                dropped += 1
+    except (OSError, ValueError, ImportError):
+        return dropped
+    return dropped
+
+
 #: The widest comfortable measure. Beyond about this many columns the eye
 #: loses the start of the next line on the way back, so a wide window gets
 #: whitespace rather than longer lines.
@@ -452,6 +496,14 @@ class Renderer:
             console.line(" " * INDENT + f"{console.accent(key)}  {text}")
         while True:
             try:
+                # Anything already in the buffer was typed before this question
+                # existed, so it cannot be an answer to it.
+                discarded = drain_input(console.stream)
+                if discarded:
+                    console.line(
+                        " " * INDENT
+                        + console.muted(f"({discarded} characters of pending input ignored)")
+                    )
                 console.write(pad + console.muted("choose 1-3 ") + console.accent("> "))
                 answer = input().strip().lower()
             except (EOFError, KeyboardInterrupt):

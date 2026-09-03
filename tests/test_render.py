@@ -25,6 +25,7 @@ import io
 import random
 import re
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from harness.repl.render import (
@@ -38,6 +39,8 @@ from harness.repl.render import (
     _clip,
 )
 from harness.repl.theme import THEME, Theme
+
+ROOT = Path(__file__).resolve().parents[1]
 
 #: Backgrounds a session can land on and cannot detect.
 WHITE = (255, 255, 255)
@@ -368,3 +371,52 @@ class DegradationTests(unittest.TestCase):
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+class PasteTests(unittest.TestCase):
+    """A paste is one message, and buffered text is never consent.
+
+    Both halves of a bug an operator hit in a real session. A multi-line
+    prompt pasted at the `>` prompt arrived as one message per line, so the
+    first line became the turn and the remaining seven sat in the buffer. The
+    agent then asked permission to run a command, `input()` answered the
+    question with the next line of the paste, and the operator watched their
+    own prompt being typed into a permission dialog.
+
+    A line beginning "1" would have granted the permission.
+    """
+
+    def test_a_paste_is_wrapped_in_markers(self) -> None:
+        from harness.repl.render import PASTE_END, PASTE_ON, PASTE_START
+
+        self.assertTrue(PASTE_START.startswith("\x1b["))
+        self.assertTrue(PASTE_END.startswith("\x1b["))
+        self.assertIn("2004", PASTE_ON)
+
+    def test_every_line_of_a_paste_becomes_one_message(self) -> None:
+        from harness.repl.render import PASTE_END, PASTE_START
+
+        lines = [PASTE_START + "first", "second", "third" + PASTE_END]
+        pending = list(lines)
+        parts = [pending.pop(0).split(PASTE_START, 1)[1]]
+        while PASTE_END not in parts[-1]:
+            parts.append(pending.pop(0))
+        parts[-1] = parts[-1].split(PASTE_END, 1)[0]
+        self.assertEqual("\n".join(parts), "first\nsecond\nthird")
+        self.assertEqual(pending, [], "lines were left in the buffer")
+
+    def test_draining_a_non_terminal_does_nothing(self) -> None:
+        """A pipe has no keyboard buffer, and reading it would eat real input."""
+        from harness.repl.render import drain_input
+
+        self.assertEqual(drain_input(Buffer()), 0)
+
+    def test_the_approval_prompt_drains_before_reading(self) -> None:
+        """The safety half: a question cannot be answered by text typed before it."""
+        source = (ROOT / "harness" / "repl" / "render.py").read_text(encoding="utf-8")
+        ask = source[source.index("def ask("):]
+        self.assertLess(
+            ask.index("drain_input"),
+            ask.index("input()"),
+            "the prompt reads before it drains, so buffered text can answer it",
+        )

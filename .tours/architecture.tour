@@ -1,0 +1,104 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "Yatra Harness — Architecture Tour",
+  "description": "One guided walk through the yatra-harness codebase: the authority boundary, each layered component, and how to run it with no API key. Start here as a new contributor.",
+  "isPrimary": true,
+  "steps": [
+    {
+      "title": "Start here: what this project is",
+      "file": "README.md",
+      "line": 1,
+      "description": "## Start here\n\n**Yatra Harness** is a coding-agent harness you can read in an afternoon. The core idea is one sentence: *the model proposes one action at a time; the harness decides what may run, executes it, records it, recovers it after a crash, and proves whether the task is actually done.*\n\nSwapping the model changes one line of YAML — nothing else moves. The README's diagram (`TASK -> Task Contract -> Context Engine -> AGENT LOOP … -> Verifier -> PASS/DONE | FAIL/RETRY`) is the map this whole tour follows.\n\nNext: [#2] states the rule everything else enforces."
+    },
+    {
+      "title": "The authority boundary",
+      "file": "docs/ARCHITECTURE.md",
+      "line": 10,
+      "description": "## The authority boundary\n\nThis section is the single most important idea in the codebase:\n\n```\nTask Contract -> Context -> Model Router -> Policy -> Tool Registry\n     -> Workspace -> Event Log -> Checkpoint -> Verifier\n```\n\nNo module bypasses this chain. The model only receives a bounded context and returns a normalized `ActionProposal` (tool call, finish claim, or clarification). It has no direct filesystem, shell, or network access.\n\nFour gates guard every side effect: the **skill** decides which tools exist, the **policy engine** decides whether a call is allowed, the **workspace** decides which paths are reachable, and the **verifier** decides whether the run succeeded.\n\nNext: [#3] shows the data shapes that flow through that chain."
+    },
+    {
+      "title": "Layer 1 — Core contracts (depends on nothing)",
+      "file": "harness/core/contracts.py",
+      "line": 15,
+      "description": "## Layer 1 — `harness/core/`\n\nContracts shared across the entire harness: `RunStatus`, `ActionKind` (tool / finish / clarify), `RiskLevel`, `BudgetSpec`, `TaskContract`, `ActionProposal`, `ToolResult`, `HarnessEvent`, `RunState`.\n\nThis package **depends on nothing** inside the repo — enforced by `lint-imports` (see `pyproject.toml`). Everything above it speaks these types. If you want to understand what a \"proposal\" or a \"run state\" is, read this file first. Sibling files: `errors.py` (typed errors), `schema.py` (strict-schema helpers), `util.py`."
+    },
+    {
+      "title": "Composition root — strict config loading",
+      "file": "harness/config.py",
+      "line": 1,
+      "description": "## Composition root — `harness/config.py`\n\nVersioned, strict loading for configs, tasks, and skills. Unknown YAML keys are **rejected on purpose** so a typo fails loudly — adding a key means adding it to the `reject_unknown` set and to `docs/CONFIGURATION.md`.\n\nIt sits with the entry points rather than at the bottom because it imports every module it configures; lower modules reach it only under `TYPE_CHECKING` (see the guarded import pattern repeated across the codebase). Route kinds (`replay`, `openai_compatible`, `anthropic`, `ollama`, `vllm`) are defined here (line ~35).\n\nConcrete examples of what it loads: [task](tasks/repair_counter.yaml), [teaching config](configs/teaching.yaml), [skill](skills/bugfix.yaml) — covered in [#15]."
+    },
+    {
+      "title": "Operator interface — the CLI",
+      "file": "harness/cli.py",
+      "line": 1,
+      "description": "## Entry point — `harness/cli.py`\n\nThe operator interface: `doctor`, `explain`, `tools`, `routes`, `run`, `goal`, `loop`, `resume`, `inspect`, `replay`, `list-runs`, `deliver`, `eval`, `review`, `auth`. Note `run_directory` (line ~43): run ids that escape the runs directory are refused — it matters most for `deliver`, which pushes.\n\nThe REPL entry [ay.py](ay.py) delegates anything it does not read as a message straight to this CLI, so `ay run` / `harness run` are the same code path.\n\nNext: [#6] is what `harness run` actually executes."
+    },
+    {
+      "title": "The batch agent loop — runtime",
+      "file": "harness/runtime.py",
+      "line": 1,
+      "description": "## Batch loop — `harness/runtime.py`\n\nThe observe → propose → act → observe → verify/retry runtime. It runs a task contract against a **copied workspace** and ends in the verifier's verdict — never in the model's claim.\n\nFlow per turn: build context → resolve the frozen route plan → provider normalizes the response into an `ActionProposal` → validate against the tool schema → policy check → execute → record observation → checkpoint. A `finish` proposal triggers the verifier; failure re-enters the loop as an observation until budgets are exhausted.\n\nRead `route_secrets` (line ~71) for how credentials are gathered for redaction, and `subagent_approval` (line ~46) for why read-only sub-agents may still execute checks. The two deferred imports here are deliberate and listed in the layer contract."
+    },
+    {
+      "title": "Layer 5 — Context engine (bounded prompts)",
+      "file": "harness/run/context.py",
+      "line": 34,
+      "description": "## Layer 5 — `harness/run/context.py`\n\n`ContextEngine.build()` compiles the bounded prompt: system prompt from the skill, repo map, recent observations, and budget state. Older observations are compacted to summaries with artifact references (see `compaction.py`), so context degrades gracefully instead of failing.\n\nSiblings in `harness/run/`: `verifier.py` [#10], `faults.py` (deterministic fault injection: `model-timeout-once`, `crash-after-tool=N`), `subagents.py` (read-only delegated agents working on a workspace copy), `session.py`, `instructions.py`."
+    },
+    {
+      "title": "Layer 4 — Tool registry (what the model may call)",
+      "file": "harness/execution/tools.py",
+      "line": 48,
+      "description": "## Layer 4 — `harness/execution/tools.py`\n\nThe typed tool registry: native tools plus the MCP stdio client (`mcp.py`). Every proposal is validated against the tool's JSON schema before anything else happens.\n\nDeliberately small surface: file search is `grep` and `glob` and nothing more — a ranked semantic `retrieve` tool was measured, never chosen by the model, and removed (see README). Related: `process.py` (how commands run), `sandbox.py` (optional Docker confinement), `search.py`, `hooks.py`, `diagnostics.py`.\n\nNext: [#8] decides whether a valid call is *allowed*."
+    },
+    {
+      "title": "Layer 4 — Policy gate (whether it may run)",
+      "file": "harness/execution/policy.py",
+      "line": 22,
+      "description": "## Layer 4 — `harness/execution/policy.py`\n\nCapability authorization, separate from technical tool availability. `PolicyDecision` (allowed / requires_approval / reason) enforces risk classes (`RiskLevel`: read, write, execute, network, control), the command allowlist, shell-interpreter unwrapping (`SHELL_INTERPRETERS`, `CODE_INTERPRETERS`), and approvals.\n\nHard rule from `AGENTS.md`: **never widen the authority boundary to make something pass.** A change that lets the model bypass skill, policy, workspace, or verifier is wrong even when the tests are green."
+    },
+    {
+      "title": "Layer 4 — Workspace (where it may reach)",
+      "file": "harness/execution/workspace.py",
+      "line": 44,
+      "description": "## Layer 4 — `harness/execution/workspace.py`\n\nPer-run workspace lifecycle with canonical-path containment. The seed repo is copied into `.runs/<run-id>/workspace`, initialized as a git repo with a baseline commit, and all tool access is confined to that copy (`resolve()` + `is_protected()`).\n\n`git_environment` (line ~16) pins git identity and ignores the operator's global git config so runs behave identically on every machine. `HOME`/`SSH_AUTH_SOCK` are present for harness-side clone/push but absent from tool execution — cloning and pushing are harness actions, not model actions."
+    },
+    {
+      "title": "The independent verifier (only COMPLETED wins)",
+      "file": "harness/run/verifier.py",
+      "line": 23,
+      "description": "## The verifier — `harness/run/verifier.py`\n\nDeliberately independent of the model. Only this class may produce `COMPLETED`:\n\n1. Runs every acceptance command itself (in the same sandbox the tools used).\n2. Requires a non-empty diff (unless disabled).\n3. Ensures no protected path changed.\n\nA `finish` claim that fails verification re-enters the loop as an observation (the retry loop). The eval suite's `broken-acceptance-is-refused` case exists to catch a verifier that stops verifying."
+    },
+    {
+      "title": "Layer 2 — Providers and routing (how models are called)",
+      "file": "harness/models/providers.py",
+      "line": 39,
+      "description": "## Layer 2 — `harness/models/`\n\nOne normalized contract: every provider returns the same `ActionProposal`, so the loop never learns which vendor it talks to. `ReplayProvider` (here) replays deterministic scripts — that is what makes the teaching config need no API key. HTTP adapters subclass a shared base and fill in endpoint, body, headers, and normalization.\n\nNeighbors: `model_router.py` (retries, backoff, circuit breaking, fallback — reliability; route *ordering* belongs to `llm_light.py` priorities: privacy, quality, cost, latency, context), `auth.py` (the **only** module that holds a raw credential; everything it resolves is registered with the `Redactor` so keys never reach a run bundle), `streaming.py`, `prompting.py`."
+    },
+    {
+      "title": "Layer 3 — Record: ledger, checkpoints, replay",
+      "file": "harness/record/events.py",
+      "line": 20,
+      "description": "## Layer 3 — `harness/record/`\n\n`EventLog` (here) is the append-only, sequence-checked JSONL ledger — including torn-tail recovery on open. Siblings: `state.py` (`StateStore`: atomic `state.json` checkpoints via `os.replace` + `fsync` after every boundary, enabling `resume`), `replay.py` (side-effect-free reconstruction with a SHA-256 hash — edit one event and the hash changes), `artifacts.py` (evidence bundle: `summary.md`, `patch.diff`, verification records), `redaction.py`, `tracing.py`, `memory.py`.\n\nRule: observability degrades rather than raises — losing the record must never cost you the job."
+    },
+    {
+      "title": "Layer 6+ — Autonomy: goals, backlogs, evals",
+      "file": "harness/autonomy/loop.py",
+      "line": 1,
+      "description": "## Upper layers — `harness/autonomy/` + `harness/repl/`\n\n`loop.py` (here) works a `feature_list.json` backlog until done or stuck — with three named endings (finished, budget spent, everything left already failed). Siblings: `goal.py` (keep attempting until the acceptance command passes), `backlog.py`, `delivery.py` (commit → push → PR, each step explicitly approved), `evals.py` (`harness eval`: pass-rate gating), `rubric.py` (`harness review`: fixed-dimension scoring where an unscored dimension counts as zero).\n\nThe *other* agent loop lives in [harness/repl/agent.py](harness/repl/agent.py): one user message starts a turn (send thread → run tools → append results → resend) until the model stops asking for tools. `harness/runtime.py` [#6] runs a contract against a copied workspace and ends in a verdict; the REPL runs a conversation in your own directory and ends when the model stops. They share providers, config, contracts, and the deny-list — not the loop."
+    },
+    {
+      "title": "Contracts in practice — task, skill, teaching config",
+      "file": "tasks/repair_counter.yaml",
+      "line": 1,
+      "description": "## The three YAML contracts\n\nA run freezes these three into the run directory as `inputs/*.yaml`:\n\n- **Task** (this file): objective, `workspace_seed`, constraints, `protected_paths`, and `acceptance.commands` — the stopping condition. The model's opinion is not the stopping condition.\n- **Skill** ([skills/bugfix.yaml](skills/bugfix.yaml)): instructions + `allowed_tools`. This is gate #1 of the four.\n- **Config** ([configs/teaching.yaml](configs/teaching.yaml)): budgets, model router with a `replay` route, policy, sandbox. Runs a scripted local model, so every machine sees the same trace with no network and no credentials.\n\nTry: `uv run harness doctor --config configs/teaching.yaml` then the run in [#16]."
+    },
+    {
+      "title": "Verify everything — init.sh and done",
+      "file": "init.sh",
+      "line": 9,
+      "description": "## Verify everything\n\n`init.sh` is the whole verification path and the single command to trust: `ruff` → unit tests (`python -m unittest discover -s tests`, run via `uv run` so the MCP demo server can import `harness`) → `doctor` → deterministic teaching run (watch for `VERIFICATION_FAILED` then `RETRY_LOOP_ENTERED` — that failure is the point of the exercise) → `harness eval evals/teaching.yaml`.\n\nYou now know the full chain: contract → context → router → policy → tools → workspace → ledger → checkpoint → verifier. Contributor rules live in [AGENTS.md](AGENTS.md): test before fix, never edit `tests/**` to make an implementation pass, strict schemas, and never let a run fail for an observability feature. Happy touring!"
+    }
+  ]
+}
