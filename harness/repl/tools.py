@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING, Any
 
 from harness.core.contracts import RiskLevel, ToolSpec
 from harness.core.errors import ToolError, WorkspaceError
+from harness.execution import diagnostics
 from harness.execution.policy import ANY_COMMAND, PolicyEngine
 from harness.execution.sandbox import build_sandbox
 from harness.execution.tools import ToolRegistry
@@ -177,6 +178,11 @@ class ReplToolset:
     ) -> None:
         self.workspace = workspace
         self.config = config
+        #: Problems with the checker itself, for the shell to show the
+        #: operator once. Collected rather than raised, and deliberately not
+        #: shown to the model: a missing linter is the operator's problem, and
+        #: a model told about one tries to install it.
+        self.notices: list[str] = []
         self._handlers: dict[str, Handler] = {
             "read_file": self.read_file,
             "list_dir": self.list_dir,
@@ -546,10 +552,13 @@ class ReplToolset:
         path.write_text(content, encoding="utf-8")
         added, removed = _count_changes(before, content)
         verb = "updated" if existed else "created"
-        return ToolOutcome(
-            f"{verb} {self._relative(path)} ({len(content.splitlines())} lines)",
-            display=self._label(path),
-            detail=f"+{added} -{removed}",
+        return self._checked(
+            path,
+            ToolOutcome(
+                f"{verb} {self._relative(path)} ({len(content.splitlines())} lines)",
+                display=self._label(path),
+                detail=f"+{added} -{removed}",
+            ),
         )
 
     def edit_file(self, arguments: dict[str, Any]) -> ToolOutcome:
@@ -588,10 +597,41 @@ class ReplToolset:
         path.write_text(after, encoding="utf-8")
         added, removed = _count_changes(before, after)
         where = f"{occurrences} places" if arguments.get("replace_all") and occurrences > 1 else "1 place"
-        return ToolOutcome(
-            f"edited {self._relative(path)} in {where} (+{added} -{removed})",
-            display=self._label(path),
-            detail=f"+{added} -{removed}",
+        return self._checked(
+            path,
+            ToolOutcome(
+                f"edited {self._relative(path)} in {where} (+{added} -{removed})",
+                display=self._label(path),
+                detail=f"+{added} -{removed}",
+            ),
+        )
+
+    def _checked(self, path: Path, outcome: ToolOutcome) -> ToolOutcome:
+        """Add the project checker's report to a successful write.
+
+        `ok` is never touched. A diagnostic is not a failed edit, and an agent
+        that reads one as a failure writes the same change again -- which is a
+        bug another agent shipped, not a hypothetical.
+        """
+        settings = getattr(self.config, "diagnostics", None)
+        relative = self._relative(path)
+        if settings is None or not settings.applies_to(relative):
+            return outcome
+        report = diagnostics.check(settings, self.workspace.root, relative)
+        if report.broken:
+            # The operator's problem, not the model's. Telling the model its
+            # linter is missing makes it try to install one.
+            first = report.output.splitlines()[0] if report.output else "could not run"
+            note = f"diagnostics: {first}"
+            if note not in self.notices:
+                self.notices.append(note)
+            return outcome
+        if report.clean:
+            return outcome
+        return replace(
+            outcome,
+            content=diagnostics.attach(outcome.content, report),
+            detail=f"{outcome.detail}, checker reported".strip(", "),
         )
 
     def run_command(self, arguments: dict[str, Any]) -> ToolOutcome:

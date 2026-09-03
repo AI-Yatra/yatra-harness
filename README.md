@@ -615,6 +615,9 @@ and what it does not, including where redaction stops.
 with, and how each was measured.
 [Retrieval](docs/RETRIEVAL.md) is how `retrieve` finds the relevant part of a
 repository nobody has read, and the measurements behind its defaults.
+[Project state](docs/PROJECT-STATE.md) covers the three things that follow the
+repository rather than the install: layered settings, what one session
+remembers for the next, and the checker that runs after every edit.
 [Operations](docs/OPERATIONS.md) is the runbook,
 [Testing](docs/TESTING.md) maps tests to acceptance criteria, and
 [Workshop](docs/WORKSHOP.md) walks through the material module by module.

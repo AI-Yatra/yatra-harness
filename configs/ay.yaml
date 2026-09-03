@@ -357,6 +357,28 @@ context:
   instruction_files: [AGENTS.md, CLAUDE.md]
   max_instruction_chars: 6000
 
+# The project's own checker, run over a file straight after the agent writes
+# it. Off by default: a checker nobody asked for is a surprise.
+#
+# This is not a hook. A hook observes and its output never reaches the model,
+# because a formatter that is not installed is your problem and a model told
+# about it tries to fix it. This report is about the model's own edit, so it
+# goes to the model -- separated from the edit's result and labelled, because
+# an agent that reads a diagnostic as a failed edit writes the change twice.
+#
+#   command    the checker; `{file}` is the changed path, appended if absent
+#   suffixes   only these extensions are checked; empty means every file
+#   timeout    seconds, default 20
+#   max_lines  how much of a noisy report to pass on, default 20
+#
+# A CLI checker rather than a language server, deliberately: no client, no
+# protocol, no per-language install, and your project already has one.
+#
+#   diagnostics:
+#     command: [ruff, check, --output-format, concise, "{file}"]
+#     suffixes: [.py]
+diagnostics: {}
+
 # How `retrieve` finds the relevant part of a repository nobody has read.
 #
 #   lexical    BM25 over a persistent SQLite FTS5 index. No key, no network,
