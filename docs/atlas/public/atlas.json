@@ -465,8 +465,8 @@
  "generated_by": "docs/atlas/scripts/scan_harness.py",
  "head": {
   "date": "2026-09-03",
-  "sha": "583d8ee",
-  "subject": "Find `gh` the way a shell does, and fix the tests that hid it"
+  "sha": "979eda0",
+  "subject": "Tell the agent what its own edit broke"
  },
  "lanes": [
   {
@@ -553,6 +553,7 @@
    "modules": [
     "record.artifacts",
     "record.events",
+    "record.memory",
     "record.redaction",
     "record.replay",
     "record.state",
@@ -566,6 +567,7 @@
    "key": "execution",
    "modules": [
     "execution.chunking",
+    "execution.diagnostics",
     "execution.hooks",
     "execution.indexing",
     "execution.mcp",
@@ -625,7 +627,8 @@
     "cli",
     "config",
     "doctor",
-    "runtime"
+    "runtime",
+    "settings"
    ],
    "side": "harness",
    "title": "Entry points"
@@ -1215,7 +1218,7 @@
    "doc": "Typed harness failures used to make terminal behavior explicit.",
    "doc_full": "Typed harness failures used to make terminal behavior explicit.",
    "external": [],
-   "fan_in": 32,
+   "fan_in": 34,
    "fan_out": 0,
    "functions": 0,
    "imported_by": [
@@ -1228,6 +1231,7 @@
     "config",
     "core.schema",
     "doctor",
+    "execution.diagnostics",
     "execution.hooks",
     "execution.mcp",
     "execution.retrieval",
@@ -1250,7 +1254,8 @@
     "run.faults",
     "run.session",
     "run.subagents",
-    "runtime"
+    "runtime",
+    "settings"
    ],
    "imports": [],
    "in_boundary": false,
@@ -1261,12 +1266,13 @@
    "path": "harness/core/errors.py",
    "side": "harness",
    "sloc": 47,
-   "test_cases": 638,
-   "test_sloc": 5544,
+   "test_cases": 708,
+   "test_sloc": 5963,
    "tests": [
     "test_backlog.py",
     "test_compaction.py",
     "test_context_budget.py",
+    "test_diagnostics.py",
     "test_evals.py",
     "test_failure_recovery.py",
     "test_gmi.py",
@@ -1285,6 +1291,7 @@
     "test_sandbox.py",
     "test_search.py",
     "test_session.py",
+    "test_settings_and_memory.py",
     "test_subagents.py",
     "test_tools.py",
     "test_workspace.py"
@@ -1956,6 +1963,91 @@
    "api": [
     {
      "doc": "",
+     "kind": "class",
+     "line": 71,
+     "methods": [
+      "age_days",
+      "stale",
+      "render"
+     ],
+     "name": "Entry"
+    },
+    {
+     "doc": "",
+     "kind": "function",
+     "line": 87,
+     "methods": [],
+     "name": "path_for"
+    },
+    {
+     "doc": "Everything remembered about this project, oldest first.",
+     "kind": "function",
+     "line": 91,
+     "methods": [],
+     "name": "load"
+    },
+    {
+     "doc": "Add one fact, and drop the oldest if the file is full.",
+     "kind": "function",
+     "line": 113,
+     "methods": [],
+     "name": "remember"
+    },
+    {
+     "doc": "Drop every entry containing *needle*. Returns how many went.",
+     "kind": "function",
+     "line": 124,
+     "methods": [],
+     "name": "forget"
+    },
+    {
+     "doc": "",
+     "kind": "function",
+     "line": 139,
+     "methods": [],
+     "name": "save"
+    },
+    {
+     "doc": "The block that goes into the system prompt, newest first.",
+     "kind": "function",
+     "line": 146,
+     "methods": [],
+     "name": "as_prompt"
+    }
+   ],
+   "api_count": 7,
+   "classes": 1,
+   "commits": 1,
+   "doc": "What one session leaves for the next.",
+   "doc_full": "What one session leaves for the next.\n\nA session persisted its transcript and nothing else, so every conversation\nstarted from zero: the same questions answered, the same conventions\nrediscovered, the same dead end walked into twice. `Session` holds an id, a\ndirectory and a list of turns, and none of that is memory.\n\nMemory here is a markdown file in the project, not a vector store. That is a\ndeliberate choice and not a shortcut. A file can be read, edited and deleted\nby the person it describes; it diffs; a team can commit it or ignore it; and\nwhen it is wrong the fix is obvious. An embedding index of remembered facts is\nnone of those things, and for the amount a repository actually needs\nremembering -- tens of lines, not thousands -- it would be machinery standing\nin for a paragraph.\n\nThree failures decide the design, and each is a rule below.\n\n**Staleness.** A remembered fact outlives the thing it describes. \"The tests\nlive in `spec/`\" survives the day someone renames the directory, and the agent\nthen acts on it confidently. Every entry carries the date it was written and\nis shown with its age, so the model reads a claim about the repository next to\nhow old the claim is.\n\n**Growth.** A memory that only grows becomes the context problem it was meant\nto solve. The file is capped, and the oldest entries fall off the end.\n\n**Junk.** The expensive failure is not forgetting, it is remembering the\nwrong thing: a fact true only of one branch, or a preference the operator\nstated once and changed their mind about. The `remember` tool says what is\nworth keeping, and the file is small enough to read at a glance.\n\nMemory is scoped to the project, not the session, because the project is the\nstable identity. Keying it to a session id would mean it never outlives the\nthing it exists to outlive.",
+   "external": [
+    "__future__",
+    "dataclasses",
+    "datetime",
+    "pathlib",
+    "re"
+   ],
+   "fan_in": 0,
+   "fan_out": 0,
+   "functions": 6,
+   "imported_by": [],
+   "imports": [],
+   "in_boundary": false,
+   "last_touched": "2026-09-03",
+   "layer": "record",
+   "lines": 166,
+   "name": "record.memory",
+   "path": "harness/record/memory.py",
+   "side": "harness",
+   "sloc": 124,
+   "test_cases": 0,
+   "test_sloc": 0,
+   "tests": []
+  },
+  {
+   "api": [
+    {
+     "doc": "",
      "kind": "function",
      "line": 34,
      "methods": [],
@@ -2346,14 +2438,14 @@
     {
      "doc": "Discover one MCP server's tools as registerable pairs.",
      "kind": "function",
-     "line": 1121,
+     "line": 1153,
      "methods": [],
      "name": "mcp_tools"
     }
    ],
    "api_count": 6,
    "classes": 2,
-   "commits": 12,
+   "commits": 13,
    "doc": "Typed tool registry and policy-governed native/MCP tool implementations.",
    "doc_full": "Typed tool registry and policy-governed native/MCP tool implementations.",
    "external": [
@@ -2397,11 +2489,11 @@
    "in_boundary": true,
    "last_touched": "2026-09-03",
    "layer": "execution",
-   "lines": 1182,
+   "lines": 1214,
    "name": "execution.tools",
    "path": "harness/execution/tools.py",
    "side": "harness",
-   "sloc": 1033,
+   "sloc": 1057,
    "test_cases": 58,
    "test_sloc": 646,
    "tests": [
@@ -2467,14 +2559,14 @@
     {
      "doc": "The rule governing this call, or None when the operator wrote none.",
      "kind": "function",
-     "line": 375,
+     "line": 387,
      "methods": [],
      "name": "rule_for"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 404,
+     "line": 431,
      "methods": [
       "evaluate"
      ],
@@ -2483,7 +2575,7 @@
    ],
    "api_count": 9,
    "classes": 3,
-   "commits": 7,
+   "commits": 8,
    "doc": "Capability authorization separate from technical tool availability.",
    "doc_full": "Capability authorization separate from technical tool availability.",
    "external": [
@@ -2513,11 +2605,11 @@
    "in_boundary": true,
    "last_touched": "2026-09-03",
    "layer": "execution",
-   "lines": 476,
+   "lines": 503,
    "name": "execution.policy",
    "path": "harness/execution/policy.py",
    "side": "harness",
-   "sloc": 360,
+   "sloc": 377,
    "test_cases": 137,
    "test_sloc": 1160,
    "tests": [
@@ -2842,13 +2934,14 @@
    "path": "harness/execution/workspace.py",
    "side": "harness",
    "sloc": 278,
-   "test_cases": 454,
-   "test_sloc": 4509,
+   "test_cases": 483,
+   "test_sloc": 4690,
    "tests": [
     "test_checkpoints.py",
     "test_context_budget.py",
     "test_deliver_cli.py",
     "test_delivery.py",
+    "test_diagnostics.py",
     "test_failure_recovery.py",
     "test_hooks.py",
     "test_instructions.py",
@@ -3280,6 +3373,92 @@
   {
    "api": [
     {
+     "doc": "The project's checker, and when to run it.",
+     "kind": "class",
+     "line": 54,
+     "methods": [
+      "enabled",
+      "applies_to"
+     ],
+     "name": "DiagnosticsConfig"
+    },
+    {
+     "doc": "What the checker said. Empty output means it was happy.",
+     "kind": "class",
+     "line": 75,
+     "methods": [
+      "clean"
+     ],
+     "name": "Report"
+    },
+    {
+     "doc": "The command for one file, with `{file}` filled in.",
+     "kind": "function",
+     "line": 90,
+     "methods": [],
+     "name": "build_command"
+    },
+    {
+     "doc": "Run the checker over one changed file. Never raises.",
+     "kind": "function",
+     "line": 97,
+     "methods": [],
+     "name": "check"
+    },
+    {
+     "doc": "Put the report after the edit's own result, clearly separated.",
+     "kind": "function",
+     "line": 126,
+     "methods": [],
+     "name": "attach"
+    },
+    {
+     "doc": "",
+     "kind": "function",
+     "line": 145,
+     "methods": [],
+     "name": "diagnostics_config_from_dict"
+    }
+   ],
+   "api_count": 6,
+   "classes": 2,
+   "commits": 1,
+   "doc": "What the project's own checker says about a file the agent just changed.",
+   "doc_full": "What the project's own checker says about a file the agent just changed.\n\nWithout this the agent is editing blind. It writes a change, the change is\napplied, and nothing tells it that the file no longer imports, no longer type\nchecks, or breaks a lint rule the repository enforces. It finds out later, if\nit happens to run the right command, or it never finds out and hands back\nsomething that does not compile.\n\n**This is not a hook, and the difference is the whole point.** A hook observes\nand its output deliberately never reaches the model, because a formatter that\nis not installed is the operator's problem and a model told about it tries to\nfix it. Diagnostics are the opposite: the report is *about the model's own\nedit*, it is exactly what the model needs, and it is useless to anyone else.\nOne mechanism could not have both rules.\n\nA CLI checker rather than a language server, deliberately. A language server\nmeans a client, a lifecycle, a protocol and a per-language install, and the\nprojects that most want this already have `ruff`, `tsc` or `mypy` configured\nand know how to run them. The tradeoff is real -- no go-to-definition, no call\ngraph -- and it is documented rather than hidden.\n\nThe one rule everything here is shaped by: **a diagnostic is not a failed\nedit.** Another agent shipped this exact bug -- its model read the diagnostics\nattached to a successful edit and concluded the edit had not been applied, so\nit wrote the same change again. So the edit's own result comes first and\nstands on its own, the report is separated from it and labelled, and the\ntool's success flag never changes because a checker had something to say.",
+   "external": [
+    "__future__",
+    "dataclasses",
+    "pathlib",
+    "shlex",
+    "typing"
+   ],
+   "fan_in": 1,
+   "fan_out": 2,
+   "functions": 4,
+   "imported_by": [
+    "config"
+   ],
+   "imports": [
+    "core.errors",
+    "execution.process"
+   ],
+   "in_boundary": false,
+   "last_touched": "2026-09-03",
+   "layer": "execution",
+   "lines": 170,
+   "name": "execution.diagnostics",
+   "path": "harness/execution/diagnostics.py",
+   "side": "harness",
+   "sloc": 123,
+   "test_cases": 29,
+   "test_sloc": 181,
+   "tests": [
+    "test_diagnostics.py"
+   ]
+  },
+  {
+   "api": [
+    {
      "doc": "",
      "kind": "class",
      "line": 66,
@@ -3308,10 +3487,11 @@
     "signal",
     "subprocess"
    ],
-   "fan_in": 7,
+   "fan_in": 8,
    "fan_out": 1,
    "functions": 1,
    "imported_by": [
+    "execution.diagnostics",
     "execution.hooks",
     "execution.sandbox",
     "execution.tools",
@@ -4507,72 +4687,72 @@
     {
      "doc": "",
      "kind": "class",
-     "line": 46,
+     "line": 48,
      "methods": [],
      "name": "RouteConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 73,
+     "line": 75,
      "methods": [],
      "name": "ModelRouterConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 83,
+     "line": 85,
      "methods": [],
      "name": "PolicyConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 101,
+     "line": 103,
      "methods": [],
      "name": "MCPServerConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 110,
+     "line": 112,
      "methods": [
       "with_overrides"
      ],
      "name": "HarnessConfig"
     },
     {
-     "doc": "",
+     "doc": "Load the shipped config, then fold any project settings onto it.",
      "kind": "function",
-     "line": 201,
+     "line": 212,
      "methods": [],
      "name": "load_config"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 432,
+     "line": 456,
      "methods": [],
      "name": "reject_unknown_route_keys"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 605,
+     "line": 629,
      "methods": [],
      "name": "load_task"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 687,
+     "line": 711,
      "methods": [],
      "name": "load_skill"
     }
    ],
    "api_count": 9,
    "classes": 5,
-   "commits": 16,
+   "commits": 17,
    "doc": "Versioned, strict configuration/task/skill loading.",
    "doc_full": "Versioned, strict configuration/task/skill loading.",
    "external": [
@@ -4585,7 +4765,7 @@
     "yaml"
    ],
    "fan_in": 17,
-   "fan_out": 11,
+   "fan_out": 12,
    "functions": 4,
    "imported_by": [
     "cli",
@@ -4609,6 +4789,7 @@
    "imports": [
     "core.contracts",
     "core.errors",
+    "execution.diagnostics",
     "execution.hooks",
     "execution.policy",
     "execution.retrieval",
@@ -4622,13 +4803,13 @@
    "in_boundary": true,
    "last_touched": "2026-09-03",
    "layer": "",
-   "lines": 702,
+   "lines": 726,
    "name": "config",
    "path": "harness/config.py",
    "side": "harness",
-   "sloc": 618,
-   "test_cases": 760,
-   "test_sloc": 6932,
+   "sloc": 634,
+   "test_cases": 830,
+   "test_sloc": 7351,
    "tests": [
     "test_atlas_trace.py",
     "test_auth_gateways.py",
@@ -4637,6 +4818,7 @@
     "test_context_budget.py",
     "test_demo_repo.py",
     "test_denied_approval.py",
+    "test_diagnostics.py",
     "test_failure_recovery.py",
     "test_gmi.py",
     "test_goal.py",
@@ -4658,11 +4840,111 @@
     "test_retrieval.py",
     "test_review_findings.py",
     "test_runtime.py",
+    "test_settings_and_memory.py",
     "test_shared_tooling.py",
     "test_subagents.py",
     "test_tools.py",
     "test_workspace.py"
    ]
+  },
+  {
+   "api": [
+    {
+     "doc": "One settings file that was found, and what it said.",
+     "kind": "class",
+     "line": 68,
+     "methods": [],
+     "name": "Layer"
+    },
+    {
+     "doc": "The nearest directory above *start* holding a `.yatra` or a `.git`.",
+     "kind": "function",
+     "line": 77,
+     "methods": [],
+     "name": "find_project_root"
+    },
+    {
+     "doc": "Every settings layer that applies, lowest precedence first.",
+     "kind": "function",
+     "line": 93,
+     "methods": [],
+     "name": "discover"
+    },
+    {
+     "doc": "Fold every layer onto *base*, lowest precedence first.",
+     "kind": "function",
+     "line": 119,
+     "methods": [],
+     "name": "apply"
+    },
+    {
+     "doc": "Deep-merge *overlay* onto *base*, without mutating either.",
+     "kind": "function",
+     "line": 127,
+     "methods": [],
+     "name": "merge"
+    },
+    {
+     "doc": "One line per layer, for `/config` to print.",
+     "kind": "function",
+     "line": 183,
+     "methods": [],
+     "name": "describe"
+    },
+    {
+     "doc": "Where a project's settings belong, for a writer to create.",
+     "kind": "function",
+     "line": 196,
+     "methods": [],
+     "name": "project_settings_path"
+    },
+    {
+     "doc": "Keep the machine-local file out of the repository.",
+     "kind": "function",
+     "line": 201,
+     "methods": [],
+     "name": "ignore_local_settings"
+    },
+    {
+     "doc": "`YATRA_PROJECT_DIR`, for a test or a wrapper that knows better.",
+     "kind": "function",
+     "line": 215,
+     "methods": [],
+     "name": "env_root"
+    }
+   ],
+   "api_count": 9,
+   "classes": 1,
+   "commits": 1,
+   "doc": "Settings that follow the project rather than the install.",
+   "doc_full": "Settings that follow the project rather than the install.\n\n`ay` read one config, from its own install directory, and nothing from the\ndirectory you started it in. So a rule could not be scoped to one repository:\neither every session got it or none did. Writing a demo that needed one deny\nrule in one folder is what made the gap concrete -- the constraint had to\nbecome a sentence in AGENTS.md that the model chooses to obey, instead of a\ngate that stops it.\n\nThe precedence chain is the one every comparable tool settled on, and the\norder is the point rather than the file names:\n\n    explicit --config          what the operator typed wins outright\n    .yatra/settings.local.yaml machine-local, gitignored, not shared\n    .yatra/settings.yaml       the project's, committed, shared with the team\n    ~/.yatra-harness/settings.yaml   personal defaults for every project\n    configs/ay.yaml            what ships\n\n**Permission rules do not follow that order.** They merge across every layer,\nand a `deny` written at any layer survives all of them. Overriding is right\nfor a model choice and wrong for a refusal: if a project bans `git push` a\npersonal file must not quietly re-enable it, and the operator who wrote the\nnarrower rule is usually the one who knows why. Everything else is last\nwriter wins.\n\nDiscovery walks up from the working directory, so a session started three\nfolders inside a repository still finds the repository's settings. It stops at\na `.git` directory or the filesystem root, because past that point the files\nbelong to somebody else's project.",
+   "external": [
+    "__future__",
+    "collections",
+    "dataclasses",
+    "os",
+    "pathlib",
+    "typing",
+    "yaml"
+   ],
+   "fan_in": 0,
+   "fan_out": 1,
+   "functions": 8,
+   "imported_by": [],
+   "imports": [
+    "core.errors"
+   ],
+   "in_boundary": false,
+   "last_touched": "2026-09-03",
+   "layer": "",
+   "lines": 218,
+   "name": "settings",
+   "path": "harness/settings.py",
+   "side": "harness",
+   "sloc": 162,
+   "test_cases": 0,
+   "test_sloc": 0,
+   "tests": []
   },
   {
    "api": [
@@ -4748,7 +5030,7 @@
    ],
    "api_count": 3,
    "classes": 3,
-   "commits": 9,
+   "commits": 10,
    "doc": "The interactive shell around the agent loop.",
    "doc_full": "The interactive shell around the agent loop.\n\nOwns everything the loop deliberately does not: reading a line, expanding\n`@path` and `!command`, slash commands, the banner, and turning Ctrl-C into\nan interrupted turn rather than a dead process.",
    "external": [
@@ -4791,11 +5073,11 @@
    "in_boundary": false,
    "last_touched": "2026-09-03",
    "layer": "repl",
-   "lines": 1092,
+   "lines": 1103,
    "name": "repl.shell",
    "path": "harness/repl/shell.py",
    "side": "harness",
-   "sloc": 937,
+   "sloc": 941,
    "test_cases": 93,
    "test_sloc": 848,
    "tests": [
@@ -4809,14 +5091,14 @@
     {
      "doc": "What running a tool produced.",
      "kind": "class",
-     "line": 57,
+     "line": 58,
      "methods": [],
      "name": "ToolOutcome"
     },
     {
      "doc": "The conversational tool set, executed by the shared registry.",
      "kind": "class",
-     "line": 152,
+     "line": 153,
      "methods": [
       "specs",
       "dispatch",
@@ -4833,14 +5115,14 @@
     {
      "doc": "A diff for the approval prompt, so consent is informed by the change.",
      "kind": "function",
-     "line": 725,
+     "line": 765,
      "methods": [],
      "name": "unified_diff"
     }
    ],
    "api_count": 3,
    "classes": 2,
-   "commits": 5,
+   "commits": 6,
    "doc": "The tools a conversational session gives the model.",
    "doc_full": "The tools a conversational session gives the model.\n\nShaped for editing rather than for batch patching. The batch path's\n`apply_patch` takes a whole unified diff, which asks a model to get line\nnumbers and context right in one shot; the failure mode is a rejected hunk\nand a wasted turn. `edit_file` instead takes the exact text to replace and\nrefuses when that text is absent or ambiguous, so a mistake comes back as a\nspecific, fixable message rather than a corrupted file.\n\nEvery path goes through `Workspace.resolve`, so containment is the same code\nthe batch path uses. The difference is only where the workspace root points:\nhere it is the directory the operator launched in.",
    "external": [
@@ -4874,17 +5156,18 @@
     "record.artifacts"
    ],
    "in_boundary": false,
-   "last_touched": "2026-09-02",
+   "last_touched": "2026-09-03",
    "layer": "repl",
-   "lines": 757,
+   "lines": 797,
    "name": "repl.tools",
    "path": "harness/repl/tools.py",
    "side": "harness",
-   "sloc": 622,
-   "test_cases": 304,
-   "test_sloc": 2914,
+   "sloc": 654,
+   "test_cases": 333,
+   "test_sloc": 3095,
    "tests": [
     "test_checkpoints.py",
+    "test_diagnostics.py",
     "test_failure_recovery.py",
     "test_hooks.py",
     "test_interrupt.py",
@@ -5424,8 +5707,8 @@
    "path": "harness/repl/approvals.py",
    "side": "harness",
    "sloc": 184,
-   "test_cases": 266,
-   "test_sloc": 2416,
+   "test_cases": 307,
+   "test_sloc": 2654,
    "tests": [
     "test_hooks.py",
     "test_interrupt.py",
@@ -5436,7 +5719,8 @@
     "test_repl_agent.py",
     "test_repl_end_to_end.py",
     "test_repl_gemini.py",
-    "test_repl_shell.py"
+    "test_repl_shell.py",
+    "test_settings_and_memory.py"
    ]
   },
   {
@@ -5451,7 +5735,7 @@
    ],
    "api_count": 1,
    "classes": 0,
-   "commits": 4,
+   "commits": 5,
    "doc": "The system prompt, assembled once per session.",
    "doc_full": "The system prompt, assembled once per session.\n\nKept stable and at the front of every request. Providers cache on prompt\nprefixes, so the difference between building this once and rebuilding it per\nturn is a cache hit on the entire conversation history.",
    "external": [
@@ -5476,14 +5760,16 @@
    "in_boundary": false,
    "last_touched": "2026-09-03",
    "layer": "repl",
-   "lines": 140,
+   "lines": 162,
    "name": "repl.prompt",
    "path": "harness/repl/prompt.py",
    "side": "harness",
-   "sloc": 116,
-   "test_cases": 0,
-   "test_sloc": 0,
-   "tests": []
+   "sloc": 131,
+   "test_cases": 41,
+   "test_sloc": 238,
+   "tests": [
+    "test_settings_and_memory.py"
+   ]
   },
   {
    "api": [
@@ -5666,10 +5952,10 @@
      "repl.conversation",
      "repl.prompt"
     ],
-    "sloc": 304,
-    "tests": 160
+    "sloc": 319,
+    "tests": 201
    },
-   "sloc": 693
+   "sloc": 708
   },
   {
    "asks": "typed capabilities, validated arguments, legible failures",
@@ -5680,7 +5966,7 @@
      "execution.tools",
      "core.schema"
     ],
-    "sloc": 1092,
+    "sloc": 1116,
     "tests": 58
    },
    "key": "execution.tools",
@@ -5691,10 +5977,10 @@
     "modules": [
      "repl.tools"
     ],
-    "sloc": 622,
-    "tests": 304
+    "sloc": 654,
+    "tests": 333
    },
-   "sloc": 1714
+   "sloc": 1770
   },
   {
    "asks": "capability sets declared outside the code that runs them",
@@ -5705,8 +5991,8 @@
      "execution.mcp",
      "config"
     ],
-    "sloc": 798,
-    "tests": 760
+    "sloc": 814,
+    "tests": 830
    },
    "key": "skills",
    "name": "Skills and MCP",
@@ -5717,7 +6003,7 @@
     "sloc": 0,
     "tests": 0
    },
-   "sloc": 798
+   "sloc": 814
   },
   {
    "asks": "who may do what, and what may never be authorized at all",
@@ -5727,7 +6013,7 @@
     "modules": [
      "execution.policy"
     ],
-    "sloc": 360,
+    "sloc": 377,
     "tests": 137
    },
    "key": "permissions",
@@ -5739,9 +6025,9 @@
      "repl.approvals"
     ],
     "sloc": 184,
-    "tests": 266
+    "tests": 307
    },
-   "sloc": 544
+   "sloc": 561
   },
   {
    "asks": "what survives a turn, a crash, and a session",
@@ -5804,7 +6090,7 @@
      "execution.workspace"
     ],
     "sloc": 664,
-    "tests": 553
+    "tests": 582
    },
    "key": "execution.sandbox",
    "name": "Sandbox and execution",
@@ -5814,10 +6100,10 @@
     "modules": [
      "repl.tools"
     ],
-    "sloc": 622,
-    "tests": 304
+    "sloc": 654,
+    "tests": 333
    },
-   "sloc": 1286
+   "sloc": 1318
   },
   {
    "asks": "which model, which credential, what if it fails",
@@ -5916,10 +6202,10 @@
      "repl.shell",
      "repl.render"
     ],
-    "sloc": 1305,
+    "sloc": 1309,
     "tests": 231
    },
-   "sloc": 2212
+   "sloc": 2216
   },
   {
    "asks": "does the harness still do the job after a change",
@@ -5955,7 +6241,7 @@
      "core.errors"
     ],
     "sloc": 290,
-    "tests": 638
+    "tests": 708
    },
    "key": "reliability",
    "name": "Reliability",
@@ -5990,10 +6276,10 @@
     "modules": [
      "repl.tools"
     ],
-    "sloc": 622,
-    "tests": 304
+    "sloc": 654,
+    "tests": 333
    },
-   "sloc": 1020
+   "sloc": 1052
   }
  ],
  "repo": "yatra-harness",
@@ -6336,6 +6622,18 @@
    ],
    "lines": 95,
    "sloc": 66
+  },
+  "test_diagnostics.py": {
+   "cases": 29,
+   "covers": [
+    "config",
+    "core.errors",
+    "execution.diagnostics",
+    "execution.workspace",
+    "repl.tools"
+   ],
+   "lines": 238,
+   "sloc": 181
   },
   "test_evals.py": {
    "cases": 16,
@@ -6717,6 +7015,18 @@
    "lines": 160,
    "sloc": 126
   },
+  "test_settings_and_memory.py": {
+   "cases": 41,
+   "covers": [
+    "config",
+    "core.errors",
+    "record",
+    "repl.approvals",
+    "repl.prompt"
+   ],
+   "lines": 318,
+   "sloc": 238
+  },
   "test_shared_tooling.py": {
    "cases": 20,
    "covers": [
@@ -6799,11 +7109,23 @@
   },
   {
    "arguments": [
+    "fact"
+   ],
+   "description": "Write one durable fact about this repository for future sessions to read. Worth remembering: a convention that is not written down, where something surprising lives, a command that works here, a dead end and why. Not worth remembering: anything already in AGENTS.md or the README, anything true only of the change you are making now, or a summary of this conversation. One sentence.",
+   "line": 245,
+   "name": "remember",
+   "required": [
+    "fact"
+   ],
+   "risk": "write"
+  },
+  {
+   "arguments": [
     "query",
     "limit"
    ],
    "description": "Search the workspace by meaning. Ask a plain question and get back the most relevant excerpts, ranked, each with its file, line range and enclosing function. Use this first to find where something lives when you do not already know the file or the identifier; it replaces listing directories and opening files to look around. Use grep instead when you know the exact string.",
-   "line": 245,
+   "line": 267,
    "name": "retrieve",
    "required": [
     "query"
@@ -6816,7 +7138,7 @@
     "limit"
    ],
    "description": "Search the web and return ranked results with their URLs.",
-   "line": 270,
+   "line": 292,
    "name": "web_search",
    "required": [
     "query"
@@ -6828,7 +7150,7 @@
     "url"
    ],
    "description": "Fetch one URL and return its readable text.",
-   "line": 284,
+   "line": 306,
    "name": "browser_fetch",
    "required": [
     "url"
@@ -6840,7 +7162,7 @@
     "max_entries"
    ],
    "description": "List a bounded tree of files in the run workspace.",
-   "line": 312,
+   "line": 334,
    "name": "repo_tree",
    "required": [],
    "risk": "read"
@@ -6851,7 +7173,7 @@
     "max_matches"
    ],
    "description": "Search UTF-8 text files in the workspace for a literal string.",
-   "line": 321,
+   "line": 343,
    "name": "search_repo",
    "required": [
     "query"
@@ -6865,7 +7187,7 @@
     "end_line"
    ],
    "description": "Read a UTF-8 file inside the run workspace.",
-   "line": 333,
+   "line": 355,
    "name": "read_file",
    "required": [
     "path"
@@ -6877,7 +7199,7 @@
     "patch"
    ],
    "description": "Apply a unified git patch inside the run workspace.",
-   "line": 349,
+   "line": 371,
    "name": "apply_patch",
    "required": [
     "patch"
@@ -6889,7 +7211,7 @@
     "command"
    ],
    "description": "Run an allowlisted command without a shell in the workspace.",
-   "line": 358,
+   "line": 380,
    "name": "run_command",
    "required": [
     "command"
@@ -6902,7 +7224,7 @@
     "arguments"
    ],
    "description": "Run a workspace-relative Python script in isolated interpreter mode.",
-   "line": 369,
+   "line": 391,
    "name": "python_run",
    "required": [
     "path"
@@ -6912,7 +7234,7 @@
   {
    "arguments": [],
    "description": "Return the current workspace diff and changed paths.",
-   "line": 384,
+   "line": 406,
    "name": "git_diff",
    "required": [],
    "risk": "read"
@@ -6922,7 +7244,7 @@
     "url"
    ],
    "description": "Fetch one allowlisted public HTTP(S) URL without following redirects.",
-   "line": 393,
+   "line": 415,
    "name": "browser_fetch",
    "required": [
     "url"
@@ -6935,7 +7257,7 @@
     "limit"
    ],
    "description": "Find the parts of the workspace most relevant to a question, ranked, as excerpts with their file and line range.",
-   "line": 402,
+   "line": 424,
    "name": "retrieve",
    "required": [
     "query"
@@ -6947,7 +7269,7 @@
     "query"
    ],
    "description": "Search the public web and return titles, URLs and snippets.",
-   "line": 414,
+   "line": 436,
    "name": "web_search",
    "required": [
     "query"
@@ -6959,7 +7281,7 @@
     "summary"
    ],
    "description": "Submit a completion claim. The harness will independently verify it.",
-   "line": 423,
+   "line": 445,
    "name": "finish",
    "required": [
     "summary"
@@ -6968,17 +7290,17 @@
   }
  ],
  "totals": {
-  "api": 293,
+  "api": 315,
   "commands": 20,
-  "commits": 16,
-  "edges": 205,
-  "lines": 17006,
-  "modules": 57,
-  "sloc": 13922,
-  "test_cases": 1205,
-  "test_files": 52,
-  "test_sloc": 10324,
-  "tools": 15
+  "commits": 17,
+  "edges": 209,
+  "lines": 17716,
+  "modules": 60,
+  "sloc": 14439,
+  "test_cases": 1275,
+  "test_files": 54,
+  "test_sloc": 10743,
+  "tools": 16
  },
  "transitions": [
   {
