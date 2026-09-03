@@ -20,11 +20,18 @@ runs_dir: ../.runs
 # approval gate rather than the deny-list is the control here, and why
 # full-auto deserves a directory you would be willing to lose.
 #
+# `os` asks the kernel instead: bubblewrap on Linux, Seatbelt on macOS. Reads
+# stay wide, writes are confined to this directory, and the network is off
+# unless network says otherwise. Lighter than a container and it keeps the
+# operator's own toolchain, which is what a conversation wants. There is no
+# equivalent on Windows reachable from Python, so it runs locally there and
+# says so at startup rather than claiming a confinement it is not providing.
+#
 # `docker` runs the same call in a container with no network, dropped
-# capabilities, and only the workspace mounted. Nothing else about the session
-# changes: the same tool, the same policy, the same loop. It is one word here
-# because the batch loop and this one now share an execution path rather than
-# each having their own.
+# capabilities, and only the workspace mounted. The strongest of the three and
+# the heaviest. Nothing else about the session changes: the same tool, the same
+# policy, the same loop. It is one word here because the batch loop and this
+# one share an execution path rather than each having their own.
 sandbox:
   kind: local
 
@@ -216,6 +223,28 @@ policy:
   # The REPL's own approval modes (suggest / auto-edit / full-auto) decide
   # what is asked about. This setting governs the batch path only.
   approval_mode: mutations
+  # Decisions about one specific thing, which outrank the mode in both
+  # directions. A mode is a default for everything, so where the two disagree
+  # the more specific one wins.
+  #
+  #   deny  refuses it in every mode, including full-auto, and never offers it
+  #         for approval
+  #   ask   asks even in a mode that would not have
+  #   allow skips the prompt a mode would have shown
+  #
+  # Write a rule as tool(pattern). A command pattern matches by token, so
+  # `git push` does not match `git pushed`, and `*` stands for any run of
+  # tokens. A path pattern is a glob. Wrappers are unwrapped exactly as the
+  # deny-list unwraps them, so `bash -c "docker run x"` matches
+  # `run_command(docker *)`.
+  #
+  # Nothing here reaches past denied_commands below, which stays absolute.
+  # Empty by default: the modes are the right starting point, and a rule is
+  # what you add once you know which specific thing you keep answering.
+  rules:
+    deny: []
+    ask: []
+    allow: []
   # The REPL asks about commands rather than requiring a prefix allowlist, so
   # this list is what runs without a prompt on the batch path. The REPL's gate
   # reads the deny-list below, not this.
@@ -274,3 +303,25 @@ context:
   # the repository's own conventions without being told to.
   instruction_files: [AGENTS.md, CLAUDE.md]
   max_instruction_chars: 6000
+
+# Commands that run when the agent acts. These observe; they cannot veto. The
+# approval gate already answers whether something may happen, and two
+# authorities over one decision is how a permission system stops being
+# trustworthy.
+#
+#   event    tool_start, tool_end or turn_end
+#   run      the command, as an array; there is no shell
+#   match    optional glob on the tool name
+#   timeout  seconds, default 30
+#
+# The command is yours, from your own config, and gets your environment plus
+# HARNESS_EVENT and HARNESS_TOOL. The model cannot add one. A hook that fails
+# to start is reported once and then switched off for the session; a hook that
+# exits non-zero keeps running, because a lint hook failing is it working.
+#
+#   hooks:
+#     - event: tool_end
+#       match: edit_file
+#       run: [ruff, format, .]
+#       name: format
+hooks: []

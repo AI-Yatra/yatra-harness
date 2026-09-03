@@ -13,6 +13,8 @@ import yaml
 from harness.core import schema
 from harness.core.contracts import BudgetSpec, SkillContract, TaskContract, VerificationSpec
 from harness.core.errors import ConfigurationError
+from harness.execution.hooks import Hook, parse_hooks
+from harness.execution.policy import EFFECTS, PolicyRule, parse_rule
 from harness.execution.retrieval import RetrievalConfig, retrieval_config_from_dict
 from harness.execution.sandbox import SandboxConfig, sandbox_config_from_dict
 from harness.execution.search import SearchConfig, search_config_from_dict
@@ -86,6 +88,11 @@ class PolicyConfig:
     allowed_domains: tuple[str, ...]
     command_timeout_seconds: float
     browser_timeout_seconds: float
+    # Operator rules, strongest effect first. These sit between the absolute
+    # denied_commands above and the approval mode: a rule can refuse something
+    # a mode would have allowed, or wave through something it would have asked
+    # about, and cannot override denied_commands.
+    rules: tuple[PolicyRule, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +123,9 @@ class HarnessConfig:
     subagents: SubagentConfig = field(default_factory=SubagentConfig)
     sandbox: SandboxConfig = field(default_factory=SandboxConfig)
     retrieval: RetrievalConfig = field(default_factory=RetrievalConfig)
+    #: Operator commands that run when the agent acts. They observe; they
+    #: cannot veto, because Gate already answers that question.
+    hooks: tuple[Hook, ...] = ()
     llm_light: LLMLightConfig = field(default_factory=LLMLightConfig)
     fault: str = ""
     selected_model: str = ""
@@ -208,6 +218,7 @@ def load_config(path: str | Path) -> HarnessConfig:
             "subagents",
             "sandbox",
             "retrieval",
+            "hooks",
             "llm_light",
             # Written by the runtime so a resumed run routes identically; not
             # part of the operator-facing hand-authored schema.
@@ -296,6 +307,7 @@ def load_config(path: str | Path) -> HarnessConfig:
             "allowed_domains",
             "command_timeout_seconds",
             "browser_timeout_seconds",
+            "rules",
         },
         "policy",
     )
@@ -324,6 +336,7 @@ def load_config(path: str | Path) -> HarnessConfig:
             "policy.browser_timeout_seconds",
             minimum=0.1,
         ),
+        rules=_policy_rules(policy_raw.get("rules", {}), "policy.rules"),
     )
     mcp_raw = schema.sequence(raw.get("mcp", []), "mcp")
     mcp_servers = []
@@ -381,6 +394,7 @@ def load_config(path: str | Path) -> HarnessConfig:
         subagents=subagent_config_from_dict(raw.get("subagents"), base, "subagents"),
         sandbox=sandbox_config_from_dict(raw.get("sandbox"), "sandbox"),
         retrieval=retrieval_config_from_dict(raw.get("retrieval"), "retrieval"),
+        hooks=parse_hooks(raw.get("hooks", []), "hooks"),
         compaction=compaction_config_from_dict(context_raw.get("compaction")),
         context_instruction_files=instruction_files,
         context_max_instruction_chars=schema.integer(
@@ -415,6 +429,36 @@ ROUTE_ROUTING_KEYS = {
 
 def reject_unknown_route_keys(item: dict, path: str) -> None:
     schema.reject_unknown(item, ROUTE_BASE_KEYS | ROUTE_ROUTING_KEYS, path)
+
+
+def _policy_rules(raw: object, path: str) -> tuple[PolicyRule, ...]:
+    """Parse `policy.rules`, refusing anything that is not a rule.
+
+    Validated here rather than at first use, because a rule that silently does
+    not parse is worse than no rule: the operator believes something is
+    forbidden and it is not.
+    """
+    if not raw:
+        return ()
+    if not isinstance(raw, dict):
+        raise ConfigurationError(f"{path} must be a mapping of deny, ask and allow lists")
+    unknown = sorted(set(raw) - set(EFFECTS))
+    if unknown:
+        raise ConfigurationError(
+            f"{path} has unknown effects: {', '.join(unknown)}. Use {', '.join(EFFECTS)}."
+        )
+    rules: list[PolicyRule] = []
+    for effect in EFFECTS:
+        entries = raw.get(effect, []) or []
+        if not isinstance(entries, list):
+            raise ConfigurationError(f"{path}.{effect} must be a list of rules")
+        for index, entry in enumerate(entries):
+            text = schema.string(entry, f"{path}.{effect}[{index}]")
+            try:
+                rules.append(parse_rule(text, effect))
+            except ValueError as exc:
+                raise ConfigurationError(f"{path}.{effect}[{index}]: {exc}") from exc
+    return tuple(rules)
 
 
 def _routing_attributes(item: dict, name: str) -> dict:

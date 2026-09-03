@@ -148,7 +148,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--mode",
         default="suggest",
-        choices=("suggest", "auto-edit", "full-auto"),
+        choices=("plan", "suggest", "auto-edit", "full-auto"),
         help="how much to ask before acting (default: suggest)",
     )
     parser.add_argument(

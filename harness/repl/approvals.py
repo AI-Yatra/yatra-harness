@@ -1,18 +1,25 @@
 """Deciding what the model is allowed to actually do.
 
 The REPL edits the operator's real working directory, so this is the module
-that stands between a proposed side effect and the filesystem. Three rules,
-in order:
+that stands between a proposed side effect and the filesystem. The order is
+from least negotiable to most:
 
 1. The deny-list is absolute. A command matching it is refused and is never
    offered for approval, because a human clicking yes on a prompt is exactly
    the mistake the deny-list exists to prevent.
-2. Reads never ask.
-3. Everything else asks, unless the mode says otherwise or the operator has
+2. An operator rule decides one specific thing, so it outranks the mode, which
+   is only a default for everything. A deny rule holds in every mode including
+   full-auto; an ask rule asks in a mode that would not have; an allow rule
+   waves through what a mode would have asked about. No rule can reach past
+   the deny-list.
+3. Reads never ask, unless a rule says to ask about that one.
+4. Plan mode refuses anything that would change something, rather than
+   offering to approve it one at a time.
+5. Everything else asks, unless the mode says otherwise or the operator has
    already said "don't ask again" for this shape of action.
 
-The modes mirror the three that coding agents have converged on: ask about
-everything, ask only about running commands, ask about nothing.
+The modes mirror what coding agents have converged on: read without changing,
+ask about everything, ask only about running commands, ask about nothing.
 """
 
 from __future__ import annotations
@@ -23,7 +30,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 from harness.core.contracts import RiskLevel, ToolSpec
-from harness.execution.policy import denied_pattern, normalize_command
+from harness.execution.policy import denied_pattern, normalize_command, rule_for
 
 # Guarded because `config` is the composition root: it imports every
 # module it configures, so importing it back at runtime would close a
@@ -36,6 +43,9 @@ if TYPE_CHECKING:
 class Mode(StrEnum):
     """How much the gate asks about."""
 
+    #: Read and search only. Nothing that changes anything, and nothing to
+    #: approve: the answer is no until the operator leaves this mode.
+    PLAN = "plan"
     #: Ask before every write and every command.
     SUGGEST = "suggest"
     #: Edit files freely; still ask before running anything.
@@ -46,6 +56,7 @@ class Mode(StrEnum):
     @property
     def label(self) -> str:
         return {
+            Mode.PLAN: "reads and plans, changes nothing",
             Mode.SUGGEST: "asks before edits and commands",
             Mode.AUTO_EDIT: "edits freely, asks before commands",
             Mode.FULL_AUTO: "does not ask",
@@ -125,10 +136,47 @@ class Gate:
         if refusal is not None:
             return Decision(False, refusal)
 
-        if tool.risk is RiskLevel.READ:
+        # Operator rules outrank the mode in both directions, and a deny rule
+        # applies in every mode including full-auto. A mode is a default for
+        # everything; a rule is a decision about one thing, and the specific
+        # decision should win.
+        rule = rule_for(tool.name, arguments, self.policy.rules)
+        if rule is not None and rule.effect == "deny":
+            return Decision(
+                False,
+                f"a policy rule refuses this: {rule.text}. Do not retry it, and do not "
+                "reach the same effect another way; say what is blocked instead.",
+            )
+
+        if tool.risk is RiskLevel.READ and (rule is None or rule.effect == "allow"):
             return Decision(True, "reads do not need approval")
 
-        if not self._must_ask(tool.risk):
+        if self.mode is Mode.PLAN and tool.risk is not RiskLevel.READ:
+            # A refusal rather than a prompt, deliberately. The point of the
+            # mode is to read a codebase without any chance of changing it, so
+            # offering to approve each change one at a time would be the same
+            # as not being in the mode. Saying the way out keeps the model from
+            # spending the turn asking for permission it cannot be given.
+            return Decision(
+                False,
+                f"{tool.name} would change something and this session is in plan mode, "
+                "which reads only. Finish the plan and say what you would do; the "
+                "operator switches with /mode auto-edit when they are ready.",
+            )
+
+        # An allow rule answers "may this be done at all", which is a narrower
+        # question than the mode is asking. It is checked after plan mode on
+        # purpose: plan mode is the operator saying they do not want anything
+        # changed right now, and a standing permission should not quietly
+        # override the intent of the session they are in.
+        if rule is not None and rule.effect == "allow":
+            return Decision(True, f"a policy rule allows this: {rule.text}")
+
+        # An ask rule is the one case where a rule makes things stricter
+        # without refusing: full-auto would not have asked, and the operator
+        # said this particular thing is worth being asked about.
+        asks = rule is not None and rule.effect == "ask"
+        if not asks and not self._must_ask(tool.risk):
             return Decision(True, f"{self.mode.value} mode")
 
         request = self._describe(tool, arguments)
@@ -161,6 +209,11 @@ class Gate:
         )
 
     def _must_ask(self, risk: RiskLevel) -> bool:
+        if self.mode is Mode.PLAN:
+            # Unreachable through `check`, which stops plan mode earlier. Kept
+            # correct anyway so a future caller cannot read "does not ask" as
+            # "allows".
+            return True
         if self.mode is Mode.FULL_AUTO:
             return False
         if self.mode is Mode.AUTO_EDIT:

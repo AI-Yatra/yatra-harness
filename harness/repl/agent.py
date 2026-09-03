@@ -13,13 +13,15 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from harness.core.contracts import ToolSpec
+from harness.core.contracts import RiskLevel, ToolSpec
 from harness.core.errors import HarnessError, PermanentProviderError, TransientProviderError
+from harness.execution.hooks import HookRunner
 from harness.repl.tools import ReplToolset
 
 from .approvals import Gate
+from .checkpoints import Checkpoints
 from .conversation import AssistantTurn, Conversation, ToolCall
 from .model import ChatModel
 
@@ -71,6 +73,12 @@ class Events:
     on_thinking: Callable[[bool], None] = lambda _busy: None
 
 
+#: Risk levels whose calls can change the working tree. READ and CONTROL
+#: cannot, so snapshotting after them would record identical states and push
+#: the useful ones out of the kept range.
+_MUTATING = frozenset({RiskLevel.WRITE, RiskLevel.EXECUTE})
+
+
 class Agent:
     """One session: a thread, a working directory, a model and a gate."""
 
@@ -84,6 +92,8 @@ class Agent:
         config: HarnessConfig,
         events: Events | None = None,
         limits: Limits | None = None,
+        checkpoints: Checkpoints | None = None,
+        hooks: HookRunner | None = None,
     ) -> None:
         self.model = model
         self.conversation = conversation
@@ -93,12 +103,21 @@ class Agent:
         self.events = events or Events()
         self.limits = limits or Limits()
         self.specs: dict[str, ToolSpec] = {spec.name: spec for spec in toolset.specs()}
+        self.checkpoints = checkpoints
+        self.hooks = hooks or HookRunner()
         self._cancel = threading.Event()
 
     # -------------------------------------------------------------- interrupt
 
     def cancel(self) -> None:
-        """Ask the running turn to stop at the next safe point."""
+        """Ask the running turn to stop at the next safe point.
+
+        Called from a signal handler, so it does the least it can: set a flag
+        the loop reads between steps and between tool calls. Raising from the
+        handler instead is what the loop is trying to avoid, because the
+        interpreter delivers that wherever the program happens to be, which
+        can be the middle of writing a file.
+        """
         self._cancel.set()
 
     def _check_cancelled(self) -> None:
@@ -111,12 +130,6 @@ class Agent:
         """Run one user message to completion. Returns what it cost."""
         self._cancel.clear()
         self.conversation.add_user(message)
-        return self._drive()
-
-    def resume_after_interrupt(self, note: str) -> TurnStats:
-        """Continue the thread after the operator cut a turn short."""
-        self._cancel.clear()
-        self.conversation.add_system_note(note)
         return self._drive()
 
     def _drive(self) -> TurnStats:
@@ -201,6 +214,7 @@ class Agent:
             return False
 
         self.events.on_tool_start(call, spec)
+        self._fire("tool_start", call.name, {"arguments": describe_arguments(call)})
 
         decision = self.gate.check(spec, call.arguments)
         if not decision.allowed:
@@ -212,7 +226,30 @@ class Agent:
         detail = outcome.detail or ("done" if outcome.ok else outcome.content)
         self.events.on_tool_end(call, detail, outcome.ok)
         self._record(call, outcome.content if outcome.ok else f"Error: {outcome.content}")
+        # After the call rather than inside the tool, so a command that
+        # reformatted the tree or regenerated a lockfile is captured too. A
+        # snapshot taken only by the edit tools would miss exactly the changes
+        # an operator is least likely to have expected.
+        if self.checkpoints is not None and spec.risk in _MUTATING:
+            self.checkpoints.record(f"{call.name} {describe_arguments(call)}"[:120])
+        # After the checkpoint, so a hook that reformats the tree is itself
+        # captured by the next one rather than appearing as an unexplained
+        # difference later.
+        self._fire("tool_end", call.name, {"ok": outcome.ok, "detail": detail})
         return outcome.ok
+
+    def _fire(self, event: str, tool: str, payload: dict[str, Any]) -> None:
+        """Run the operator's hooks and report anything that went wrong.
+
+        A failing hook is the operator's problem to see, not the model's, so it
+        reaches the screen and never the conversation. Telling the model a
+        formatter is missing would have it try to fix the formatter.
+        """
+        for report in self.hooks.fire(event, tool=tool, payload=payload):
+            if not report.ok:
+                self.events.on_notice(
+                    f"hook {report.hook.label!r} failed: {report.output[:200]}"
+                )
 
     def _record(self, call: ToolCall, content: str) -> None:
         self.conversation.add_tool_result(call.id, call.name, content)

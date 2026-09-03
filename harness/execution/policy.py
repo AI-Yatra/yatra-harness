@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import fnmatch
 import re
 import shlex
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -291,6 +292,112 @@ def denied_pattern(
         for code in code_blocks:
             if _mentions(tuple(pattern), code):
                 return " ".join(pattern)
+    return None
+
+
+#: What a rule does when it matches, strongest first. Order is the precedence:
+#: a deny anywhere in the list beats an ask, which beats an allow, so adding a
+#: permissive rule can never quietly widen something already restricted.
+EFFECTS = ("deny", "ask", "allow")
+
+_RULE = re.compile(r"^\s*(?P<tool>[A-Za-z_][A-Za-z0-9_]*|\*)\s*(?:\(\s*(?P<pattern>.*?)\s*\))?\s*$")
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyRule:
+    """One operator rule: which tool, which arguments, and what to do.
+
+    Written as `run_command(git push *)` or `write_file(*.env)` or bare
+    `web_search`, which is the shape people already know from other harnesses
+    and reads the same as the call it governs.
+    """
+
+    effect: str
+    tool: str
+    pattern: str = ""
+    source: str = ""
+
+    @property
+    def text(self) -> str:
+        return f"{self.tool}({self.pattern})" if self.pattern else self.tool
+
+
+def parse_rule(text: str, effect: str) -> PolicyRule:
+    """Parse one rule, or say why it is not one."""
+    if effect not in EFFECTS:
+        raise ValueError(f"rule effect must be one of {', '.join(EFFECTS)}, got {effect!r}")
+    match = _RULE.match(text)
+    if not match:
+        raise ValueError(
+            f"{text!r} is not a rule. Write it as tool(pattern), for example "
+            "run_command(git push *), or as a bare tool name."
+        )
+    return PolicyRule(effect, match.group("tool"), match.group("pattern") or "", text)
+
+
+def _glob_tokens(pattern: tuple[str, ...], tokens: tuple[str, ...]) -> bool:
+    """Match a token pattern where `*` stands for any run of tokens.
+
+    Tokens rather than characters, because a command is a list and matching it
+    as a string would let `git pushed` satisfy a rule written for `git push`.
+    """
+    if not pattern:
+        return not tokens
+    head, rest = pattern[0], pattern[1:]
+    if head == "*":
+        if not rest:
+            return True
+        return any(_glob_tokens(rest, tokens[index:]) for index in range(len(tokens) + 1))
+    if not tokens or (tokens[0] != head and not fnmatch.fnmatch(tokens[0], head)):
+        return False
+    return _glob_tokens(rest, tokens[1:])
+
+
+def _subjects(tool: str, arguments: dict[str, Any]) -> list[tuple[str, ...]]:
+    """What a rule's pattern is matched against for this call.
+
+    A command is matched against every spelling it would actually run, so a
+    rule written for `git push` also covers `bash -c "git push"`, exactly as
+    the deny-list does. Everything else is matched on its path, which is the
+    argument an operator means when they write `write_file(*.env)`.
+    """
+    if tool == "run_command":
+        command = arguments.get("command")
+        if isinstance(command, str):
+            command = command.split()
+        if not isinstance(command, list):
+            return []
+        return expand_command(tuple(str(part) for part in command))
+    path = arguments.get("path") or arguments.get("url") or arguments.get("query")
+    return [(str(path),)] if path else [()]
+
+
+def rule_for(
+    tool: str, arguments: dict[str, Any], rules: Sequence[PolicyRule]
+) -> PolicyRule | None:
+    """The rule governing this call, or None when the operator wrote none.
+
+    Deny is searched before ask and ask before allow, so precedence does not
+    depend on the order rules happen to appear in the file. Within one effect
+    the first match wins, which makes a list readable top to bottom.
+    """
+    subjects = _subjects(tool, arguments)
+    for effect in EFFECTS:
+        for rule in rules:
+            if rule.effect != effect:
+                continue
+            if rule.tool not in ("*", tool):
+                continue
+            if not rule.pattern:
+                return rule
+            wanted = tuple(shlex.split(rule.pattern)) if rule.pattern.strip() else ()
+            if any(_glob_tokens(normalize_command(wanted), subject) for subject in subjects):
+                return rule
+            if any(
+                len(subject) == 1 and fnmatch.fnmatch(subject[0], rule.pattern)
+                for subject in subjects
+            ):
+                return rule
     return None
 
 

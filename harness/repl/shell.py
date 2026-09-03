@@ -7,19 +7,24 @@ an interrupted turn rather than a dead process.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import shlex
+import signal
 import time
 import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from harness.config import HarnessConfig, RouteConfig, load_config
 from harness.core.contracts import ToolSpec
 from harness.core.errors import HarnessError
 from harness.core.util import is_chat_model, model_version
 from harness.execution.process import run_process
+from harness.execution.sandbox import detect_mechanism as sandbox_mechanism
 from harness.execution.tools import optional_tools
 from harness.execution.workspace import Workspace
 from harness.models import auth, prompting
@@ -29,6 +34,7 @@ from . import banner as banner_art
 from . import prompt as prompt_builder
 from .agent import Agent, Events, Interrupted, ModelUnavailable, describe_arguments
 from .approvals import Gate, Mode, Request, Verdict
+from .checkpoints import Checkpoints
 from .conversation import Conversation, ToolCall
 from .model import ChatModel, RouteChain
 from .render import Console, Renderer, Spinner
@@ -41,13 +47,15 @@ Ask anything, or give an instruction. The agent works in this directory.
   /help              this
   /model [name]      show or switch the model
   /models [filter]   what the current provider actually serves
-  /mode [name]       approval mode: suggest, auto-edit, full-auto
+  /mode [name]       plan, suggest, auto-edit, full-auto
   /profile [name]    prompting dials for this route, or a dial to change
   /approvals         what you have allowed for the rest of this session
   /tools             the tools the model can call
   /context           how full the context window is
   /cost              tokens used this session
   /compact           summarise the conversation to free context
+  /undo              put the files back to before the last change
+  /checkpoints       the states this session can go back to
   /clear             forget the conversation and start fresh
   /init              write an AGENTS.md describing this repository
   /config            the active config file and route
@@ -111,11 +119,23 @@ class Shell:
             extra = []
             self._startup_notices.append(f"optional tools unavailable: {exc}")
         self.toolset = ReplToolset(self.workspace, self.config, extra_tools=extra)
+        # A sandbox that quietly is not one is worse than none, because the
+        # operator relaxes on the strength of it. If the kernel mechanism is
+        # missing, the session says so at startup rather than at no point.
+        if self.config.sandbox.kind == "os":
+            mechanism, why = sandbox_mechanism()
+            if not mechanism:
+                self._startup_notices.append(
+                    f"sandbox: kind is os but {why}. Commands run unconfined."
+                )
         self.gate = Gate(self.config.policy, mode=self.mode, prompt=self._ask)
         self.guessed_route = ""
         self.route = self._route(options.model_override)
         self.model = self._chat_model()
         self.conversation = self._open_conversation()
+        # Rooted next to the session files rather than in the operator's
+        # repository, so an undo never writes to the history they will publish.
+        self.checkpoints = Checkpoints(self.root, self.root / options.sessions_dir.name / "checkpoints.git")
         self.agent = Agent(
             model=self.model,
             conversation=self.conversation,
@@ -123,6 +143,7 @@ class Shell:
             gate=self.gate,
             config=self.config,
             events=self._events(),
+            checkpoints=self.checkpoints,
         )
         self.total_in = 0
         self.total_out = 0
@@ -402,6 +423,12 @@ class Shell:
         if name == "profile":
             self._switch_profile(argument)
             return True
+        if name == "undo":
+            self._undo(argument)
+            return True
+        if name == "checkpoints":
+            self._list_checkpoints()
+            return True
         if name == "approvals":
             standing = self.gate.standing_approvals
             if not standing:
@@ -610,6 +637,79 @@ class Shell:
         )
         self.render.notice(f"{reason}; the system prompt was rebuilt for this session.")
 
+    def _list_checkpoints(self) -> None:
+        found = self.checkpoints.list()
+        if not found:
+            reason = self.checkpoints.reason
+            self.render.notice(
+                f"no checkpoints yet ({reason})" if reason else "no checkpoints yet; "
+                "one is taken after every change the agent makes."
+            )
+            return
+        self.console.line()
+        for index, point in enumerate(found):
+            marker = "now" if index == 0 else f"-{index}"
+            self.console.line(
+                f"  {marker:>4}  {self.console.dim(point.short)}  {point.label[:64]}"
+                f"  {self.console.dim(point.when)}"
+            )
+        self.console.line()
+        self.console.line("  " + self.console.dim("/undo, or /undo <id> to go back to one"))
+
+    def _undo(self, argument: str) -> None:
+        """Put the files back, after saying exactly what that would change."""
+        found = self.checkpoints.list()
+        if not found:
+            reason = self.checkpoints.reason
+            self.render.notice(
+                f"nothing to undo ({reason})" if reason else "nothing to undo yet."
+            )
+            return
+        if argument:
+            target = next((c for c in found if c.ref.startswith(argument)), None)
+            if target is None:
+                self.render.error(f"no checkpoint starting {argument!r}; try /checkpoints")
+                return
+        elif len(found) > 1:
+            target = found[1]
+        else:
+            target = found[0]
+
+        changed = self.checkpoints.changed_since(target.ref)
+        if not changed:
+            self.render.notice("the files already match that checkpoint.")
+            return
+
+        self.console.line()
+        self.console.line(f"  going back to {self.console.dim(target.short)} {target.label[:60]}")
+        for path in changed[:12]:
+            self.console.line(f"    {path}")
+        if len(changed) > 12:
+            self.console.line(f"    {self.console.dim(f'and {len(changed) - 12} more')}")
+        # Asked rather than assumed, because the operator may have edited these
+        # themselves between two turns and a silent restore would discard their
+        # work with no way back to it.
+        if not self._confirm(f"restore {len(changed)} path(s)?"):
+            self.render.notice("left as it is.")
+            return
+        if self.checkpoints.restore(target.ref):
+            self.checkpoints.record(f"undo to {target.short}")
+            self.render.notice(f"restored {len(changed)} path(s) to {target.short}.")
+            self.conversation.add_system_note(
+                "The operator undid the file changes. The working tree no longer matches "
+                "what you did; read anything before relying on it."
+            )
+        else:
+            self.render.error("could not restore; the files were left as they are.")
+
+    def _confirm(self, question: str) -> bool:
+        self.console.write(f"  {question} [y/N] ")
+        try:
+            return input().strip().lower() in {"y", "yes"}
+        except (EOFError, KeyboardInterrupt):
+            self.console.line()
+            return False
+
     def _switch_mode(self, argument: str) -> None:
         if not argument:
             self.render.notice(f"mode: {self.mode.value} - {self.mode.label}")
@@ -620,7 +720,10 @@ class Shell:
             self.render.error(f"modes are: {', '.join(m.value for m in Mode)}")
             return
         self.gate.mode = self.mode
-        self.render.notice(f"mode -> {self.mode.value} ({self.mode.label})")
+        # The system prompt states the mode, so a switch the model is not told
+        # about leaves it planning edits it is about to be refused, or asking
+        # for approval that no longer gets requested.
+        self._restart_conversation(f"mode -> {self.mode.value} ({self.mode.label})")
 
     def _show_context(self) -> None:
         used = self.conversation.token_estimate()
@@ -673,15 +776,57 @@ class Shell:
 
     # ------------------------------------------------------------------- turns
 
+    @contextlib.contextmanager
+    def _interruptible(self) -> Iterator[None]:
+        """Make the first Ctrl-C a request and the second one an order.
+
+        The agent had a cooperative cancel and nothing ever called it, so every
+        interrupt arrived as a KeyboardInterrupt raised wherever the
+        interpreter happened to be. Usually that is harmless. Sometimes it is
+        inside `edit_file` between reading a file and writing it back, and the
+        result is a truncated file the operator did not ask for.
+
+        The first Ctrl-C now sets a flag the loop reads between steps and
+        between tool calls, so the turn stops after the current tool finishes
+        rather than during it. A second Ctrl-C restores the default handler's
+        behaviour and interrupts immediately, because an operator pressing it
+        twice has stopped asking politely.
+
+        Only the main thread can install a handler, and some hosts do not allow
+        it at all, so a failure here falls back to the old behaviour rather
+        than refusing to run the turn.
+        """
+        pressed = 0
+        previous: Any = None
+
+        def handle(signum: int, frame: Any) -> None:
+            nonlocal pressed
+            pressed += 1
+            if pressed == 1:
+                self.agent.cancel()
+                self.render.notice("Stopping after this step; press ctrl-c again to stop now.")
+                return
+            signal.signal(signal.SIGINT, previous or signal.default_int_handler)
+            raise KeyboardInterrupt
+
+        try:
+            previous = signal.signal(signal.SIGINT, handle)
+        except (ValueError, OSError):
+            yield  # not the main thread, or a host that forbids handlers
+            return
+        try:
+            yield
+        finally:
+            with contextlib.suppress(ValueError, OSError):
+                signal.signal(signal.SIGINT, previous)
+
     def _run_turn(self, message: str) -> bool:
         """Run one message. False when the turn did not complete."""
         started = time.monotonic()
         try:
-            stats = self.agent.send(message)
-        except KeyboardInterrupt:
-            self._abandon_turn()
-            return False
-        except Interrupted:
+            with self._interruptible():
+                stats = self.agent.send(message)
+        except (KeyboardInterrupt, Interrupted):
             self._abandon_turn()
             return False
         except ModelUnavailable as exc:
