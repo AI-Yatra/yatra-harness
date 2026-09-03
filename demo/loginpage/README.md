@@ -64,6 +64,9 @@ No flags. `ay` works in the directory you started it in and reads the
 
 Then paste this at the `>` prompt:
 
+Paste the whole block at once. `ay` reads lines that arrive together as one
+message, so a multi-line prompt stays a single turn.
+
 ```
 The sign-in page is a mess and the tests prove it. Run
 `python -m unittest discover -s tests` to see the eleven failures, then fix

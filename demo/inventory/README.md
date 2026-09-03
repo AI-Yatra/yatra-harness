@@ -112,7 +112,10 @@ this session, and every tool the model can call.
 
 ## If you only want it fixed
 
-Skip the tour and type this instead:
+Skip the tour and paste this instead:
+
+Paste the whole block at once. `ay` reads lines that arrive together as one
+message, so a multi-line prompt stays a single turn.
 
 ```
 The tests are failing. Run them, fix inventory.py so every test passes, then

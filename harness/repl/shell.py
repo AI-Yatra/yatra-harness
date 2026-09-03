@@ -38,7 +38,8 @@ from .approvals import Gate, Mode, Request, Verdict
 from .checkpoints import Checkpoints
 from .conversation import Conversation, ToolCall
 from .model import ChatModel, RouteChain
-from .render import PASTE_END, PASTE_OFF, PASTE_ON, PASTE_START, Console, Renderer, Spinner
+from .reading import PASTE_OFF, PASTE_ON, LineReader, read_message
+from .render import Console, Renderer, Spinner
 from .theme import GUTTER
 
 HISTORY_LIMIT = 500
@@ -67,6 +68,7 @@ Ask anything, or give an instruction. The agent works in this directory.
   @path/to/file      include a file's contents with your message
   !command           run a shell command yourself, without the model
   \\ at end of line   continue on the next line
+  paste a block      arrives as one message, not one line per turn
 """
 
 
@@ -167,6 +169,12 @@ class Shell:
         self.total_out = 0
         self._spinner: Spinner | None = None
         self._streamed = False
+        # One object reads stdin for the whole session. Two readers -- the
+        # worker here and an `input()` inside the approval prompt -- would race
+        # for the operator's answer, and whichever won would decide whether an
+        # action was approved.
+        self.reader = LineReader()
+        self.render.reader = self.reader
 
     # ------------------------------------------------------------------ setup
 
@@ -395,39 +403,22 @@ class Shell:
             pass
 
     def _read(self) -> str | None:
-        """One logical input, which may span lines. None means end of input."""
-        parts: list[str] = []
-        while True:
-            marker = "  " if parts else self.console.accent("> ")
-            try:
-                self.console.write("\n" + marker if not parts else marker)
-                line = input()
-            except EOFError:
-                return None
-            except KeyboardInterrupt:
-                self.console.line()
-                if not parts:
-                    self.console.line(self.console.muted("  (ctrl-c again or /exit to leave)"))
-                    return ""
-                return ""
-            if PASTE_START in line:
-                # A paste is one message however many lines it has. Read line
-                # by line, every line after the first became a separate turn,
-                # and the leftovers were answered into whatever prompt opened
-                # next -- including a permission question.
-                parts.append(line.split(PASTE_START, 1)[1])
-                while PASTE_END not in parts[-1]:
-                    try:
-                        parts.append(input())
-                    except (EOFError, KeyboardInterrupt):
-                        break
-                parts[-1] = parts[-1].split(PASTE_END, 1)[0]
-                return "\n".join(parts).strip()
-            if line.endswith("\\"):
-                parts.append(line[:-1])
-                continue
-            parts.append(line)
-            return "\n".join(parts).strip()
+        """One logical input, which may span lines. None means end of input.
+
+        A paste arrives as a run of lines with nothing marking it, so the
+        reader groups whatever lands together. See `reading.py` for why the
+        terminal cannot be relied on to tell us.
+        """
+        self.console.write("\n" + self.console.accent("> "))
+        try:
+            # Grouping is a terminal behaviour. A pipe delivers everything
+            # at once, so timing says nothing there and grouping would turn a
+            # script of commands into one enormous message.
+            return read_message(self.reader, group=self.console.stream.isatty())
+        except KeyboardInterrupt:
+            self.console.line()
+            self.console.line(self.console.muted("  (ctrl-c again or /exit to leave)"))
+            return ""
 
     def _expand(self, text: str) -> str:
         """Inline the contents of any `@path` the operator referenced."""
@@ -1044,6 +1035,7 @@ class Shell:
         if not self._credential_ready():
             return 2
         self._setup_readline()
+        self.reader.start()
         self._paste_mode(on=True)
         self._banner()
 
