@@ -57,6 +57,42 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(SandboxConfig().kind, "local")
 
 
+class ProbeTests(unittest.TestCase):
+    """Presence is not capability, and assuming it was hid a real failure.
+
+    `--unshare-net` asks the kernel to bring a loopback interface up inside
+    the new namespace. In a container, or under a hardened AppArmor profile,
+    that is refused and *every* command through the sandbox fails rather than
+    running confined. The first CI run that installed bwrap found it at once;
+    the suite had been green for as long as bwrap was absent, which was
+    everywhere.
+    """
+
+    def test_the_probe_answers_both_questions(self) -> None:
+        from harness.execution.sandbox import probe_bubblewrap
+
+        if not shutil.which("bwrap"):
+            self.skipTest("bubblewrap is not installed")
+        probe = probe_bubblewrap()
+        self.assertIsInstance(probe.usable, bool)
+        self.assertIsInstance(probe.network, bool)
+
+    def test_a_host_that_cannot_unshare_the_network_still_confines_files(self) -> None:
+        """Half a sandbox is worth having; half a sandbox unannounced is not."""
+        argv = bubblewrap_command(
+            SandboxConfig(kind="os"), ["x"], workspace=WORKSPACE, network=False
+        )
+        self.assertNotIn("--unshare-net", argv)
+        self.assertIn("--bind", argv)
+        self.assertIn("--ro-bind-try", argv)
+
+    def test_the_operator_is_told_when_the_network_is_not_confined(self) -> None:
+        sandbox = OsSandbox(SandboxConfig(kind="os"))
+        if sandbox.mechanism != "bubblewrap" or sandbox.network_confined:
+            self.skipTest("this host confines the network")
+        self.assertIn("network", sandbox.reason)
+
+
 class MechanismTests(unittest.TestCase):
     def test_it_names_a_mechanism_or_says_why_not(self) -> None:
         mechanism, reason = detect_mechanism()

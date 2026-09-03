@@ -465,8 +465,8 @@
  "generated_by": "docs/atlas/scripts/scan_harness.py",
  "head": {
   "date": "2026-09-03",
-  "sha": "56e3581",
-  "subject": "Remove retrieval: 750 lines and 148 packages for a tool nothing called"
+  "sha": "f9baed5",
+  "subject": "Install bubblewrap in CI, and name every skip"
  },
  "lanes": [
   {
@@ -1262,8 +1262,8 @@
    "path": "harness/core/errors.py",
    "side": "harness",
    "sloc": 47,
-   "test_cases": 649,
-   "test_sloc": 5640,
+   "test_cases": 652,
+   "test_sloc": 5669,
    "tests": [
     "test_backlog.py",
     "test_compaction.py",
@@ -2621,14 +2621,14 @@
     {
      "doc": "",
      "kind": "class",
-     "line": 43,
+     "line": 45,
      "methods": [],
      "name": "SandboxConfig"
     },
     {
      "doc": "",
      "kind": "class",
-     "line": 65,
+     "line": 67,
      "methods": [
       "run"
      ],
@@ -2637,7 +2637,7 @@
     {
      "doc": "The original behaviour: a process on this machine, in the workspace.",
      "kind": "class",
-     "line": 88,
+     "line": 90,
      "methods": [
       "run"
      ],
@@ -2646,7 +2646,7 @@
     {
      "doc": "A throwaway container with the workspace mounted and nothing else.",
      "kind": "class",
-     "line": 109,
+     "line": 111,
      "methods": [
       "run"
      ],
@@ -2655,7 +2655,7 @@
     {
      "doc": "Confinement from the kernel, without a container.",
      "kind": "class",
-     "line": 137,
+     "line": 139,
      "methods": [
       "run"
      ],
@@ -2664,70 +2664,86 @@
     {
      "doc": "Which kernel sandbox is available here, and why not when there is none.",
      "kind": "function",
-     "line": 182,
+     "line": 197,
      "methods": [],
      "name": "detect_mechanism"
     },
     {
+     "doc": "What bubblewrap can actually do on this host, as opposed to whether it exists.",
+     "kind": "class",
+     "line": 217,
+     "methods": [],
+     "name": "Probe"
+    },
+    {
+     "doc": "Run bubblewrap once and find out what it can do here.",
+     "kind": "function",
+     "line": 241,
+     "methods": [],
+     "name": "probe_bubblewrap"
+    },
+    {
      "doc": "An Apple Seatbelt profile allowing reads, writes only in the workspace.",
      "kind": "function",
-     "line": 199,
+     "line": 266,
      "methods": [],
      "name": "seatbelt_profile"
     },
     {
      "doc": "The `sandbox-exec` invocation for one command. Pure, so it is testable.",
      "kind": "function",
-     "line": 221,
+     "line": 288,
      "methods": [],
      "name": "seatbelt_command"
     },
     {
      "doc": "The `bwrap` invocation for one command.",
      "kind": "function",
-     "line": 233,
+     "line": 300,
      "methods": [],
      "name": "bubblewrap_command"
     },
     {
      "doc": "The `docker run` invocation for one command.",
      "kind": "function",
-     "line": 275,
+     "line": 342,
      "methods": [],
      "name": "docker_command"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 336,
+     "line": 403,
      "methods": [],
      "name": "build_sandbox"
     },
     {
      "doc": "",
      "kind": "function",
-     "line": 344,
+     "line": 411,
      "methods": [],
      "name": "sandbox_config_from_dict"
     }
    ],
-   "api_count": 12,
-   "classes": 5,
+   "api_count": 14,
+   "classes": 6,
    "commits": 4,
    "doc": "Where a tool command actually runs.",
    "doc_full": "Where a tool command actually runs.\n\nPath containment and a command allowlist confine the model's *interface*.\nThey do not confine the operating system: an allowlisted test runner is still\nan ordinary process on the host, with the host's filesystem and the host's\nnetwork. docs/SECURITY.md has said so honestly for as long as it has existed,\nand recommended a container. This is that container.\n\nThe rules a sandbox has to enforce are the ones an application-level gate\ncannot: no network unless asked for, no new privileges, not root, bounded\nmemory and CPU, and nothing mounted except the run workspace. All of that\nlives in `docker_command`, which is a pure function -- so those rules are\nchecked on every machine, and only the test that genuinely starts a container\nneeds docker installed.\n\nLocal execution stays the default. A workshop laptop without docker must\nstill be able to run the harness, and a teaching tool that refuses to start\nteaches nothing.",
    "external": [
     "__future__",
     "dataclasses",
+    "functools",
     "os",
     "pathlib",
     "shutil",
+    "subprocess",
     "sys",
     "typing"
    ],
    "fan_in": 5,
    "fan_out": 2,
-   "functions": 7,
+   "functions": 8,
    "imported_by": [
     "config",
     "execution.tools",
@@ -2742,13 +2758,13 @@
    "in_boundary": true,
    "last_touched": "2026-09-03",
    "layer": "execution",
-   "lines": 366,
+   "lines": 433,
    "name": "execution.sandbox",
    "path": "harness/execution/sandbox.py",
    "side": "harness",
-   "sloc": 287,
-   "test_cases": 74,
-   "test_sloc": 575,
+   "sloc": 340,
+   "test_cases": 77,
+   "test_sloc": 604,
    "tests": [
     "test_os_sandbox.py",
     "test_sandbox.py",
@@ -3057,7 +3073,7 @@
    ],
    "api_count": 6,
    "classes": 2,
-   "commits": 1,
+   "commits": 2,
    "doc": "What the project's own checker says about a file the agent just changed.",
    "doc_full": "What the project's own checker says about a file the agent just changed.\n\nWithout this the agent is editing blind. It writes a change, the change is\napplied, and nothing tells it that the file no longer imports, no longer type\nchecks, or breaks a lint rule the repository enforces. It finds out later, if\nit happens to run the right command, or it never finds out and hands back\nsomething that does not compile.\n\n**This is not a hook, and the difference is the whole point.** A hook observes\nand its output deliberately never reaches the model, because a formatter that\nis not installed is the operator's problem and a model told about it tries to\nfix it. Diagnostics are the opposite: the report is *about the model's own\nedit*, it is exactly what the model needs, and it is useless to anyone else.\nOne mechanism could not have both rules.\n\nA CLI checker rather than a language server, deliberately. A language server\nmeans a client, a lifecycle, a protocol and a per-language install, and the\nprojects that most want this already have `ruff`, `tsc` or `mypy` configured\nand know how to run them. The tradeoff is real -- no go-to-definition, no call\ngraph -- and it is documented rather than hidden.\n\nThe one rule everything here is shaped by: **a diagnostic is not a failed\nedit.** Another agent shipped this exact bug -- its model read the diagnostics\nattached to a successful edit and concluded the edit had not been applied, so\nit wrote the same change again. So the edit's own result comes first and\nstands on its own, the report is separated from it and labelled, and the\ntool's success flag never changes because a checker had something to say.",
    "external": [
@@ -5236,7 +5252,7 @@
    ],
    "api_count": 5,
    "classes": 3,
-   "commits": 2,
+   "commits": 3,
    "doc": "The message history a session accumulates, and what to do when it fills.",
    "doc_full": "The message history a session accumulates, and what to do when it fills.\n\nMessages are held in the OpenAI chat shape because it is the one every route\nin this repository speaks natively except Anthropic, which `model.py`\nconverts on the way out. Holding one canonical shape means compaction,\npersistence and token accounting are written once.",
    "external": [
@@ -5792,15 +5808,15 @@
   {
    "asks": "where a command runs and what it can reach",
    "batch": {
-    "api": 17,
+    "api": 19,
     "missing": [],
     "modules": [
      "execution.sandbox",
      "execution.process",
      "execution.workspace"
     ],
-    "sloc": 664,
-    "tests": 572
+    "sloc": 717,
+    "tests": 575
    },
    "key": "execution.sandbox",
    "name": "Sandbox and execution",
@@ -5813,7 +5829,7 @@
     "sloc": 654,
     "tests": 336
    },
-   "sloc": 1318
+   "sloc": 1371
   },
   {
    "asks": "which model, which credential, what if it fails",
@@ -5951,7 +5967,7 @@
      "core.errors"
     ],
     "sloc": 290,
-    "tests": 649
+    "tests": 652
    },
    "key": "reliability",
    "name": "Reliability",
@@ -6454,13 +6470,13 @@
    "sloc": 165
   },
   "test_os_sandbox.py": {
-   "cases": 27,
+   "cases": 30,
    "covers": [
     "core.errors",
     "execution.sandbox"
    ],
-   "lines": 224,
-   "sloc": 174
+   "lines": 260,
+   "sloc": 203
   },
   "test_patch_recovery.py": {
    "cases": 6,
@@ -6960,16 +6976,16 @@
   }
  ],
  "totals": {
-  "api": 295,
+  "api": 297,
   "commands": 20,
   "commits": 18,
   "edges": 203,
-  "lines": 16866,
+  "lines": 16933,
   "modules": 57,
-  "sloc": 13763,
-  "test_cases": 1216,
+  "sloc": 13816,
+  "test_cases": 1219,
   "test_files": 53,
-  "test_sloc": 10417,
+  "test_sloc": 10446,
   "tools": 14
  },
  "transitions": [

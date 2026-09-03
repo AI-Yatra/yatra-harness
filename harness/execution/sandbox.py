@@ -20,8 +20,10 @@ teaches nothing.
 
 from __future__ import annotations
 
+import functools
 import os
 import shutil
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -153,6 +155,17 @@ class OsSandbox:
     def __init__(self, config: SandboxConfig) -> None:
         self.config = config
         self.mechanism, self.reason = detect_mechanism()
+        #: False when this host confines the filesystem but refuses to unshare
+        #: the network. Recorded rather than silently accepted: an operator who
+        #: asked for `network: none` and did not get it has to be told, because
+        #: the whole value of a sandbox is knowing what it actually did.
+        probe = probe_bubblewrap() if self.mechanism == "bubblewrap" else None
+        self.network_confined = probe.network if probe else True
+        if probe and not probe.network:
+            self.reason = (
+                "the filesystem is confined but this host refuses to unshare the "
+                f"network, so a command can still reach it ({probe.reason})"
+            )
 
     def run(
         self,
@@ -165,7 +178,9 @@ class OsSandbox:
     ) -> ProcessResult:
         root = Path(workspace).resolve()
         if self.mechanism == "bubblewrap":
-            argv = bubblewrap_command(self.config, command, workspace=root)
+            argv = bubblewrap_command(
+                self.config, command, workspace=root, network=self.network_confined
+            )
         elif self.mechanism == "seatbelt":
             argv = seatbelt_command(self.config, command, workspace=root)
         else:
@@ -190,10 +205,62 @@ def detect_mechanism() -> tuple[str, str]:
             return "seatbelt", ""
         return "", "sandbox-exec not found"
     if sys.platform.startswith("linux"):
-        if shutil.which("bwrap"):
-            return "bubblewrap", ""
-        return "", "bubblewrap (bwrap) is not installed"
+        if not shutil.which("bwrap"):
+            return "", "bubblewrap (bwrap) is not installed"
+        if not probe_bubblewrap().usable:
+            return "", f"bubblewrap is installed but cannot run here: {probe_bubblewrap().reason}"
+        return "bubblewrap", ""
     return "", f"no kernel sandbox is available on {sys.platform}; use kind: docker"
+
+
+@dataclass(frozen=True, slots=True)
+class Probe:
+    """What bubblewrap can actually do on this host, as opposed to whether it exists."""
+
+    usable: bool
+    #: False when the filesystem can be confined but the network cannot.
+    network: bool
+    reason: str = ""
+
+
+def _bwrap_ok(*flags: str) -> tuple[bool, str]:
+    try:
+        result = subprocess.run(  # noqa: S603 - fixed argv, no shell
+            ["bwrap", *flags, "--ro-bind", "/", "/", "true"],
+            capture_output=True, text=True, timeout=15, check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return False, f"{type(exc).__name__}: {exc}"
+    if result.returncode == 0:
+        return True, ""
+    message = (result.stderr or result.stdout).strip().splitlines()
+    return False, message[-1] if message else f"exit {result.returncode}"
+
+
+@functools.lru_cache(maxsize=1)
+def probe_bubblewrap() -> Probe:
+    """Run bubblewrap once and find out what it can do here.
+
+    Presence is not capability, and assuming it was cost us a sandbox nobody
+    had ever exercised. `--unshare-net` asks the kernel to bring up a loopback
+    interface in the new namespace, and inside a container or under a hardened
+    AppArmor profile that is refused -- `Failed RTM_NEWADDR: Operation not
+    permitted` -- so *every* command through the sandbox failed rather than
+    running confined. The first CI run that installed bwrap found it
+    immediately; a year of green suites had not, because the check skipped
+    wherever bwrap was absent, which was everywhere.
+
+    So the network is probed separately from the filesystem. A host that can
+    confine files but not sockets still gets file confinement, and is told in
+    those words rather than left to assume it got both.
+    """
+    full, reason = _bwrap_ok("--unshare-net", "--unshare-pid")
+    if full:
+        return Probe(usable=True, network=True)
+    partial, plain_reason = _bwrap_ok("--unshare-pid")
+    if partial:
+        return Probe(usable=True, network=False, reason=reason)
+    return Probe(usable=False, network=False, reason=plain_reason or reason)
 
 
 def seatbelt_profile(config: SandboxConfig, *, workspace: Path) -> str:
@@ -231,7 +298,7 @@ def seatbelt_command(
 
 
 def bubblewrap_command(
-    config: SandboxConfig, command: list[str], *, workspace: Path
+    config: SandboxConfig, command: list[str], *, workspace: Path, network: bool = True
 ) -> list[str]:
     """The `bwrap` invocation for one command.
 
@@ -267,7 +334,7 @@ def bubblewrap_command(
         argv += ["--ro-bind-try", path, path]
     root = Path(workspace).as_posix()
     argv += ["--bind", root, root, "--chdir", root]
-    if config.network == "none":
+    if config.network == "none" and network:
         argv.append("--unshare-net")
     return [*argv, *command]
 
