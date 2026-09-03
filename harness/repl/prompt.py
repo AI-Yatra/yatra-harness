@@ -38,6 +38,12 @@ def build(
     conventions = _conventions(config, root, active)
     if conventions:
         parts.append(conventions)
+    # After the conventions, deliberately. What a person wrote down outranks
+    # what the agent worked out for itself, and putting memory second is the
+    # cheapest way to say so.
+    learned = _memory(root, active)
+    if learned:
+        parts.append(learned)
     if extra.strip():
         parts.append(active.block("Operator instructions", extra.strip()))
     return "\n\n".join(parts)
@@ -83,6 +89,22 @@ def _environment(root: Path, mode: Mode, profile: PromptProfile) -> str:
         "it; grep is for when you know the exact string.",
     ]
     return "\n".join(lines)
+
+
+def _memory(root: Path, profile: PromptProfile) -> str:
+    """What earlier sessions in this repository learned.
+
+    Separate from AGENTS.md on purpose. That file is what a person wrote down
+    for anyone working here; this is what the agent worked out for itself, and
+    conflating the two would let a guess acquire the authority of a rule.
+    """
+    from harness.record import memory  # noqa: PLC0415 - avoids a cycle at import time
+
+    try:
+        body = memory.as_prompt(root)
+    except OSError:
+        return ""
+    return profile.block("Project memory", body) if body else ""
 
 
 def _git_summary(root: Path) -> str:

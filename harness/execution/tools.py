@@ -241,6 +241,28 @@ def optional_tools(
     # beyond the workspace, which is exactly what makes it worth having in a
     # conversation that has not been told where to look.
     found.append(
+        (
+            ToolSpec(
+                "remember",
+                # The description is the whole defence against a memory full
+                # of noise. It says what is worth keeping and, more usefully,
+                # what is not: the expensive failure is not forgetting, it is
+                # remembering something that was only true once.
+                "Write one durable fact about this repository for future "
+                "sessions to read. Worth remembering: a convention that is not "
+                "written down, where something surprising lives, a command that "
+                "works here, a dead end and why. Not worth remembering: "
+                "anything already in AGENTS.md or the README, anything true "
+                "only of the change you are making now, or a summary of this "
+                "conversation. One sentence.",
+                object_schema({"fact": {"type": "string"}}, ("fact",)),
+                RiskLevel.WRITE,
+            ),
+            lambda args: _remember(workspace, args),
+        )
+    )
+
+    found.append(
             (
                 ToolSpec(
                     "retrieve",
@@ -1014,6 +1036,16 @@ def _retriever(workspace: Workspace, config: HarnessConfig) -> Retriever:
             oldest = next(iter(_RETRIEVERS))
             _RETRIEVERS.pop(oldest).close()
     return found
+
+
+def _remember(workspace: Workspace, arguments: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    from harness.record import memory  # noqa: PLC0415 - avoids a cycle at import time
+
+    try:
+        entry = memory.remember(workspace.root, str(arguments.get("fact", "")))
+    except (ValueError, OSError) as exc:
+        raise ToolError(f"could not write that down: {exc}") from exc
+    return f"Remembered: {entry.text}", {"fact": entry.text, "written": entry.written.isoformat()}
 
 
 def _retrieve(

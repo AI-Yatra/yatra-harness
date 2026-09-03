@@ -10,9 +10,11 @@ from typing import Any
 
 import yaml
 
+from harness import settings
 from harness.core import schema
 from harness.core.contracts import BudgetSpec, SkillContract, TaskContract, VerificationSpec
 from harness.core.errors import ConfigurationError
+from harness.execution.diagnostics import DiagnosticsConfig, diagnostics_config_from_dict
 from harness.execution.hooks import Hook, parse_hooks
 from harness.execution.policy import EFFECTS, PolicyRule, parse_rule
 from harness.execution.retrieval import RetrievalConfig, retrieval_config_from_dict
@@ -129,8 +131,17 @@ class HarnessConfig:
     #: cannot veto, because Gate already answers that question.
     hooks: tuple[Hook, ...] = ()
     llm_light: LLMLightConfig = field(default_factory=LLMLightConfig)
+    #: The project's own checker, run after a successful write. Not a hook:
+    #: this report is about the model's own edit and goes to the model, where
+    #: a hook's output deliberately never does.
+    diagnostics: DiagnosticsConfig = field(default_factory=DiagnosticsConfig)
     fault: str = ""
     selected_model: str = ""
+    #: The project and user settings files folded onto the shipped config, in
+    #: the order they were applied. Recorded so `/config` can show where a
+    #: value came from; an operator debugging a rule needs to know which file
+    #: set it, and guessing is how they end up editing the wrong one.
+    settings_sources: tuple[Path, ...] = ()
 
     def with_overrides(
         self,
@@ -198,9 +209,19 @@ def _resolve(base: Path, value: str) -> Path:
     return (base / path).resolve() if not path.is_absolute() else path.resolve()
 
 
-def load_config(path: str | Path) -> HarnessConfig:
+def load_config(path: str | Path, *, project_root: Path | None = None) -> HarnessConfig:
+    """Load the shipped config, then fold any project settings onto it.
+
+    `project_root` is where discovery starts; None means do not discover,
+    which keeps every existing caller -- and every test -- reading exactly the
+    file it named. `ay` passes the directory it was started in.
+    """
     config_path = Path(path).expanduser().resolve()
     raw = _load_yaml(config_path)
+    layers = settings.discover(project_root) if project_root is not None else []
+    if layers:
+        raw = settings.apply(raw, layers)
+    settings_sources = tuple(layer.path for layer in layers)
     runs_dir_value = raw.get("runs_dir", "../.runs")
     # HARNESS_RUNS_DIR overrides the configured runs directory. Intended for
     # tests and CI isolation; production runs use the config value.
@@ -221,6 +242,7 @@ def load_config(path: str | Path) -> HarnessConfig:
             "sandbox",
             "retrieval",
             "hooks",
+            "diagnostics",
             "llm_light",
             # Written by the runtime so a resumed run routes identically; not
             # part of the operator-facing hand-authored schema.
@@ -380,6 +402,8 @@ def load_config(path: str | Path) -> HarnessConfig:
         else ("AGENTS.md", "CLAUDE.md")
     )
     return HarnessConfig(
+        settings_sources=settings_sources,
+        diagnostics=diagnostics_config_from_dict(raw.get("diagnostics"), "diagnostics"),
         config_path=config_path,
         runs_dir=_resolve(base, str(runs_dir)),
         budgets=BudgetSpec.from_dict(schema.mapping(raw.get("budgets", {}), "budgets")),

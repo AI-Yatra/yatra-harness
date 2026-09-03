@@ -98,7 +98,13 @@ class Shell:
         self.options = options
         self.console = Console()
         self.render = Renderer(self.console)
-        self.config: HarnessConfig = load_config(options.config_path)
+        # Discovery starts where the operator started, so a repository's own
+        # `.yatra/settings.yaml` applies without anyone naming it on the
+        # command line. That is the whole point: a rule can now belong to one
+        # project instead of to every session on the machine.
+        self.config: HarnessConfig = load_config(
+            options.config_path, project_root=options.root
+        )
         self.root = options.root.resolve()
         # Set only by /profile; None means the route still decides.
         self._profile_override: prompting.PromptProfile | None = None
@@ -484,6 +490,11 @@ class Shell:
             return True
         if name == "config":
             self.render.notice(f"config: {self.options.config_path}")
+            for source in self.config.settings_sources:
+                # Named individually rather than summarised. An operator
+                # debugging a rule needs to know which file set it, and
+                # guessing is how they edit the wrong one.
+                self.render.notice(f"        + {source}")
             self.render.notice(f"route:  {self.route.name} ({self.route.kind})")
             self.render.notice(f"model:  {self.route.model}")
             self.render.notice(f"cwd:    {self.root}")
