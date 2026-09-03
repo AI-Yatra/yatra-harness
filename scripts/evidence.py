@@ -696,6 +696,12 @@ def main() -> int:
     print(f"\n{passed} passed, {len(failed)} failed, {len(skipped)} skipped")
     for result in failed:
         print(f"  FAILED {result.area}/{result.name}: {result.detail}")
+    for result in skipped:
+        # Named individually rather than counted. A component nobody has ever
+        # exercised reads exactly like one that works, and a summary line hides
+        # which is which -- this script skipped the kernel sandbox on Windows
+        # and on CI for a week while every report called it covered.
+        print(f"  SKIPPED {result.area}/{result.name}: {result.detail}")
     return 1 if failed else 0
 
 
