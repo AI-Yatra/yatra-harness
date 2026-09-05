@@ -1,0 +1,13 @@
+Architecture artifact checks
+High-level: 9/9 showcase, zero errors and warnings; automated browser evidence passed.
+Detailed: 9/9 standard, zero errors, one overview-text readability warning; browser readability check failed, desktop containment passed. Use search and zoom.
+All 273 snapshot files represented once; 3176 declarations and 540 resolved Python dependencies indexed.
+Inventory JavaScript syntax check passed; in-app browser opening blocked by URL policy, so interactive inventory QA not performed.
+
+Repository checks
+./init.sh: FAILED at unit tests (1303 run, 5 failures, 20 skipped). Later init.sh stages were not reached.
+ruff: passed.
+uv run lint-imports: passed, both contracts kept.
+Four test_demo_repo.StartingStateTests failures correspond to the pre-existing modified demo/tictactoe/game.py (the test expects an unfixed demo).
+One test_settings_and_memory.DiscoveryTests.test_a_yatra_directory_marks_one_without_git failure compares /private/var with /var on macOS.
+No runtime or test files were edited for this documentation task.

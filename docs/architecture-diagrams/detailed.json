@@ -1,0 +1,4791 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Yatra Harness \u00b7 Complete component map",
+    "locale": "en",
+    "quality_profile": "standard",
+    "viewBox": [
+      7180,
+      3860
+    ]
+  },
+  "components": [
+    {
+      "id": "file-0",
+      "type": "backend",
+      "label": "repo-to-pr.md",
+      "sublabel": ".claude/plans",
+      "pos": [
+        1845,
+        3300
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-1",
+      "type": "backend",
+      "label": ".env.example",
+      "sublabel": ".",
+      "pos": [
+        5405,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-2",
+      "type": "backend",
+      "label": ".gitattributes",
+      "sublabel": ".",
+      "pos": [
+        5835,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-4",
+      "type": "backend",
+      "label": ".gitignore",
+      "sublabel": ".",
+      "pos": [
+        6265,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-7",
+      "type": "backend",
+      "label": "AGENTS.md",
+      "sublabel": ".",
+      "pos": [
+        6695,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-8",
+      "type": "backend",
+      "label": "Dockerfile",
+      "sublabel": ".",
+      "pos": [
+        5405,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-9",
+      "type": "backend",
+      "label": "LICENSE",
+      "sublabel": ".",
+      "pos": [
+        5835,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-10",
+      "type": "backend",
+      "label": "README.md",
+      "sublabel": ".",
+      "pos": [
+        6265,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-11",
+      "type": "backend",
+      "label": "ay.README.md",
+      "sublabel": ".",
+      "pos": [
+        6695,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-12",
+      "type": "backend",
+      "label": "ay.py",
+      "sublabel": ".",
+      "pos": [
+        5405,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "3 symbols"
+    },
+    {
+      "id": "file-123",
+      "type": "backend",
+      "label": "future features.md",
+      "sublabel": ".",
+      "pos": [
+        5835,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-192",
+      "type": "backend",
+      "label": "init.sh",
+      "sublabel": ".",
+      "pos": [
+        6265,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-193",
+      "type": "backend",
+      "label": "install.ps1",
+      "sublabel": ".",
+      "pos": [
+        6695,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-194",
+      "type": "backend",
+      "label": "install.sh",
+      "sublabel": ".",
+      "pos": [
+        5405,
+        780
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-195",
+      "type": "backend",
+      "label": "pyproject.toml",
+      "sublabel": ".",
+      "pos": [
+        5835,
+        780
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-272",
+      "type": "backend",
+      "label": "uv.lock",
+      "sublabel": ".",
+      "pos": [
+        6265,
+        780
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-3",
+      "type": "backend",
+      "label": "ci.yml",
+      "sublabel": ".github/workflows",
+      "pos": [
+        65,
+        3370
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-5",
+      "type": "backend",
+      "label": "architecture.tour",
+      "sublabel": ".tours",
+      "pos": [
+        3625,
+        3170
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-6",
+      "type": "backend",
+      "label": "prompt-to-completion.tour",
+      "sublabel": ".tours",
+      "pos": [
+        4055,
+        3170
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-13",
+      "type": "backend",
+      "label": "ay.yaml",
+      "sublabel": "configs",
+      "pos": [
+        3625,
+        1135
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-14",
+      "type": "backend",
+      "label": "delegation.yaml",
+      "sublabel": "configs",
+      "pos": [
+        4055,
+        1135
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-15",
+      "type": "backend",
+      "label": "llm_light.yaml",
+      "sublabel": "configs",
+      "pos": [
+        4485,
+        1135
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-16",
+      "type": "backend",
+      "label": "local.yaml",
+      "sublabel": "configs",
+      "pos": [
+        4915,
+        1135
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-17",
+      "type": "backend",
+      "label": "palimpsest-config.yaml",
+      "sublabel": "configs",
+      "pos": [
+        3625,
+        1265
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-18",
+      "type": "backend",
+      "label": "remote-bad-model.yaml",
+      "sublabel": "configs",
+      "pos": [
+        4055,
+        1265
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-19",
+      "type": "backend",
+      "label": "remote-nvidia.yaml",
+      "sublabel": "configs",
+      "pos": [
+        4485,
+        1265
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-20",
+      "type": "backend",
+      "label": "remote-qwen.yaml",
+      "sublabel": "configs",
+      "pos": [
+        4915,
+        1265
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-21",
+      "type": "backend",
+      "label": "remote.example.yaml",
+      "sublabel": "configs",
+      "pos": [
+        3625,
+        1395
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-22",
+      "type": "backend",
+      "label": "sandboxed.yaml",
+      "sublabel": "configs",
+      "pos": [
+        4055,
+        1395
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-23",
+      "type": "backend",
+      "label": "subagent-explore.yaml",
+      "sublabel": "configs",
+      "pos": [
+        4485,
+        1395
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-24",
+      "type": "backend",
+      "label": "teaching.yaml",
+      "sublabel": "configs",
+      "pos": [
+        4915,
+        1395
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-25",
+      "type": "backend",
+      "label": "README.md",
+      "sublabel": "demo",
+      "pos": [
+        1845,
+        3075
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-26",
+      "type": "backend",
+      "label": "config.yaml",
+      "sublabel": "demo",
+      "pos": [
+        2275,
+        3075
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-46",
+      "type": "backend",
+      "label": "setup.sh",
+      "sublabel": "demo",
+      "pos": [
+        2705,
+        3075
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-27",
+      "type": "backend",
+      "label": ".gitignore",
+      "sublabel": "demo/inventory",
+      "pos": [
+        5405,
+        2105
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-28",
+      "type": "backend",
+      "label": "AGENTS.md",
+      "sublabel": "demo/inventory",
+      "pos": [
+        5835,
+        2105
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-29",
+      "type": "backend",
+      "label": "README.md",
+      "sublabel": "demo/inventory",
+      "pos": [
+        6265,
+        2105
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-30",
+      "type": "backend",
+      "label": "stock.json",
+      "sublabel": "demo/inventory/data",
+      "pos": [
+        6695,
+        2105
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-31",
+      "type": "backend",
+      "label": "inventory.py",
+      "sublabel": "demo/inventory",
+      "pos": [
+        5405,
+        2235
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "6 symbols"
+    },
+    {
+      "id": "file-32",
+      "type": "backend",
+      "label": "__init__.py",
+      "sublabel": "demo/inventory/tests",
+      "pos": [
+        5835,
+        2235
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-33",
+      "type": "backend",
+      "label": "test_inventory.py",
+      "sublabel": "demo/inventory/tests",
+      "pos": [
+        6265,
+        2235
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "17 symbols"
+    },
+    {
+      "id": "file-34",
+      "type": "backend",
+      "label": ".gitignore",
+      "sublabel": "demo/loginpage",
+      "pos": [
+        1845,
+        1525
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-35",
+      "type": "backend",
+      "label": "AGENTS.md",
+      "sublabel": "demo/loginpage",
+      "pos": [
+        2275,
+        1525
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-36",
+      "type": "backend",
+      "label": "README.md",
+      "sublabel": "demo/loginpage",
+      "pos": [
+        2705,
+        1525
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-37",
+      "type": "backend",
+      "label": "app.py",
+      "sublabel": "demo/loginpage",
+      "pos": [
+        3135,
+        1525
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "10 symbols"
+    },
+    {
+      "id": "file-38",
+      "type": "security",
+      "label": "auth.py",
+      "sublabel": "demo/loginpage",
+      "pos": [
+        1845,
+        1655
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "4 symbols"
+    },
+    {
+      "id": "file-39",
+      "type": "backend",
+      "label": "feature_list.json",
+      "sublabel": "demo/loginpage",
+      "pos": [
+        2275,
+        1655
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-40",
+      "type": "backend",
+      "label": "page.py",
+      "sublabel": "demo/loginpage",
+      "pos": [
+        2705,
+        1655
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "2 symbols"
+    },
+    {
+      "id": "file-41",
+      "type": "backend",
+      "label": "style.css",
+      "sublabel": "demo/loginpage/static",
+      "pos": [
+        3135,
+        1655
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-42",
+      "type": "backend",
+      "label": "__init__.py",
+      "sublabel": "demo/loginpage/tests",
+      "pos": [
+        1845,
+        1785
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-43",
+      "type": "backend",
+      "label": "test_auth.py",
+      "sublabel": "demo/loginpage/tests",
+      "pos": [
+        2275,
+        1785
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "18 symbols"
+    },
+    {
+      "id": "file-44",
+      "type": "backend",
+      "label": "test_page.py",
+      "sublabel": "demo/loginpage/tests",
+      "pos": [
+        2705,
+        1785
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "33 symbols"
+    },
+    {
+      "id": "file-45",
+      "type": "backend",
+      "label": "test_style.py",
+      "sublabel": "demo/loginpage/tests",
+      "pos": [
+        3135,
+        1785
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "21 symbols"
+    },
+    {
+      "id": "file-47",
+      "type": "backend",
+      "label": "add-best-move.yaml",
+      "sublabel": "demo/tasks",
+      "pos": [
+        65,
+        3145
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-48",
+      "type": "backend",
+      "label": "both.yaml",
+      "sublabel": "demo/tasks",
+      "pos": [
+        495,
+        3145
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-49",
+      "type": "backend",
+      "label": "fix-winner.yaml",
+      "sublabel": "demo/tasks",
+      "pos": [
+        925,
+        3145
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-50",
+      "type": "backend",
+      "label": "AGENTS.md",
+      "sublabel": "demo/tictactoe",
+      "pos": [
+        1845,
+        2365
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-51",
+      "type": "backend",
+      "label": "README.md",
+      "sublabel": "demo/tictactoe",
+      "pos": [
+        2275,
+        2365
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-52",
+      "type": "backend",
+      "label": "feature_list.json",
+      "sublabel": "demo/tictactoe",
+      "pos": [
+        2705,
+        2365
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-53",
+      "type": "backend",
+      "label": "game.py",
+      "sublabel": "demo/tictactoe",
+      "pos": [
+        3135,
+        2365
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "9 symbols"
+    },
+    {
+      "id": "file-54",
+      "type": "backend",
+      "label": "__init__.py",
+      "sublabel": "demo/tictactoe/tests",
+      "pos": [
+        1845,
+        2495
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-55",
+      "type": "backend",
+      "label": "test_best_move.py",
+      "sublabel": "demo/tictactoe/tests",
+      "pos": [
+        2275,
+        2495
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "15 symbols"
+    },
+    {
+      "id": "file-56",
+      "type": "backend",
+      "label": "test_winner.py",
+      "sublabel": "demo/tictactoe/tests",
+      "pos": [
+        2705,
+        2495
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "22 symbols"
+    },
+    {
+      "id": "file-57",
+      "type": "backend",
+      "label": "ARCHITECTURE.md",
+      "sublabel": "docs",
+      "pos": [
+        3625,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-58",
+      "type": "backend",
+      "label": "CONFIGURATION.md",
+      "sublabel": "docs",
+      "pos": [
+        4055,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-59",
+      "type": "backend",
+      "label": "INTERFACE.md",
+      "sublabel": "docs",
+      "pos": [
+        4485,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-60",
+      "type": "backend",
+      "label": "LLM-LIGHT.md",
+      "sublabel": "docs",
+      "pos": [
+        4915,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-61",
+      "type": "backend",
+      "label": "OPERATIONS.md",
+      "sublabel": "docs",
+      "pos": [
+        3625,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-62",
+      "type": "backend",
+      "label": "PROJECT-STATE.md",
+      "sublabel": "docs",
+      "pos": [
+        4055,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-63",
+      "type": "backend",
+      "label": "PROVIDERS.md",
+      "sublabel": "docs",
+      "pos": [
+        4485,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-64",
+      "type": "backend",
+      "label": "SECURITY.md",
+      "sublabel": "docs",
+      "pos": [
+        4915,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-65",
+      "type": "backend",
+      "label": "TESTING.md",
+      "sublabel": "docs",
+      "pos": [
+        3625,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-66",
+      "type": "backend",
+      "label": "WORKSHOP.md",
+      "sublabel": "docs",
+      "pos": [
+        4055,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-99",
+      "type": "backend",
+      "label": "checkpoints-hooks-plan.md",
+      "sublabel": "docs/design",
+      "pos": [
+        4485,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-100",
+      "type": "backend",
+      "label": "sandbox-and-permissions.md",
+      "sublabel": "docs/design",
+      "pos": [
+        4915,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-101",
+      "type": "backend",
+      "label": "prompting-practices.md",
+      "sublabel": "docs/research",
+      "pos": [
+        3625,
+        780
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-102",
+      "type": "backend",
+      "label": "READINESS.md",
+      "sublabel": "docs/review",
+      "pos": [
+        4055,
+        780
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-103",
+      "type": "backend",
+      "label": "readiness-research.md",
+      "sublabel": "docs/review",
+      "pos": [
+        4485,
+        780
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-104",
+      "type": "backend",
+      "label": "review-platform.md",
+      "sublabel": "docs/review",
+      "pos": [
+        4915,
+        780
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-105",
+      "type": "backend",
+      "label": "review-repl.md",
+      "sublabel": "docs/review",
+      "pos": [
+        3625,
+        910
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-67",
+      "type": "frontend",
+      "label": "README.md",
+      "sublabel": "docs/atlas",
+      "pos": [
+        1845,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-68",
+      "type": "frontend",
+      "label": "index.html",
+      "sublabel": "docs/atlas",
+      "pos": [
+        2275,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-69",
+      "type": "frontend",
+      "label": "package-lock.json",
+      "sublabel": "docs/atlas",
+      "pos": [
+        2705,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-70",
+      "type": "frontend",
+      "label": "package.json",
+      "sublabel": "docs/atlas",
+      "pos": [
+        3135,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-71",
+      "type": "frontend",
+      "label": "atlas.json",
+      "sublabel": "docs/atlas/public",
+      "pos": [
+        1845,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-72",
+      "type": "frontend",
+      "label": "trace.json",
+      "sublabel": "docs/atlas/public",
+      "pos": [
+        2275,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-73",
+      "type": "frontend",
+      "label": "scan_harness.py",
+      "sublabel": "docs/atlas/scripts",
+      "pos": [
+        2705,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "23 symbols"
+    },
+    {
+      "id": "file-74",
+      "type": "frontend",
+      "label": "taxonomy.py",
+      "sublabel": "docs/atlas/scripts",
+      "pos": [
+        3135,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-75",
+      "type": "frontend",
+      "label": "trace_session.py",
+      "sublabel": "docs/atlas/scripts",
+      "pos": [
+        1845,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "17 symbols"
+    },
+    {
+      "id": "file-76",
+      "type": "frontend",
+      "label": "color.ts",
+      "sublabel": "docs/atlas/src",
+      "pos": [
+        2275,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-77",
+      "type": "frontend",
+      "label": "data.ts",
+      "sublabel": "docs/atlas/src",
+      "pos": [
+        2705,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-78",
+      "type": "frontend",
+      "label": "diagrams.css",
+      "sublabel": "docs/atlas/src",
+      "pos": [
+        3135,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-79",
+      "type": "frontend",
+      "label": "main.ts",
+      "sublabel": "docs/atlas/src",
+      "pos": [
+        1845,
+        780
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-80",
+      "type": "frontend",
+      "label": "panel.ts",
+      "sublabel": "docs/atlas/src",
+      "pos": [
+        2275,
+        780
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-81",
+      "type": "frontend",
+      "label": "gates.ts",
+      "sublabel": "docs/atlas/src/sections",
+      "pos": [
+        2705,
+        780
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-82",
+      "type": "frontend",
+      "label": "graph.ts",
+      "sublabel": "docs/atlas/src/sections",
+      "pos": [
+        3135,
+        780
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-83",
+      "type": "frontend",
+      "label": "intro.ts",
+      "sublabel": "docs/atlas/src/sections",
+      "pos": [
+        1845,
+        910
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-84",
+      "type": "frontend",
+      "label": "loops.ts",
+      "sublabel": "docs/atlas/src/sections",
+      "pos": [
+        2275,
+        910
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-85",
+      "type": "frontend",
+      "label": "mass.ts",
+      "sublabel": "docs/atlas/src/sections",
+      "pos": [
+        2705,
+        910
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-86",
+      "type": "frontend",
+      "label": "matrix.ts",
+      "sublabel": "docs/atlas/src/sections",
+      "pos": [
+        3135,
+        910
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-87",
+      "type": "frontend",
+      "label": "state.ts",
+      "sublabel": "docs/atlas/src/sections",
+      "pos": [
+        1845,
+        1040
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-88",
+      "type": "frontend",
+      "label": "surface.ts",
+      "sublabel": "docs/atlas/src/sections",
+      "pos": [
+        2275,
+        1040
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-89",
+      "type": "frontend",
+      "label": "trace.ts",
+      "sublabel": "docs/atlas/src/sections",
+      "pos": [
+        2705,
+        1040
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-90",
+      "type": "frontend",
+      "label": "turn.ts",
+      "sublabel": "docs/atlas/src/sections",
+      "pos": [
+        3135,
+        1040
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-91",
+      "type": "frontend",
+      "label": "wall.ts",
+      "sublabel": "docs/atlas/src/sections",
+      "pos": [
+        1845,
+        1170
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-92",
+      "type": "frontend",
+      "label": "store.ts",
+      "sublabel": "docs/atlas/src",
+      "pos": [
+        2275,
+        1170
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-93",
+      "type": "frontend",
+      "label": "style.css",
+      "sublabel": "docs/atlas/src",
+      "pos": [
+        2705,
+        1170
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-94",
+      "type": "frontend",
+      "label": "ui.ts",
+      "sublabel": "docs/atlas/src",
+      "pos": [
+        3135,
+        1170
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-95",
+      "type": "frontend",
+      "label": "widgets.ts",
+      "sublabel": "docs/atlas/src",
+      "pos": [
+        1845,
+        1300
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-96",
+      "type": "frontend",
+      "label": "world.ts",
+      "sublabel": "docs/atlas/src",
+      "pos": [
+        2275,
+        1300
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-97",
+      "type": "frontend",
+      "label": "tsconfig.json",
+      "sublabel": "docs/atlas",
+      "pos": [
+        2705,
+        1300
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-98",
+      "type": "frontend",
+      "label": "vite.config.ts",
+      "sublabel": "docs/atlas",
+      "pos": [
+        3135,
+        1300
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-106",
+      "type": "backend",
+      "label": "teaching.yaml",
+      "sublabel": "evals",
+      "pos": [
+        3625,
+        3395
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-107",
+      "type": "backend",
+      "label": "feature_list.json",
+      "sublabel": "examples",
+      "pos": [
+        5405,
+        3490
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-108",
+      "type": "backend",
+      "label": "README.md",
+      "sublabel": "fixtures/buggy_counter",
+      "pos": [
+        5405,
+        2815
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-109",
+      "type": "backend",
+      "label": "counter.py",
+      "sublabel": "fixtures/buggy_counter",
+      "pos": [
+        5835,
+        2815
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "1 symbols"
+    },
+    {
+      "id": "file-110",
+      "type": "backend",
+      "label": "__init__.py",
+      "sublabel": "fixtures/buggy_counter/tests",
+      "pos": [
+        6265,
+        2815
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-111",
+      "type": "backend",
+      "label": "test_counter.py",
+      "sublabel": "fixtures/buggy_counter/tests",
+      "pos": [
+        6695,
+        2815
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "6 symbols"
+    },
+    {
+      "id": "file-112",
+      "type": "backend",
+      "label": "README.md",
+      "sublabel": "fixtures/chat_seed",
+      "pos": [
+        1845,
+        3525
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-113",
+      "type": "backend",
+      "label": "README.md",
+      "sublabel": "fixtures/palimpsest",
+      "pos": [
+        3625,
+        1620
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-114",
+      "type": "backend",
+      "label": "alice_smith.vcf",
+      "sublabel": "fixtures/palimpsest/contact_cards",
+      "pos": [
+        4055,
+        1620
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-115",
+      "type": "backend",
+      "label": "bob_johnson.vcf",
+      "sublabel": "fixtures/palimpsest/contact_cards",
+      "pos": [
+        4485,
+        1620
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-116",
+      "type": "backend",
+      "label": "charlie_brown.vcf",
+      "sublabel": "fixtures/palimpsest/contact_cards",
+      "pos": [
+        4915,
+        1620
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-117",
+      "type": "backend",
+      "label": "david_miller.vcf",
+      "sublabel": "fixtures/palimpsest/contact_cards",
+      "pos": [
+        3625,
+        1750
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-118",
+      "type": "backend",
+      "label": "grace_lee.vcf",
+      "sublabel": "fixtures/palimpsest/contact_cards",
+      "pos": [
+        4055,
+        1750
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-119",
+      "type": "backend",
+      "label": "jane_doe.vcf",
+      "sublabel": "fixtures/palimpsest/contact_cards",
+      "pos": [
+        4485,
+        1750
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-120",
+      "type": "backend",
+      "label": "maria_garcia.vcf",
+      "sublabel": "fixtures/palimpsest/contact_cards",
+      "pos": [
+        4915,
+        1750
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-121",
+      "type": "backend",
+      "label": "tom_tom.vcf",
+      "sublabel": "fixtures/palimpsest/contact_cards",
+      "pos": [
+        3625,
+        1880
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-122",
+      "type": "backend",
+      "label": "verify_contact_workbook.py",
+      "sublabel": "fixtures/palimpsest",
+      "pos": [
+        4055,
+        1880
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "3 symbols"
+    },
+    {
+      "id": "file-124",
+      "type": "backend",
+      "label": "__init__.py",
+      "sublabel": "harness",
+      "pos": [
+        65,
+        2435
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-125",
+      "type": "backend",
+      "label": "__main__.py",
+      "sublabel": "harness",
+      "pos": [
+        495,
+        2435
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-133",
+      "type": "backend",
+      "label": "cli.py",
+      "sublabel": "harness",
+      "pos": [
+        925,
+        2435
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "32 symbols"
+    },
+    {
+      "id": "file-134",
+      "type": "backend",
+      "label": "config.py",
+      "sublabel": "harness",
+      "pos": [
+        1355,
+        2435
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "19 symbols"
+    },
+    {
+      "id": "file-140",
+      "type": "backend",
+      "label": "doctor.py",
+      "sublabel": "harness",
+      "pos": [
+        65,
+        2565
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "4 symbols"
+    },
+    {
+      "id": "file-190",
+      "type": "backend",
+      "label": "runtime.py",
+      "sublabel": "harness",
+      "pos": [
+        495,
+        2565
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "29 symbols"
+    },
+    {
+      "id": "file-191",
+      "type": "backend",
+      "label": "settings.py",
+      "sublabel": "harness",
+      "pos": [
+        925,
+        2565
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "16 symbols"
+    },
+    {
+      "id": "file-126",
+      "type": "backend",
+      "label": "__init__.py",
+      "sublabel": "harness/autonomy",
+      "pos": [
+        3625,
+        2460
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-127",
+      "type": "backend",
+      "label": "backlog.py",
+      "sublabel": "harness/autonomy",
+      "pos": [
+        4055,
+        2460
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "6 symbols"
+    },
+    {
+      "id": "file-128",
+      "type": "backend",
+      "label": "delivery.py",
+      "sublabel": "harness/autonomy",
+      "pos": [
+        4485,
+        2460
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "19 symbols"
+    },
+    {
+      "id": "file-129",
+      "type": "backend",
+      "label": "evals.py",
+      "sublabel": "harness/autonomy",
+      "pos": [
+        4915,
+        2460
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "7 symbols"
+    },
+    {
+      "id": "file-130",
+      "type": "backend",
+      "label": "goal.py",
+      "sublabel": "harness/autonomy",
+      "pos": [
+        3625,
+        2590
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "6 symbols"
+    },
+    {
+      "id": "file-131",
+      "type": "backend",
+      "label": "loop.py",
+      "sublabel": "harness/autonomy",
+      "pos": [
+        4055,
+        2590
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "5 symbols"
+    },
+    {
+      "id": "file-132",
+      "type": "backend",
+      "label": "rubric.py",
+      "sublabel": "harness/autonomy",
+      "pos": [
+        4485,
+        2590
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "9 symbols"
+    },
+    {
+      "id": "file-135",
+      "type": "backend",
+      "label": "__init__.py",
+      "sublabel": "harness/core",
+      "pos": [
+        65,
+        2790
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-136",
+      "type": "backend",
+      "label": "contracts.py",
+      "sublabel": "harness/core",
+      "pos": [
+        495,
+        2790
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "23 symbols"
+    },
+    {
+      "id": "file-137",
+      "type": "backend",
+      "label": "errors.py",
+      "sublabel": "harness/core",
+      "pos": [
+        925,
+        2790
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "15 symbols"
+    },
+    {
+      "id": "file-138",
+      "type": "backend",
+      "label": "schema.py",
+      "sublabel": "harness/core",
+      "pos": [
+        1355,
+        2790
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "11 symbols"
+    },
+    {
+      "id": "file-139",
+      "type": "backend",
+      "label": "util.py",
+      "sublabel": "harness/core",
+      "pos": [
+        65,
+        2920
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "12 symbols"
+    },
+    {
+      "id": "file-141",
+      "type": "backend",
+      "label": "__init__.py",
+      "sublabel": "harness/execution",
+      "pos": [
+        5405,
+        1620
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-142",
+      "type": "backend",
+      "label": "diagnostics.py",
+      "sublabel": "harness/execution",
+      "pos": [
+        5835,
+        1620
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "9 symbols"
+    },
+    {
+      "id": "file-143",
+      "type": "backend",
+      "label": "hooks.py",
+      "sublabel": "harness/execution",
+      "pos": [
+        6265,
+        1620
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "9 symbols"
+    },
+    {
+      "id": "file-144",
+      "type": "backend",
+      "label": "mcp.py",
+      "sublabel": "harness/execution",
+      "pos": [
+        6695,
+        1620
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "13 symbols"
+    },
+    {
+      "id": "file-145",
+      "type": "security",
+      "label": "policy.py",
+      "sublabel": "harness/execution",
+      "pos": [
+        5405,
+        1750
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "22 symbols"
+    },
+    {
+      "id": "file-146",
+      "type": "backend",
+      "label": "process.py",
+      "sublabel": "harness/execution",
+      "pos": [
+        5835,
+        1750
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "5 symbols"
+    },
+    {
+      "id": "file-147",
+      "type": "security",
+      "label": "sandbox.py",
+      "sublabel": "harness/execution",
+      "pos": [
+        6265,
+        1750
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "25 symbols"
+    },
+    {
+      "id": "file-148",
+      "type": "backend",
+      "label": "search.py",
+      "sublabel": "harness/execution",
+      "pos": [
+        6695,
+        1750
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "13 symbols"
+    },
+    {
+      "id": "file-149",
+      "type": "backend",
+      "label": "tools.py",
+      "sublabel": "harness/execution",
+      "pos": [
+        5405,
+        1880
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "35 symbols"
+    },
+    {
+      "id": "file-150",
+      "type": "backend",
+      "label": "workspace.py",
+      "sublabel": "harness/execution",
+      "pos": [
+        5835,
+        1880
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "23 symbols"
+    },
+    {
+      "id": "file-151",
+      "type": "backend",
+      "label": "__init__.py",
+      "sublabel": "harness/mcp_demo",
+      "pos": [
+        5405,
+        3265
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-152",
+      "type": "backend",
+      "label": "server.py",
+      "sublabel": "harness/mcp_demo",
+      "pos": [
+        5835,
+        3265
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "5 symbols"
+    },
+    {
+      "id": "file-153",
+      "type": "backend",
+      "label": "__init__.py",
+      "sublabel": "harness/models",
+      "pos": [
+        5405,
+        2460
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-154",
+      "type": "security",
+      "label": "auth.py",
+      "sublabel": "harness/models",
+      "pos": [
+        5835,
+        2460
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "41 symbols"
+    },
+    {
+      "id": "file-155",
+      "type": "backend",
+      "label": "llm_light.py",
+      "sublabel": "harness/models",
+      "pos": [
+        6265,
+        2460
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "31 symbols"
+    },
+    {
+      "id": "file-156",
+      "type": "backend",
+      "label": "model_router.py",
+      "sublabel": "harness/models",
+      "pos": [
+        6695,
+        2460
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "8 symbols"
+    },
+    {
+      "id": "file-157",
+      "type": "backend",
+      "label": "prompting.py",
+      "sublabel": "harness/models",
+      "pos": [
+        5405,
+        2590
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "11 symbols"
+    },
+    {
+      "id": "file-158",
+      "type": "backend",
+      "label": "providers.py",
+      "sublabel": "harness/models",
+      "pos": [
+        5835,
+        2590
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "42 symbols"
+    },
+    {
+      "id": "file-159",
+      "type": "backend",
+      "label": "streaming.py",
+      "sublabel": "harness/models",
+      "pos": [
+        6265,
+        2590
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "9 symbols"
+    },
+    {
+      "id": "file-160",
+      "type": "database",
+      "label": "__init__.py",
+      "sublabel": "harness/record",
+      "pos": [
+        1845,
+        2010
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-161",
+      "type": "database",
+      "label": "artifacts.py",
+      "sublabel": "harness/record",
+      "pos": [
+        2275,
+        2010
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "8 symbols"
+    },
+    {
+      "id": "file-162",
+      "type": "database",
+      "label": "events.py",
+      "sublabel": "harness/record",
+      "pos": [
+        2705,
+        2010
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "7 symbols"
+    },
+    {
+      "id": "file-163",
+      "type": "database",
+      "label": "memory.py",
+      "sublabel": "harness/record",
+      "pos": [
+        3135,
+        2010
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "10 symbols"
+    },
+    {
+      "id": "file-164",
+      "type": "security",
+      "label": "redaction.py",
+      "sublabel": "harness/record",
+      "pos": [
+        1845,
+        2140
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "5 symbols"
+    },
+    {
+      "id": "file-165",
+      "type": "database",
+      "label": "replay.py",
+      "sublabel": "harness/record",
+      "pos": [
+        2275,
+        2140
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "2 symbols"
+    },
+    {
+      "id": "file-166",
+      "type": "database",
+      "label": "state.py",
+      "sublabel": "harness/record",
+      "pos": [
+        2705,
+        2140
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "4 symbols"
+    },
+    {
+      "id": "file-167",
+      "type": "database",
+      "label": "tracing.py",
+      "sublabel": "harness/record",
+      "pos": [
+        3135,
+        2140
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "11 symbols"
+    },
+    {
+      "id": "file-168",
+      "type": "frontend",
+      "label": "__init__.py",
+      "sublabel": "harness/repl",
+      "pos": [
+        5405,
+        1005
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-169",
+      "type": "frontend",
+      "label": "agent.py",
+      "sublabel": "harness/repl",
+      "pos": [
+        5835,
+        1005
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "20 symbols"
+    },
+    {
+      "id": "file-170",
+      "type": "security",
+      "label": "approvals.py",
+      "sublabel": "harness/repl",
+      "pos": [
+        6265,
+        1005
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "14 symbols"
+    },
+    {
+      "id": "file-171",
+      "type": "frontend",
+      "label": "banner.py",
+      "sublabel": "harness/repl",
+      "pos": [
+        6695,
+        1005
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "3 symbols"
+    },
+    {
+      "id": "file-172",
+      "type": "frontend",
+      "label": "blocks.py",
+      "sublabel": "harness/repl",
+      "pos": [
+        5405,
+        1135
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "1 symbols"
+    },
+    {
+      "id": "file-173",
+      "type": "frontend",
+      "label": "checkpoints.py",
+      "sublabel": "harness/repl",
+      "pos": [
+        5835,
+        1135
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "12 symbols"
+    },
+    {
+      "id": "file-174",
+      "type": "frontend",
+      "label": "conversation.py",
+      "sublabel": "harness/repl",
+      "pos": [
+        6265,
+        1135
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "20 symbols"
+    },
+    {
+      "id": "file-175",
+      "type": "frontend",
+      "label": "model.py",
+      "sublabel": "harness/repl",
+      "pos": [
+        6695,
+        1135
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "19 symbols"
+    },
+    {
+      "id": "file-176",
+      "type": "frontend",
+      "label": "prompt.py",
+      "sublabel": "harness/repl",
+      "pos": [
+        5405,
+        1265
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "5 symbols"
+    },
+    {
+      "id": "file-177",
+      "type": "frontend",
+      "label": "reading.py",
+      "sublabel": "harness/repl",
+      "pos": [
+        5835,
+        1265
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "9 symbols"
+    },
+    {
+      "id": "file-178",
+      "type": "frontend",
+      "label": "render.py",
+      "sublabel": "harness/repl",
+      "pos": [
+        6265,
+        1265
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "47 symbols"
+    },
+    {
+      "id": "file-179",
+      "type": "frontend",
+      "label": "shell.py",
+      "sublabel": "harness/repl",
+      "pos": [
+        6695,
+        1265
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "56 symbols"
+    },
+    {
+      "id": "file-180",
+      "type": "frontend",
+      "label": "theme.py",
+      "sublabel": "harness/repl",
+      "pos": [
+        5405,
+        1395
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "1 symbols"
+    },
+    {
+      "id": "file-181",
+      "type": "frontend",
+      "label": "tools.py",
+      "sublabel": "harness/repl",
+      "pos": [
+        5835,
+        1395
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "32 symbols"
+    },
+    {
+      "id": "file-182",
+      "type": "backend",
+      "label": "__init__.py",
+      "sublabel": "harness/run",
+      "pos": [
+        3625,
+        2105
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-183",
+      "type": "backend",
+      "label": "compaction.py",
+      "sublabel": "harness/run",
+      "pos": [
+        4055,
+        2105
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "15 symbols"
+    },
+    {
+      "id": "file-184",
+      "type": "backend",
+      "label": "context.py",
+      "sublabel": "harness/run",
+      "pos": [
+        4485,
+        2105
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "9 symbols"
+    },
+    {
+      "id": "file-185",
+      "type": "backend",
+      "label": "faults.py",
+      "sublabel": "harness/run",
+      "pos": [
+        4915,
+        2105
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "5 symbols"
+    },
+    {
+      "id": "file-186",
+      "type": "backend",
+      "label": "instructions.py",
+      "sublabel": "harness/run",
+      "pos": [
+        3625,
+        2235
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "3 symbols"
+    },
+    {
+      "id": "file-187",
+      "type": "backend",
+      "label": "session.py",
+      "sublabel": "harness/run",
+      "pos": [
+        4055,
+        2235
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "7 symbols"
+    },
+    {
+      "id": "file-188",
+      "type": "backend",
+      "label": "subagents.py",
+      "sublabel": "harness/run",
+      "pos": [
+        4485,
+        2235
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "8 symbols"
+    },
+    {
+      "id": "file-189",
+      "type": "security",
+      "label": "verifier.py",
+      "sublabel": "harness/run",
+      "pos": [
+        4915,
+        2235
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "4 symbols"
+    },
+    {
+      "id": "file-196",
+      "type": "backend",
+      "label": "delegate_parent.yaml",
+      "sublabel": "scenarios",
+      "pos": [
+        5405,
+        3040
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-197",
+      "type": "backend",
+      "label": "explore_reply.yaml",
+      "sublabel": "scenarios",
+      "pos": [
+        5835,
+        3040
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-198",
+      "type": "backend",
+      "label": "provider_failure.yaml",
+      "sublabel": "scenarios",
+      "pos": [
+        6265,
+        3040
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-199",
+      "type": "backend",
+      "label": "repair_demo.yaml",
+      "sublabel": "scenarios",
+      "pos": [
+        6695,
+        3040
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-200",
+      "type": "backend",
+      "label": "evidence.py",
+      "sublabel": "scripts",
+      "pos": [
+        65,
+        3595
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "36 symbols"
+    },
+    {
+      "id": "file-201",
+      "type": "backend",
+      "label": "bugfix-delegating.yaml",
+      "sublabel": "skills",
+      "pos": [
+        1845,
+        2720
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-202",
+      "type": "backend",
+      "label": "bugfix.yaml",
+      "sublabel": "skills",
+      "pos": [
+        2275,
+        2720
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-203",
+      "type": "backend",
+      "label": "explore.yaml",
+      "sublabel": "skills",
+      "pos": [
+        2705,
+        2720
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-204",
+      "type": "backend",
+      "label": "palimpsest-skill.yaml",
+      "sublabel": "skills",
+      "pos": [
+        3135,
+        2720
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-205",
+      "type": "backend",
+      "label": "repo-edit.yaml",
+      "sublabel": "skills",
+      "pos": [
+        1845,
+        2850
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-206",
+      "type": "backend",
+      "label": "review.yaml",
+      "sublabel": "skills",
+      "pos": [
+        2275,
+        2850
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-207",
+      "type": "backend",
+      "label": "palimpsest_task.yaml",
+      "sublabel": "tasks",
+      "pos": [
+        3625,
+        2815
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-208",
+      "type": "backend",
+      "label": "repair_counter.yaml",
+      "sublabel": "tasks",
+      "pos": [
+        4055,
+        2815
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-209",
+      "type": "backend",
+      "label": "repair_counter_fail.yaml",
+      "sublabel": "tasks",
+      "pos": [
+        4485,
+        2815
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-210",
+      "type": "backend",
+      "label": "repair_counter_nvidia.yaml",
+      "sublabel": "tasks",
+      "pos": [
+        4915,
+        2815
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-211",
+      "type": "backend",
+      "label": "repair_counter_qwen.yaml",
+      "sublabel": "tasks",
+      "pos": [
+        3625,
+        2945
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "repository file"
+    },
+    {
+      "id": "file-212",
+      "type": "backend",
+      "label": "support.py",
+      "sublabel": "tests",
+      "pos": [
+        65,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "1 symbols"
+    },
+    {
+      "id": "file-213",
+      "type": "backend",
+      "label": "test_approval_prompt.py",
+      "sublabel": "tests",
+      "pos": [
+        495,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "12 symbols"
+    },
+    {
+      "id": "file-214",
+      "type": "backend",
+      "label": "test_atlas_scan.py",
+      "sublabel": "tests",
+      "pos": [
+        925,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "36 symbols"
+    },
+    {
+      "id": "file-215",
+      "type": "backend",
+      "label": "test_atlas_trace.py",
+      "sublabel": "tests",
+      "pos": [
+        1355,
+        390
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "25 symbols"
+    },
+    {
+      "id": "file-216",
+      "type": "backend",
+      "label": "test_auth.py",
+      "sublabel": "tests",
+      "pos": [
+        65,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "53 symbols"
+    },
+    {
+      "id": "file-217",
+      "type": "backend",
+      "label": "test_auth_gateways.py",
+      "sublabel": "tests",
+      "pos": [
+        495,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "75 symbols"
+    },
+    {
+      "id": "file-218",
+      "type": "backend",
+      "label": "test_auth_gateways_live.py",
+      "sublabel": "tests",
+      "pos": [
+        925,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "7 symbols"
+    },
+    {
+      "id": "file-219",
+      "type": "backend",
+      "label": "test_backlog.py",
+      "sublabel": "tests",
+      "pos": [
+        1355,
+        520
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "26 symbols"
+    },
+    {
+      "id": "file-220",
+      "type": "backend",
+      "label": "test_banner.py",
+      "sublabel": "tests",
+      "pos": [
+        65,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "30 symbols"
+    },
+    {
+      "id": "file-221",
+      "type": "backend",
+      "label": "test_checkpoints.py",
+      "sublabel": "tests",
+      "pos": [
+        495,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "35 symbols"
+    },
+    {
+      "id": "file-222",
+      "type": "backend",
+      "label": "test_compaction.py",
+      "sublabel": "tests",
+      "pos": [
+        925,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "31 symbols"
+    },
+    {
+      "id": "file-223",
+      "type": "backend",
+      "label": "test_context_budget.py",
+      "sublabel": "tests",
+      "pos": [
+        1355,
+        650
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "17 symbols"
+    },
+    {
+      "id": "file-224",
+      "type": "backend",
+      "label": "test_deliver_cli.py",
+      "sublabel": "tests",
+      "pos": [
+        65,
+        780
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "16 symbols"
+    },
+    {
+      "id": "file-225",
+      "type": "backend",
+      "label": "test_delivery.py",
+      "sublabel": "tests",
+      "pos": [
+        495,
+        780
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "47 symbols"
+    },
+    {
+      "id": "file-226",
+      "type": "backend",
+      "label": "test_demo_repo.py",
+      "sublabel": "tests",
+      "pos": [
+        925,
+        780
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "33 symbols"
+    },
+    {
+      "id": "file-227",
+      "type": "backend",
+      "label": "test_denied_approval.py",
+      "sublabel": "tests",
+      "pos": [
+        1355,
+        780
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "16 symbols"
+    },
+    {
+      "id": "file-228",
+      "type": "backend",
+      "label": "test_diagnostics.py",
+      "sublabel": "tests",
+      "pos": [
+        65,
+        910
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "42 symbols"
+    },
+    {
+      "id": "file-229",
+      "type": "backend",
+      "label": "test_evals.py",
+      "sublabel": "tests",
+      "pos": [
+        495,
+        910
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "28 symbols"
+    },
+    {
+      "id": "file-230",
+      "type": "backend",
+      "label": "test_failure_recovery.py",
+      "sublabel": "tests",
+      "pos": [
+        925,
+        910
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "50 symbols"
+    },
+    {
+      "id": "file-231",
+      "type": "backend",
+      "label": "test_gmi.py",
+      "sublabel": "tests",
+      "pos": [
+        1355,
+        910
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "62 symbols"
+    },
+    {
+      "id": "file-232",
+      "type": "backend",
+      "label": "test_goal.py",
+      "sublabel": "tests",
+      "pos": [
+        65,
+        1040
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "32 symbols"
+    },
+    {
+      "id": "file-233",
+      "type": "backend",
+      "label": "test_hooks.py",
+      "sublabel": "tests",
+      "pos": [
+        495,
+        1040
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "36 symbols"
+    },
+    {
+      "id": "file-234",
+      "type": "backend",
+      "label": "test_ifm_provider.py",
+      "sublabel": "tests",
+      "pos": [
+        925,
+        1040
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "28 symbols"
+    },
+    {
+      "id": "file-235",
+      "type": "backend",
+      "label": "test_instructions.py",
+      "sublabel": "tests",
+      "pos": [
+        1355,
+        1040
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "25 symbols"
+    },
+    {
+      "id": "file-236",
+      "type": "backend",
+      "label": "test_interrupt.py",
+      "sublabel": "tests",
+      "pos": [
+        65,
+        1170
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "17 symbols"
+    },
+    {
+      "id": "file-237",
+      "type": "backend",
+      "label": "test_llm_light.py",
+      "sublabel": "tests",
+      "pos": [
+        495,
+        1170
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "27 symbols"
+    },
+    {
+      "id": "file-238",
+      "type": "backend",
+      "label": "test_loop.py",
+      "sublabel": "tests",
+      "pos": [
+        925,
+        1170
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "32 symbols"
+    },
+    {
+      "id": "file-239",
+      "type": "backend",
+      "label": "test_missing_program.py",
+      "sublabel": "tests",
+      "pos": [
+        1355,
+        1170
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "16 symbols"
+    },
+    {
+      "id": "file-240",
+      "type": "backend",
+      "label": "test_os_sandbox.py",
+      "sublabel": "tests",
+      "pos": [
+        65,
+        1300
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "42 symbols"
+    },
+    {
+      "id": "file-241",
+      "type": "backend",
+      "label": "test_packaging.py",
+      "sublabel": "tests",
+      "pos": [
+        495,
+        1300
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "17 symbols"
+    },
+    {
+      "id": "file-242",
+      "type": "backend",
+      "label": "test_patch_recovery.py",
+      "sublabel": "tests",
+      "pos": [
+        925,
+        1300
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "10 symbols"
+    },
+    {
+      "id": "file-243",
+      "type": "backend",
+      "label": "test_plan_mode.py",
+      "sublabel": "tests",
+      "pos": [
+        1355,
+        1300
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "28 symbols"
+    },
+    {
+      "id": "file-244",
+      "type": "backend",
+      "label": "test_policy_denylist.py",
+      "sublabel": "tests",
+      "pos": [
+        65,
+        1430
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "19 symbols"
+    },
+    {
+      "id": "file-245",
+      "type": "backend",
+      "label": "test_policy_evasion.py",
+      "sublabel": "tests",
+      "pos": [
+        495,
+        1430
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "44 symbols"
+    },
+    {
+      "id": "file-246",
+      "type": "backend",
+      "label": "test_policy_rules.py",
+      "sublabel": "tests",
+      "pos": [
+        925,
+        1430
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "41 symbols"
+    },
+    {
+      "id": "file-247",
+      "type": "backend",
+      "label": "test_prompt_profiles.py",
+      "sublabel": "tests",
+      "pos": [
+        1355,
+        1430
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "43 symbols"
+    },
+    {
+      "id": "file-248",
+      "type": "backend",
+      "label": "test_providers.py",
+      "sublabel": "tests",
+      "pos": [
+        65,
+        1560
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "39 symbols"
+    },
+    {
+      "id": "file-249",
+      "type": "backend",
+      "label": "test_reading.py",
+      "sublabel": "tests",
+      "pos": [
+        495,
+        1560
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "19 symbols"
+    },
+    {
+      "id": "file-250",
+      "type": "backend",
+      "label": "test_redaction_coverage.py",
+      "sublabel": "tests",
+      "pos": [
+        925,
+        1560
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "21 symbols"
+    },
+    {
+      "id": "file-251",
+      "type": "backend",
+      "label": "test_render.py",
+      "sublabel": "tests",
+      "pos": [
+        1355,
+        1560
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "52 symbols"
+    },
+    {
+      "id": "file-252",
+      "type": "backend",
+      "label": "test_repl_agent.py",
+      "sublabel": "tests",
+      "pos": [
+        65,
+        1690
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "55 symbols"
+    },
+    {
+      "id": "file-253",
+      "type": "backend",
+      "label": "test_repl_end_to_end.py",
+      "sublabel": "tests",
+      "pos": [
+        495,
+        1690
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "21 symbols"
+    },
+    {
+      "id": "file-254",
+      "type": "backend",
+      "label": "test_repl_gemini.py",
+      "sublabel": "tests",
+      "pos": [
+        925,
+        1690
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "62 symbols"
+    },
+    {
+      "id": "file-255",
+      "type": "backend",
+      "label": "test_repl_shell.py",
+      "sublabel": "tests",
+      "pos": [
+        1355,
+        1690
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "66 symbols"
+    },
+    {
+      "id": "file-256",
+      "type": "backend",
+      "label": "test_repl_tool_safety.py",
+      "sublabel": "tests",
+      "pos": [
+        65,
+        1820
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "22 symbols"
+    },
+    {
+      "id": "file-257",
+      "type": "backend",
+      "label": "test_repl_tools.py",
+      "sublabel": "tests",
+      "pos": [
+        495,
+        1820
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "43 symbols"
+    },
+    {
+      "id": "file-258",
+      "type": "backend",
+      "label": "test_review_findings.py",
+      "sublabel": "tests",
+      "pos": [
+        925,
+        1820
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "25 symbols"
+    },
+    {
+      "id": "file-259",
+      "type": "backend",
+      "label": "test_rubric.py",
+      "sublabel": "tests",
+      "pos": [
+        1355,
+        1820
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "23 symbols"
+    },
+    {
+      "id": "file-260",
+      "type": "backend",
+      "label": "test_runtime.py",
+      "sublabel": "tests",
+      "pos": [
+        65,
+        1950
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "32 symbols"
+    },
+    {
+      "id": "file-261",
+      "type": "backend",
+      "label": "test_sandbox.py",
+      "sublabel": "tests",
+      "pos": [
+        495,
+        1950
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "39 symbols"
+    },
+    {
+      "id": "file-262",
+      "type": "backend",
+      "label": "test_search.py",
+      "sublabel": "tests",
+      "pos": [
+        925,
+        1950
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "24 symbols"
+    },
+    {
+      "id": "file-263",
+      "type": "backend",
+      "label": "test_session.py",
+      "sublabel": "tests",
+      "pos": [
+        1355,
+        1950
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "22 symbols"
+    },
+    {
+      "id": "file-264",
+      "type": "backend",
+      "label": "test_settings_and_memory.py",
+      "sublabel": "tests",
+      "pos": [
+        65,
+        2080
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "72 symbols"
+    },
+    {
+      "id": "file-265",
+      "type": "backend",
+      "label": "test_shared_tooling.py",
+      "sublabel": "tests",
+      "pos": [
+        495,
+        2080
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "29 symbols"
+    },
+    {
+      "id": "file-266",
+      "type": "backend",
+      "label": "test_streaming.py",
+      "sublabel": "tests",
+      "pos": [
+        925,
+        2080
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "25 symbols"
+    },
+    {
+      "id": "file-267",
+      "type": "backend",
+      "label": "test_subagents.py",
+      "sublabel": "tests",
+      "pos": [
+        1355,
+        2080
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "43 symbols"
+    },
+    {
+      "id": "file-268",
+      "type": "backend",
+      "label": "test_tools.py",
+      "sublabel": "tests",
+      "pos": [
+        65,
+        2210
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "31 symbols"
+    },
+    {
+      "id": "file-269",
+      "type": "backend",
+      "label": "test_tracing.py",
+      "sublabel": "tests",
+      "pos": [
+        495,
+        2210
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "22 symbols"
+    },
+    {
+      "id": "file-270",
+      "type": "backend",
+      "label": "test_usable_routes.py",
+      "sublabel": "tests",
+      "pos": [
+        925,
+        2210
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "11 symbols"
+    },
+    {
+      "id": "file-271",
+      "type": "backend",
+      "label": "test_workspace.py",
+      "sublabel": "tests",
+      "pos": [
+        1355,
+        2210
+      ],
+      "size": [
+        380,
+        76
+      ],
+      "tag": "39 symbols"
+    },
+    {
+      "id": "layer-repl",
+      "type": "backend",
+      "label": "Conversation",
+      "sublabel": "harness/repl \u00b7 layer 8",
+      "pos": [
+        65,
+        110
+      ],
+      "size": [
+        750,
+        110
+      ]
+    },
+    {
+      "id": "layer-composition",
+      "type": "backend",
+      "label": "Composition root",
+      "sublabel": "cli \u00b7 runtime \u00b7 doctor \u00b7 config \u00b7 layer 7",
+      "pos": [
+        955,
+        110
+      ],
+      "size": [
+        750,
+        110
+      ]
+    },
+    {
+      "id": "layer-autonomy",
+      "type": "backend",
+      "label": "Autonomy",
+      "sublabel": "harness/autonomy \u00b7 layer 6",
+      "pos": [
+        1845,
+        110
+      ],
+      "size": [
+        750,
+        110
+      ]
+    },
+    {
+      "id": "layer-run",
+      "type": "backend",
+      "label": "Run services",
+      "sublabel": "harness/run \u00b7 layer 5",
+      "pos": [
+        2735,
+        110
+      ],
+      "size": [
+        750,
+        110
+      ]
+    },
+    {
+      "id": "layer-execution",
+      "type": "backend",
+      "label": "Execution",
+      "sublabel": "harness/execution \u00b7 layer 4",
+      "pos": [
+        3625,
+        110
+      ],
+      "size": [
+        750,
+        110
+      ]
+    },
+    {
+      "id": "layer-record",
+      "type": "backend",
+      "label": "Recording",
+      "sublabel": "harness/record \u00b7 layer 3",
+      "pos": [
+        4515,
+        110
+      ],
+      "size": [
+        750,
+        110
+      ]
+    },
+    {
+      "id": "layer-models",
+      "type": "backend",
+      "label": "Model adapters",
+      "sublabel": "harness/models \u00b7 layer 2",
+      "pos": [
+        5405,
+        110
+      ],
+      "size": [
+        750,
+        110
+      ]
+    },
+    {
+      "id": "layer-core",
+      "type": "backend",
+      "label": "Core contracts",
+      "sublabel": "harness/core \u00b7 layer 1",
+      "pos": [
+        6295,
+        110
+      ],
+      "size": [
+        750,
+        110
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": ".claude",
+      "wraps": [
+        "file-0"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "root \u00b7 packaging and entry",
+      "wraps": [
+        "file-1",
+        "file-2",
+        "file-4",
+        "file-7",
+        "file-8",
+        "file-9",
+        "file-10",
+        "file-11",
+        "file-12",
+        "file-123",
+        "file-192",
+        "file-193",
+        "file-194",
+        "file-195",
+        "file-272"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": ".github",
+      "wraps": [
+        "file-3"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": ".tours",
+      "wraps": [
+        "file-5",
+        "file-6"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "configs",
+      "wraps": [
+        "file-13",
+        "file-14",
+        "file-15",
+        "file-16",
+        "file-17",
+        "file-18",
+        "file-19",
+        "file-20",
+        "file-21",
+        "file-22",
+        "file-23",
+        "file-24"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "demo \u00b7 setup",
+      "wraps": [
+        "file-25",
+        "file-26",
+        "file-46"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "demo/inventory",
+      "wraps": [
+        "file-27",
+        "file-28",
+        "file-29",
+        "file-30",
+        "file-31",
+        "file-32",
+        "file-33"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "demo/loginpage",
+      "wraps": [
+        "file-34",
+        "file-35",
+        "file-36",
+        "file-37",
+        "file-38",
+        "file-39",
+        "file-40",
+        "file-41",
+        "file-42",
+        "file-43",
+        "file-44",
+        "file-45"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "demo/tasks",
+      "wraps": [
+        "file-47",
+        "file-48",
+        "file-49"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "demo/tictactoe",
+      "wraps": [
+        "file-50",
+        "file-51",
+        "file-52",
+        "file-53",
+        "file-54",
+        "file-55",
+        "file-56"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "docs \u00b7 guides and designs",
+      "wraps": [
+        "file-57",
+        "file-58",
+        "file-59",
+        "file-60",
+        "file-61",
+        "file-62",
+        "file-63",
+        "file-64",
+        "file-65",
+        "file-66",
+        "file-99",
+        "file-100",
+        "file-101",
+        "file-102",
+        "file-103",
+        "file-104",
+        "file-105"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "docs/atlas",
+      "wraps": [
+        "file-67",
+        "file-68",
+        "file-69",
+        "file-70",
+        "file-71",
+        "file-72",
+        "file-73",
+        "file-74",
+        "file-75",
+        "file-76",
+        "file-77",
+        "file-78",
+        "file-79",
+        "file-80",
+        "file-81",
+        "file-82",
+        "file-83",
+        "file-84",
+        "file-85",
+        "file-86",
+        "file-87",
+        "file-88",
+        "file-89",
+        "file-90",
+        "file-91",
+        "file-92",
+        "file-93",
+        "file-94",
+        "file-95",
+        "file-96",
+        "file-97",
+        "file-98"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "evals",
+      "wraps": [
+        "file-106"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "examples",
+      "wraps": [
+        "file-107"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "fixtures/buggy_counter",
+      "wraps": [
+        "file-108",
+        "file-109",
+        "file-110",
+        "file-111"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "fixtures/chat_seed",
+      "wraps": [
+        "file-112"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "fixtures/palimpsest",
+      "wraps": [
+        "file-113",
+        "file-114",
+        "file-115",
+        "file-116",
+        "file-117",
+        "file-118",
+        "file-119",
+        "file-120",
+        "file-121",
+        "file-122"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "harness \u00b7 composition",
+      "wraps": [
+        "file-124",
+        "file-125",
+        "file-133",
+        "file-134",
+        "file-140",
+        "file-190",
+        "file-191"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "harness/autonomy",
+      "wraps": [
+        "file-126",
+        "file-127",
+        "file-128",
+        "file-129",
+        "file-130",
+        "file-131",
+        "file-132"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "harness/core",
+      "wraps": [
+        "file-135",
+        "file-136",
+        "file-137",
+        "file-138",
+        "file-139"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "harness/execution",
+      "wraps": [
+        "file-141",
+        "file-142",
+        "file-143",
+        "file-144",
+        "file-145",
+        "file-146",
+        "file-147",
+        "file-148",
+        "file-149",
+        "file-150"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "harness/mcp_demo",
+      "wraps": [
+        "file-151",
+        "file-152"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "harness/models",
+      "wraps": [
+        "file-153",
+        "file-154",
+        "file-155",
+        "file-156",
+        "file-157",
+        "file-158",
+        "file-159"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "harness/record",
+      "wraps": [
+        "file-160",
+        "file-161",
+        "file-162",
+        "file-163",
+        "file-164",
+        "file-165",
+        "file-166",
+        "file-167"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "harness/repl",
+      "wraps": [
+        "file-168",
+        "file-169",
+        "file-170",
+        "file-171",
+        "file-172",
+        "file-173",
+        "file-174",
+        "file-175",
+        "file-176",
+        "file-177",
+        "file-178",
+        "file-179",
+        "file-180",
+        "file-181"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "harness/run",
+      "wraps": [
+        "file-182",
+        "file-183",
+        "file-184",
+        "file-185",
+        "file-186",
+        "file-187",
+        "file-188",
+        "file-189"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "scenarios",
+      "wraps": [
+        "file-196",
+        "file-197",
+        "file-198",
+        "file-199"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "scripts",
+      "wraps": [
+        "file-200"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "skills",
+      "wraps": [
+        "file-201",
+        "file-202",
+        "file-203",
+        "file-204",
+        "file-205",
+        "file-206"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "tasks",
+      "wraps": [
+        "file-207",
+        "file-208",
+        "file-209",
+        "file-210",
+        "file-211"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "tests",
+      "wraps": [
+        "file-212",
+        "file-213",
+        "file-214",
+        "file-215",
+        "file-216",
+        "file-217",
+        "file-218",
+        "file-219",
+        "file-220",
+        "file-221",
+        "file-222",
+        "file-223",
+        "file-224",
+        "file-225",
+        "file-226",
+        "file-227",
+        "file-228",
+        "file-229",
+        "file-230",
+        "file-231",
+        "file-232",
+        "file-233",
+        "file-234",
+        "file-235",
+        "file-236",
+        "file-237",
+        "file-238",
+        "file-239",
+        "file-240",
+        "file-241",
+        "file-242",
+        "file-243",
+        "file-244",
+        "file-245",
+        "file-246",
+        "file-247",
+        "file-248",
+        "file-249",
+        "file-250",
+        "file-251",
+        "file-252",
+        "file-253",
+        "file-254",
+        "file-255",
+        "file-256",
+        "file-257",
+        "file-258",
+        "file-259",
+        "file-260",
+        "file-261",
+        "file-262",
+        "file-263",
+        "file-264",
+        "file-265",
+        "file-266",
+        "file-267",
+        "file-268",
+        "file-269",
+        "file-270",
+        "file-271"
+      ],
+      "pad": 26
+    },
+    {
+      "kind": "region",
+      "label": "Enforced import layers \u00b7 downward imports may skip layers; these arrows are permissions, not runtime calls",
+      "wraps": [
+        "layer-repl",
+        "layer-composition",
+        "layer-autonomy",
+        "layer-run",
+        "layer-execution",
+        "layer-record",
+        "layer-models",
+        "layer-core"
+      ],
+      "pad": 26
+    }
+  ],
+  "connections": [
+    {
+      "id": "layer-rule-0",
+      "from": "layer-repl",
+      "to": "layer-composition",
+      "label": "may import"
+    },
+    {
+      "id": "layer-rule-1",
+      "from": "layer-composition",
+      "to": "layer-autonomy",
+      "label": "may import"
+    },
+    {
+      "id": "layer-rule-2",
+      "from": "layer-autonomy",
+      "to": "layer-run",
+      "label": "may import"
+    },
+    {
+      "id": "layer-rule-3",
+      "from": "layer-run",
+      "to": "layer-execution",
+      "label": "may import"
+    },
+    {
+      "id": "layer-rule-4",
+      "from": "layer-execution",
+      "to": "layer-record",
+      "label": "may import"
+    },
+    {
+      "id": "layer-rule-5",
+      "from": "layer-record",
+      "to": "layer-models",
+      "label": "may import"
+    },
+    {
+      "id": "layer-rule-6",
+      "from": "layer-models",
+      "to": "layer-core",
+      "label": "may import"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Complete working-tree coverage",
+      "items": [
+        "273 files across 31 ownership groups. Search a filename, then zoom to inspect.",
+        "Every Python class, function and method plus syntax-level imports is indexed in inventory.json."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "How to read this map",
+      "items": [
+        "Regions show repository ownership; placement does not imply a runtime call order.",
+        "The separate system diagram shows control flow; inventory.html exposes file-level import evidence."
+      ]
+    }
+  ]
+}

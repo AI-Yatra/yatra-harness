@@ -1,0 +1,229 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Yatra Harness \u00b7 System architecture",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1380,
+      820
+    ]
+  },
+  "components": [
+    {
+      "id": "intake",
+      "type": "frontend",
+      "label": "Operator interfaces",
+      "sublabel": "ay.py \u00b7 CLI \u00b7 settings \u00b7 config",
+      "pos": [
+        60,
+        340
+      ],
+      "size": [
+        290,
+        76
+      ]
+    },
+    {
+      "id": "batch",
+      "type": "backend",
+      "label": "Verified batch loop",
+      "sublabel": "runtime \u00b7 context \u00b7 goals \u00b7 evals",
+      "pos": [
+        550,
+        340
+      ],
+      "size": [
+        290,
+        76
+      ]
+    },
+    {
+      "id": "models",
+      "type": "external",
+      "label": "Model access",
+      "sublabel": "routing \u00b7 auth \u00b7 providers \u00b7 SSE",
+      "pos": [
+        1040,
+        340
+      ],
+      "size": [
+        290,
+        76
+      ]
+    },
+    {
+      "id": "repl",
+      "type": "frontend",
+      "label": "Conversation loop",
+      "sublabel": "shell \u00b7 agent \u00b7 prompt \u00b7 rendering",
+      "pos": [
+        60,
+        610
+      ],
+      "size": [
+        290,
+        76
+      ]
+    },
+    {
+      "id": "gate",
+      "type": "security",
+      "label": "Controlled execution",
+      "sublabel": "policy \u00b7 schemas \u00b7 tools \u00b7 workspace",
+      "pos": [
+        550,
+        610
+      ],
+      "size": [
+        290,
+        76
+      ]
+    },
+    {
+      "id": "world",
+      "type": "external",
+      "label": "Execution targets",
+      "sublabel": "files \u00b7 Git \u00b7 processes \u00b7 MCP \u00b7 web",
+      "pos": [
+        1040,
+        610
+      ],
+      "size": [
+        290,
+        76
+      ]
+    },
+    {
+      "id": "support",
+      "type": "backend",
+      "label": "Repository support",
+      "sublabel": "contracts \u00b7 tests \u00b7 demos \u00b7 CI \u00b7 Atlas",
+      "pos": [
+        60,
+        70
+      ],
+      "size": [
+        290,
+        76
+      ]
+    },
+    {
+      "id": "verify",
+      "type": "security",
+      "label": "Independent verifier",
+      "sublabel": "acceptance \u00b7 diff \u00b7 protected paths",
+      "pos": [
+        550,
+        70
+      ],
+      "size": [
+        290,
+        76
+      ]
+    },
+    {
+      "id": "record",
+      "type": "database",
+      "label": "Durable evidence",
+      "sublabel": "events \u00b7 state \u00b7 artifacts \u00b7 replay",
+      "pos": [
+        1040,
+        70
+      ],
+      "size": [
+        290,
+        76
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "intake-batch",
+      "from": "intake",
+      "to": "batch",
+      "label": "task contract"
+    },
+    {
+      "id": "batch-models",
+      "from": "batch",
+      "to": "models",
+      "label": "bounded request"
+    },
+    {
+      "id": "intake-repl",
+      "from": "intake",
+      "to": "repl",
+      "label": "message",
+      "labelAt": [
+        205,
+        510
+      ]
+    },
+    {
+      "id": "batch-gate",
+      "from": "batch",
+      "to": "gate",
+      "label": "action proposal",
+      "labelAt": [
+        695,
+        510
+      ]
+    },
+    {
+      "id": "repl-gate",
+      "from": "repl",
+      "to": "gate",
+      "label": "approved tool call"
+    },
+    {
+      "id": "gate-world",
+      "from": "gate",
+      "to": "world",
+      "label": "dispatch"
+    },
+    {
+      "id": "batch-verify",
+      "from": "batch",
+      "to": "verify",
+      "label": "finish claim",
+      "labelAt": [
+        695,
+        245
+      ]
+    },
+    {
+      "id": "verify-record",
+      "from": "verify",
+      "to": "record",
+      "label": "verdict + evidence"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Two completion rules",
+      "items": [
+        "Batch: verifier decides success; failed checks return to the loop.",
+        "REPL: edits the current directory; ends when tool requests stop."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Shared foundations",
+      "items": [
+        "Both loops use providers, credentials, contracts and execution primitives.",
+        "Local / Docker / OS sandbox options; authority is enforced by the harness."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Supporting systems",
+      "items": [
+        "Goals, backlog, rubric, delivery and evals orchestrate batch work.",
+        "Atlas reads code and traces; tests, fixtures and CI verify the repository."
+      ]
+    }
+  ]
+}

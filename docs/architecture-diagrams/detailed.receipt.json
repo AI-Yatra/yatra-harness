@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/Users/moinuddin/Documents/AIYatra/Harness-Engineering-2/yatra-harness/docs/architecture-diagrams/detailed.json",
+  "output": "/Users/moinuddin/Documents/AIYatra/Harness-Engineering-2/yatra-harness/docs/architecture-diagrams/detailed.html",
+  "specification": {
+    "sha256": "dcbb84b018593800623abc7b266ce52e482c8da7174b28168c6568ff12ba0d6b",
+    "bytes": 82590
+  },
+  "artifact": {
+    "sha256": "9f5e1821711fbc1b394f03a870b9f400c9c0e78f8d6fdc91e5a3ee7aa06235d6",
+    "bytes": 1079682
+  },
+  "validation": {
+    "checksPassed": 9,
+    "checkCount": 9,
+    "compositionProfile": "standard",
+    "compositionStatus": "pass",
+    "errors": 0,
+    "warnings": 1
+  }
+}

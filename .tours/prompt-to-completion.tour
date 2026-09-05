@@ -1,0 +1,91 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "Prompt to Completion — The Interactive Turn Lifecycle",
+  "description": "A step-by-step walkthrough of how a user prompt travels through the 'ay' agent harness: from terminal input, through the drive loop and model provider, tool execution and policy gates, all the way to final rendering and turn completion.",
+  "steps": [
+    {
+      "title": "1. CLI Intake & Argument Setup",
+      "file": "ay.py",
+      "line": 43,
+      "description": "### 1. CLI Intake\n\nExecution starts here when an operator runs `ay` in their terminal.\n\n- The CLI configures UTF-8 encoding streams so arbitrary Unicode does not crash the session.\n- It calls `main_with_argv()`, builds the argument parser, resolves the working directory, and initializes session `Options`.\n\n**Example:**\n```bash\n$ ay \"Add a reset() method to Counter and test it\"\n# or simply\n$ ay\n```\nExecution flows directly into `Shell(options).run()`."
+    },
+    {
+      "title": "2. Input Reader — Reading the Operator's Prompt",
+      "file": "harness/repl/reading.py",
+      "line": 114,
+      "description": "### 2. Capturing the Operator's Prompt\n\nWhen `ay` runs interactively, `read_message()` reads lines from standard input using a background worker thread (`LineReader`).\n\n- It groups lines that arrive within 50 milliseconds so multi-line pasted prompts arrive as **one single message**, rather than triggering a separate turn for every line.\n- It handles bracketed paste markers and trailing `\\` line continuations.\n\n**Example:**\nOperator types at the `> ` prompt:\n```text\n> Why does the test fail in tests/test_counter.py? Fix it.\n```\nThis string is passed cleanly to the interactive shell."
+    },
+    {
+      "title": "3. The Shell Interactive Loop (`while True`)",
+      "file": "harness/repl/shell.py",
+      "line": 1073,
+      "description": "### 3. The Outer Shell Loop\n\n`Shell.run()` controls the REPL session lifecycle:\n\n```python\nwhile True:\n    line = self._read()\n    ...\n    if line.startswith(\"!\"):  # Shell escape (!git status)\n    if line.startswith(\"/\"):  # Slash command (/model, /help)\n    self._run_turn(self._expand(line)) # Agent prompt\n```\n\n**Example:**\nIf the operator types `@counter.py fix the bug`, `self._expand()` automatically reads `counter.py` and inlines its contents into the prompt before passing it to `_run_turn`."
+    },
+    {
+      "title": "4. Turn Runner & Interruption Guard",
+      "file": "harness/repl/shell.py",
+      "line": 938,
+      "description": "### 4. Running the Turn (`_run_turn`)\n\n`_run_turn()` executes one conversational prompt:\n\n- It wraps execution inside `self._interruptible()`. The first `Ctrl+C` politely asks the agent to stop after the current step; a second `Ctrl+C` immediately halts it.\n- It starts a wall-clock timer and hands the message to the agent:\n  ```python\n  stats = self.agent.send(message)\n  ```\n\n**Example:**\nPrevents corrupted files or half-written edits if an operator cancels a running command."
+    },
+    {
+      "title": "5. Ingesting Prompt into Conversation History",
+      "file": "harness/repl/agent.py",
+      "line": 129,
+      "description": "### 5. Ingesting Prompt into Context (`Agent.send`)\n\nInside `Agent.send(message)`:\n\n1. Clears any previous cancel signal: `self._cancel.clear()`\n2. Appends the user prompt to the persistent conversation history: `self.conversation.add_user(message)`\n3. Triggers the core autonomous driving loop: `return self._drive()`\n\n**Example:**\nThe conversation context now contains:\n```json\n{\"role\": \"user\", \"content\": \"Why does the test fail in tests/test_counter.py? Fix it.\"}\n```"
+    },
+    {
+      "title": "6. The Agent Drive Loop (`while True` in `_drive`)",
+      "file": "harness/repl/agent.py",
+      "line": 141,
+      "description": "### 6. The Autonomous Drive Loop (`while True`)\n\nThis `while True:` loop is the central engine of the agent harness.\n\nIn each iteration (Step):\n1. Checks cancellation (`self._check_cancelled()`)\n2. Checks safety bounds (`max_steps`, `max_tool_calls`, `max_consecutive_errors`)\n3. Auto-compacts old conversation history if token limits are approached (`self._compact_if_needed()`)\n4. Calls model inference: `turn = self._infer()`\n\n**Example:**\nStep 1 begins. Budgets: `steps = 0`, `tool_calls = 0`, `consecutive_errors = 0`."
+    },
+    {
+      "title": "7. Preparing Model Inference (`_infer`)",
+      "file": "harness/repl/agent.py",
+      "line": 190,
+      "description": "### 7. Preparing the Inference Call\n\nInside `_infer()`:\n\n- Gathers allowed tool specifications (`specs`): `read_file`, `edit_file`, `run_command`, `grep`, `glob`, etc.\n- Activates the thinking spinner (`self.events.on_thinking(True)`)\n- Calls the provider adapter:\n  ```python\n  turn = self.model.converse(\n      self.conversation.wire_messages(),\n      specs,\n      on_delta=self.events.on_delta if streaming else None,\n  )\n  ```\n\n**Example:**\nPackages the entire prompt history and the schemas for available tools so the model knows what capabilities it can invoke."
+    },
+    {
+      "title": "8. Wire Transport to Model Provider",
+      "file": "harness/repl/model.py",
+      "line": 69,
+      "description": "### 8. Talking to the Model Provider\n\n`ChatModel.converse()` manages the network transport:\n\n- Formats the messages and tool schemas into the provider-specific wire format (Anthropic or OpenAI-compatible format).\n- Handles retries and exponential backoff on transient errors (e.g. HTTP 503 or rate limits).\n- Sends the HTTP request via `self.provider.send()`. If streaming is enabled, text deltas are streamed live to the terminal.\n\n**Example:**\nAn HTTP POST request is sent to the configured endpoint (e.g. Anthropic, Gemini, OpenAI, or a local Ollama/vLLM instance)."
+    },
+    {
+      "title": "9. Normalizing the Response (`AssistantTurn`)",
+      "file": "harness/repl/model.py",
+      "line": 151,
+      "description": "### 9. Normalizing the Response (`_read_openai`)\n\nThe raw JSON payload from the model is normalized into an `AssistantTurn` object:\n\n- `text`: Written reasoning or response prose.\n- `tool_calls`: Tuple of proposed tool actions (e.g., tool name and parsed JSON parameters).\n- `usage`: Input and output token counts.\n- `stop_reason`: Model finish reason.\n\n**Example:**\n```python\nAssistantTurn(\n    text=\"I will run pytest to see why test_counter.py is failing.\",\n    tool_calls=(ToolCall(name=\"run_command\", arguments={\"command\": \"pytest\"}),),\n    usage={\"prompt_tokens\": 850, \"completion_tokens\": 45}\n)\n```"
+    },
+    {
+      "title": "10. Ingesting Reply & Evaluating Stop Condition",
+      "file": "harness/repl/agent.py",
+      "line": 159,
+      "description": "### 10. Checking Stop Condition\n\nBack in `_drive()`:\n\n1. Appends the model's reply to history: `self.conversation.add_assistant(turn)`\n2. Accounts for token costs: `_account(stats, turn)`\n3. **Evaluates completion condition:**\n   ```python\n   if not turn.wants_tools:\n       return stats  # The goal is achieved! Exit loop.\n   ```\n\n**Example:**\n- If the model asked for tools (`wants_tools == True`), execution continues to Step 11.\n- If the model provided an answer without requesting further tools (`wants_tools == False`), the turn is finished!"
+    },
+    {
+      "title": "11. Policy Gate & Tool Execution (`_run_tool`)",
+      "file": "harness/repl/agent.py",
+      "line": 215,
+      "description": "### 11. Policy Gate & Tool Execution\n\nFor each tool requested in `turn.tool_calls`:\n\n1. **Policy Gate Check:** `decision = self.gate.check(spec, call.arguments)`\n   - Checks risk class and approval mode (`suggest`, `auto-edit`, `plan`, `full-auto`). Prompts the operator for approval if required.\n2. **Tool Execution:** `outcome = self.toolset.dispatch(call.name, call.arguments)`\n3. **Record Observation:** `self._record(...)` appends the tool's stdout / error back into the conversation context as a `tool` role message.\n\n**Example:**\n`run_command(command=\"pytest\")` executes in the workspace. Result `FAILED tests/test_counter.py::test_increment` is appended to the context."
+    },
+    {
+      "title": "12. The Feedback Loop — Iterating Until Complete",
+      "file": "harness/repl/agent.py",
+      "line": 178,
+      "description": "### 12. Closing the Feedback Loop\n\nNow that the tool observation has been recorded into `self.conversation`, the `while True:` loop restarts at step 141:\n\n- **Step 2:** Model sees the test failure output, proposes `edit_file(path=\"counter.py\", ...)`. Tool executes the edit.\n- **Step 3:** Model sees the edit succeeded, proposes `run_command(command=\"pytest\")`. Tests pass!\n- **Step 4:** Model sees passing tests. It responds with text: *\"I fixed the off-by-one error in counter.py. All tests pass!\"* and asks for **no tools** (`wants_tools = False`).\n- The loop exits and returns `stats`."
+    },
+    {
+      "title": "13. Rendering Output to the Terminal",
+      "file": "harness/repl/render.py",
+      "line": 357,
+      "description": "### 13. Output Presentation (`Renderer`)\n\nThe final text and progress updates are rendered cleanly to the operator's terminal by `Renderer`:\n\n- Handles styled headings, bullet points, numbered lists, and fenced code blocks without reflowing or breaking code lines.\n- Renders tool execution badges (`⏺ run_command pytest` -> `⎿ done (0.4s)`).\n\n**Example:**\nThe operator sees formatted markdown prose and status badges right in their terminal."
+    },
+    {
+      "title": "14. Turn Completion, Summary & Persistence",
+      "file": "harness/repl/shell.py",
+      "line": 962,
+      "description": "### 14. Turn Summary & Persistence\n\n`_run_turn()` concludes the turn:\n\n1. Prints the summary badge showing resource usage:\n   ```text\n   3 tool calls • 4s • 2,410 tokens\n   ```\n2. Checkpoints session state to disk: `self._persist()` writes conversation history to `.ay/<session_id>.json` so the session can be resumed anytime.\n3. The interactive loop returns to `line = self._read()` at line 1074, printing the `> ` prompt ready for the operator's next instruction!\n\n**Example Cycle Complete:**\n`User Prompt` -> `Context` -> `Inference` -> `Tools` -> `Feedback Loop` -> `Goal Done` -> `Saved`."
+    }
+  ]
+}
