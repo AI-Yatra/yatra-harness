@@ -58,7 +58,6 @@ def winning_lines() -> list[tuple[int, int, int]]:
     for column in range(3):
         lines.append((column, column + 3, column + 6))
     lines.append((0, 4, 8))
-    lines.append((2, 4, 6))
     return lines
 
 
@@ -73,28 +72,3 @@ def winner(board: list[str]) -> str | None:
 def is_draw(board: list[str]) -> bool:
     """True when the board is full and nobody has won."""
     return is_full(board) and winner(board) is None
-
-
-def best_move(board: list[str], player: str) -> int:
-    """Return the best cell to play for `player`."""
-    if player not in PLAYERS:
-        raise ValueError(f"unknown player: {player!r}")
-    if is_full(board):
-        raise ValueError("board is full")
-    
-    opponent = "O" if player == "X" else "X"
-    
-    # 1. If a cell wins the game for player, take it
-    for cell in empty_cells(board):
-        test_board = place(board, cell, player)
-        if winner(test_board) == player:
-            return cell
-    
-    # 2. Otherwise, if a cell would win the game for the opponent, take it
-    for cell in empty_cells(board):
-        test_board = place(board, cell, opponent)
-        if winner(test_board) == opponent:
-            return cell
-    
-    # 3. Otherwise, take the first free cell in board order
-    return empty_cells(board)[0]
